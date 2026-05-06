@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Kundi Typed V2 Monitoring Loop Every Hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=kundi-typed-v2-monitor.service
+
+[Install]
+WantedBy=timers.target
+

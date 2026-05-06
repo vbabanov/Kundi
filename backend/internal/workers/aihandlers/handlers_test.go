@@ -1,0 +1,52 @@
+package aihandlers
+
+import (
+	"context"
+	"testing"
+
+	assistantmodule "github.com/kundi/kundi/backend/internal/modules/assistant"
+	"github.com/kundi/kundi/backend/internal/modules/jobs"
+)
+
+type fakeAssistant struct {
+	called bool
+}
+
+func (f *fakeAssistant) Message(_ context.Context, _ assistantmodule.MessageCommand) (assistantmodule.Response, error) {
+	f.called = true
+	return assistantmodule.Response{Text: "ok"}, nil
+}
+
+type fakeAudit struct {
+	called bool
+}
+
+func (f *fakeAudit) Log(_ context.Context, _ string, _ string, _ string, _ string, _ map[string]any) error {
+	f.called = true
+	return nil
+}
+
+func TestAIPostProcessingHandler(t *testing.T) {
+	assistant := &fakeAssistant{}
+	audit := &fakeAudit{}
+	worker := NewWorker(assistant, audit)
+
+	err := worker.AIPostProcessing(context.Background(), jobs.Job{
+		ID: "ai-job-1",
+		Payload: map[string]any{
+			"student_id":  "8d8d8ec8-27e6-4623-a325-c2e7e9db2da2",
+			"text":        "Explain fractions",
+			"mode":        "tutor",
+			"grade_level": 6,
+		},
+	})
+	if err != nil {
+		t.Fatalf("handler failed: %v", err)
+	}
+	if !assistant.called {
+		t.Fatalf("assistant service should be called")
+	}
+	if !audit.called {
+		t.Fatalf("audit service should be called")
+	}
+}

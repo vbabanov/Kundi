@@ -1,0 +1,140 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kundi-migrator
+  namespace: kundi-staging
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrator
+          image: ghcr.io/kundi/backend-migrator:latest
+          envFrom:
+            - configMapRef:
+                name: kundi-backend-config
+            - secretRef:
+                name: kundi-backend-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kundi-backend-api
+  namespace: kundi-staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kundi-backend-api
+  template:
+    metadata:
+      labels:
+        app: kundi-backend-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/kundi/backend-api:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: kundi-backend-config
+            - secretRef:
+                name: kundi-backend-secrets
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kundi-backend-api
+  namespace: kundi-staging
+spec:
+  selector:
+    app: kundi-backend-api
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kundi-worker-jobs
+  namespace: kundi-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kundi-worker-jobs
+  template:
+    metadata:
+      labels:
+        app: kundi-worker-jobs
+    spec:
+      containers:
+        - name: worker-jobs
+          image: ghcr.io/kundi/backend-worker-jobs:latest
+          envFrom:
+            - configMapRef:
+                name: kundi-backend-config
+            - secretRef:
+                name: kundi-backend-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kundi-worker-ai
+  namespace: kundi-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kundi-worker-ai
+  template:
+    metadata:
+      labels:
+        app: kundi-worker-ai
+    spec:
+      containers:
+        - name: worker-ai
+          image: ghcr.io/kundi/backend-worker-ai:latest
+          envFrom:
+            - configMapRef:
+                name: kundi-backend-config
+            - secretRef:
+                name: kundi-backend-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kundi-worker-whatsapp
+  namespace: kundi-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kundi-worker-whatsapp
+  template:
+    metadata:
+      labels:
+        app: kundi-worker-whatsapp
+    spec:
+      containers:
+        - name: worker-whatsapp
+          image: ghcr.io/kundi/backend-worker-whatsapp:latest
+          envFrom:
+            - configMapRef:
+                name: kundi-backend-config
+            - secretRef:
+                name: kundi-backend-secrets

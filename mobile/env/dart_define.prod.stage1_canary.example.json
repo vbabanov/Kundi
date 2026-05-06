@@ -1,0 +1,11 @@
+{
+  "API_BASE_URL": "https://api.kundi.lucartmax.kz",
+  "ENABLE_DEBUG_SURFACES": "false",
+  "USE_TYPED_V2_READ": "true",
+  "ENABLE_V2_PARITY_SHADOW": "true",
+  "TYPED_V2_COHORT_PERCENT": "0",
+  "TYPED_V2_COHORT_ALLOWLIST": "<student_id_1,student_id_2>",
+  "TYPED_V2_COHORT_DENYLIST": "",
+  "FORCE_TYPED_V2_READ": "false",
+  "FORCE_LEGACY_V1_READ": "false"
+}

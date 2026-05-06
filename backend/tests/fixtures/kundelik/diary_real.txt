@@ -1,0 +1,2752 @@
+https://kundelik.kz/api/v2/marks/diary?personId=1000016003118&schoolId=1000001828996&startDate=1772496000&finishDate=1773878400&timestamp=1773237018293
+{
+    "days": [
+        {
+            "date": "1772496000",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 5,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304118",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1772528400",
+                    "endTime": "1772531100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Нәтиже сабақ. Мен не үйрендім",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460820664134242320",
+                        "text": "62-бет, 9-тапсырма ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448304118",
+                        "author": null,
+                        "text": null,
+                        "date": "1772530602",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304118",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304118"
+                },
+                {
+                    "id": "2442186583448303933",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1772531400",
+                    "endTime": "1772534100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Программирование составных условий",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396786890539637",
+                        "name": "Информатика",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460076616884794274",
+                        "text": "Стр.163.Задания № 4.",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": false,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448303933",
+                        "author": null,
+                        "text": null,
+                        "date": "1772532377",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000014419460@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303933",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303933"
+                },
+                {
+                    "id": "2442186583448304227",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1772534400",
+                    "endTime": "1772537100",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Художественные особенности сказки М.Е.Салтыкова-Щедрина. СОР№2",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268619687932271401",
+                        "name": "Русская литература",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460940656930583299",
+                        "text": "выполнить задания в рабочем листе",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448304227",
+                        "author": null,
+                        "text": null,
+                        "date": "1772535144",
+                        "lessonLogEntryValue": "б",
+                        "fullName": "Болеет"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304227",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304227"
+                },
+                {
+                    "id": "2442186583448304041",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1772538000",
+                    "endTime": "1772540700",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Разработка игровых комбинаций",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268614370762758941",
+                        "name": "Физическая культура",
+                        "knowledgeArea": "PhysicalCulture"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462732671905279441",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001796093@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304041",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304041"
+                },
+                {
+                    "id": "2442186583448304197",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1772541000",
+                    "endTime": "1772543700",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Как британцы XIX века и современные индусы  рассказывают о событиях  1857-1859 гг. в Индии? ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617832506399523",
+                        "name": "Всемирная история",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460143790173322353",
+                        "text": "пересказ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304197",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304197"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1772582400",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 5,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448303953",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1772614800",
+                    "endTime": "1772617500",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Нервная регуляция работы внутренних органов\t",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396808365376122",
+                        "name": "Биология",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2461331176831964930",
+                        "text": "Интервью с внутренним органом, задание указано в презентации",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448303953",
+                        "author": null,
+                        "text": null,
+                        "date": "1772781881",
+                        "lessonLogEntryValue": "б",
+                        "fullName": "Болеет"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000011675291@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303953",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303953"
+                },
+                {
+                    "id": "2442186583448303923",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1772617800",
+                    "endTime": "1772620500",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Перпендикулярные прямые. Перпендикуляр, наклонная и ее проекция",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396774005637746",
+                        "name": "Геометрия",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460449729283727967",
+                        "text": "1 теоремы",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448303923",
+                        "author": null,
+                        "text": null,
+                        "date": "1772618525",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303923",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303923"
+                },
+                {
+                    "id": "2442186583448303913",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1772620800",
+                    "endTime": "1772623500",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Математическая модель задачи",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462303862370437265",
+                        "text": "Уравнение задание ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448303913",
+                        "author": null,
+                        "text": null,
+                        "date": "1772625098",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303913",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303913"
+                },
+                {
+                    "id": "2442186583448304128",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1772624400",
+                    "endTime": "1772627100",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Наурыз – Ұлыстың ұлы күні",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462670940340317085",
+                        "text": "64-бет, 6-тапсырма",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448304128",
+                        "author": null,
+                        "text": null,
+                        "date": "1772629582",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304128",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304128"
+                },
+                {
+                    "id": "2442186583448304031",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1772627400",
+                    "endTime": "1772630100",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Азбука здорового питания. СОР № 6",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268612485272115992",
+                        "name": "Русский язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462345875740538705",
+                        "text": "упр398",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448304031",
+                        "author": null,
+                        "text": null,
+                        "date": "1772629373",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726592@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304031",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304031"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1772668800",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 7,
+                "completedLessonsWithHomeworksCount": 1
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304059",
+                    "groupId": "2370210495004756744",
+                    "number": 0,
+                    "place": null,
+                    "startTime": "1772697600",
+                    "endTime": "1772700300",
+                    "hours": {
+                        "startHour": "13",
+                        "startMinute": "00",
+                        "endHour": "13",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Narrating an experience 7D, p.82 SAT for the Unit 7",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268616458116864799",
+                        "name": "Иностранный язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462345764071388967",
+                        "text": "do ex from WB p 92 - 95",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000009142840@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304059",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304059"
+                },
+                {
+                    "id": "2442186583448304001",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1772701200",
+                    "endTime": "1772703900",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Расчет относительной молекулярной массы соединения по формуле",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396825545245310",
+                        "name": "Химия",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2461146660741925745",
+                        "text": "§19 упр 6",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001728199@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304001",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304001"
+                },
+                {
+                    "id": "2442186583448304206",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1772704200",
+                    "endTime": "1772706900",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Современная техника и оборудование в сельскохозяйственном производстве.",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268618064434633508",
+                        "name": "Художественный труд",
+                        "knowledgeArea": "TechnologyAndArt"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460899240560941877",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000004571617@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304206",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304206"
+                },
+                {
+                    "id": "2442186583448303972",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1772707200",
+                    "endTime": "1772709900",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Межнациональное и межконфессиональное согласие",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396816955310716",
+                        "name": "География",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2460834901950832645",
+                        "text": "Пр 50-51 стр 236-243",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726526@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303972",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303972"
+                },
+                {
+                    "id": "2442186583448303982",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1772710800",
+                    "endTime": "1772713500",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Практическая работа №6 Решение качественных и вычислительных задач, определение значения работы по графику, сравнение работ силы тяжести и силы трения , оценка мощности различных видов транспорта ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396821250278013",
+                        "name": "Физика",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462723622409184132",
+                        "text": "Повторить самое важное в главе",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [
+                        {
+                            "workId": "2442258399596508745",
+                            "workName": "Формативная отметка",
+                            "marks": [
+                                {
+                                    "id": "2463707174214931572",
+                                    "value": "8",
+                                    "mood": "Good",
+                                    "createdDate": "2026-03-06T04:42:07.126826"
+                                }
+                            ],
+                            "workUrl": "https://schools.kundelik.kz/v2/works?school=1000001828996&work=2442258399596508745"
+                        }
+                    ],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726362@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303982",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303982"
+                },
+                {
+                    "id": "2442186583448304137",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1772713800",
+                    "endTime": "1772716500",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Наурыз – Ұлыстың ұлы күні",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463440267767274389",
+                        "text": "67-бет, 6-тапсырма",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304137",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304137"
+                },
+                {
+                    "id": "2442186583448304236",
+                    "groupId": "2370210495004756744",
+                    "number": 6,
+                    "place": null,
+                    "startTime": "1772717100",
+                    "endTime": "1772719800",
+                    "hours": {
+                        "startHour": "18",
+                        "startMinute": "25",
+                        "endHour": "19",
+                        "endMinute": "10"
+                    },
+                    "isCanceled": false,
+                    "theme": "Грустный смех  в  рассказе М.Зощенко «Обезьяний язык»",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268619687932271401",
+                        "name": "Русская литература",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462717815613398247",
+                        "text": "стр167-168 пересказ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726592@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304236",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304236"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1772755200",
+            "utcOffset": 300,
+            "hasImportantWork": true,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 5,
+                "completedLessonsWithHomeworksCount": 1
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304011",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1772787600",
+                    "endTime": "1772790300",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Расчет относительной молекулярной массы соединения по формуле",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396825545245310",
+                        "name": "Химия",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463730165174886886",
+                        "text": "§19 выучить определения",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448304011",
+                        "author": null,
+                        "text": null,
+                        "date": "1773115334",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001728199@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304011",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304011"
+                },
+                {
+                    "id": "2442186583448303902",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1772790600",
+                    "endTime": "1772793300",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Решение текстовых задач с помощью уравнений",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462303991219456171",
+                        "text": "Уравнение  задание",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": {
+                        "lessonId": "2442186583448303902",
+                        "author": null,
+                        "text": null,
+                        "date": "1772782670",
+                        "lessonLogEntryValue": "н",
+                        "fullName": "Неявка"
+                    },
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303902",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303902"
+                },
+                {
+                    "id": "2442186583448304078",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1772793600",
+                    "endTime": "1772796300",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Great disasters p. 83",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268616458116864799",
+                        "name": "Иностранный язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465235224794617578",
+                        "text": "do ex 7 module 7 f ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000009142840@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304078",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304078"
+                },
+                {
+                    "id": "2442186583448304186",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1772797200",
+                    "endTime": "1772799900",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": " Казахское общество во второй половине 19 века СОР №7",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617716542282530",
+                        "name": "История Казахстана",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2451961057135655081",
+                        "text": "пересказ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304186",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304186"
+                },
+                {
+                    "id": "2442186583448303962",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1772800200",
+                    "endTime": "1772802900",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Нервная регуляция работы внутренних органов\t",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396808365376122",
+                        "name": "Биология",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [
+                        "Контрольная"
+                    ],
+                    "homework": {
+                        "id": "2463043314004871521",
+                        "text": "стр 183, таблицу заполнить ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000011675291@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303962",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303962"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773100800",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 5,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304117",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773133200",
+                    "endTime": "1773135900",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Наурыз көже ішеміз",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463745021466766793",
+                        "text": "70-бет, 13-тапсырма ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304117",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304117"
+                },
+                {
+                    "id": "2442186583448303932",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773136200",
+                    "endTime": "1773138900",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Организуем выбор. СОР №4",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396786890539637",
+                        "name": "Информатика",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462725718353225196",
+                        "text": "Стр.166. Уровень С, задания 3.",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000014419460@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303932",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303932"
+                },
+                {
+                    "id": "2442186583448304226",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773139200",
+                    "endTime": "1773141900",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Юмор в рассказе М. Зощенко «Не надо врать».",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268619687932271401",
+                        "name": "Русская литература",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463481516633195791",
+                        "text": "Прочитать рассказ Зощенко \" Не надо врать\"",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304226",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304226"
+                },
+                {
+                    "id": "2442186583448304040",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773142800",
+                    "endTime": "1773145500",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Разработка игровых комбинаций",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268614370762758941",
+                        "name": "Физическая культура",
+                        "knowledgeArea": "PhysicalCulture"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2462732689085148629",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001796093@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304040",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304040"
+                },
+                {
+                    "id": "2442186583448304196",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773145800",
+                    "endTime": "1773148500",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Как сформировалась мировая колониальная система? СОР №6",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617832506399523",
+                        "name": "Всемирная история",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463004650709264149",
+                        "text": "работа по доп материалу",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304196",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304196"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773187200",
+            "utcOffset": 300,
+            "hasImportantWork": true,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 4,
+                "completedLessonsWithHomeworksCount": 3
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448303952",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773219600",
+                    "endTime": "1773222300",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Сон и сохранение психического здоровья. СОР № 9.Координация и регуляция\t",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396808365376122",
+                        "name": "Биология",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2464319950083944733",
+                        "text": "Подготовиться к СОЧ",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000011675291@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303952",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303952"
+                },
+                {
+                    "id": "2442186583448303922",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773222600",
+                    "endTime": "1773225300",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "СОР 3  Перпендикулярные прямые. Перпендикуляр, наклонная и ее проекция",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396774005637746",
+                        "name": "Геометрия",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [
+                        "Контрольная"
+                    ],
+                    "homework": {
+                        "id": "2463047518777855371",
+                        "text": "Повторение ",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303922",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303922"
+                },
+                {
+                    "id": "2442186583448303912",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773225600",
+                    "endTime": "1773228300",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "СОР 6  Решение текстовых задач с помощью неравенств/Решение текстовых задач с помощью неравенств",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463076058835555228",
+                        "text": "36.11",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303912",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303912"
+                },
+                {
+                    "id": "2442186583448304127",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773229200",
+                    "endTime": "1773231900",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "«Наурыз -думан»  ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304127",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304127"
+                },
+                {
+                    "id": "2442186583448304030",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773232200",
+                    "endTime": "1773234900",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Как правильно питаться. Правописание суффиксов причастий",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268612485272115992",
+                        "name": "Русский язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463097911629163397",
+                        "text": "Стр.224,упр.407Б",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304030",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304030"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773273600",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 6,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304058",
+                    "groupId": "2370210495004756744",
+                    "number": 0,
+                    "place": null,
+                    "startTime": "1773302400",
+                    "endTime": "1773305100",
+                    "hours": {
+                        "startHour": "13",
+                        "startMinute": "00",
+                        "endHour": "13",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "People who help us p.84",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268616458116864799",
+                        "name": "Иностранный язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465235366528538375",
+                        "text": "7  module  learn all new words",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000009142840@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304058",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304058"
+                },
+                {
+                    "id": "2442186583448304000",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773306000",
+                    "endTime": "1773308700",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Суммативное оценивание за 3 четверть",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396825545245310",
+                        "name": "Химия",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465181872710852558",
+                        "text": "§20 задание 2",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001728199@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304000",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304000"
+                },
+                {
+                    "id": "2442186583448304205",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773309000",
+                    "endTime": "1773311700",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Современная техника и оборудование в сельскохозяйственном производстве.",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268618064434633508",
+                        "name": "Художественный труд",
+                        "knowledgeArea": "TechnologyAndArt"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463428710010278260",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000004571617@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304205",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304205"
+                },
+                {
+                    "id": "2442186583448303971",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773312000",
+                    "endTime": "1773314700",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Классификация природных ресурсов",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396816955310716",
+                        "name": "География",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463431037882553243",
+                        "text": "Пр 52-53 стр 244-248",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726526@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303971",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303971"
+                },
+                {
+                    "id": "2442186583448303981",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773315600",
+                    "endTime": "1773318300",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Суммативное оценивание за 3 четверть (СОЧ)",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396821250278013",
+                        "name": "Физика",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463382740975298862",
+                        "text": "Подготовиться к СОЧ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726362@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303981",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303981"
+                },
+                {
+                    "id": "2442186583448304136",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773318600",
+                    "endTime": "1773321300",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Тоқсандық жиынтық бағалау №3 ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304136",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304136"
+                },
+                {
+                    "id": "2442186583448304235",
+                    "groupId": "2370210495004756744",
+                    "number": 6,
+                    "place": null,
+                    "startTime": "1773321900",
+                    "endTime": "1773324600",
+                    "hours": {
+                        "startHour": "18",
+                        "startMinute": "25",
+                        "endHour": "19",
+                        "endMinute": "10"
+                    },
+                    "isCanceled": false,
+                    "theme": "СОЧ №3",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268619687932271401",
+                        "name": "Русская литература",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465295294207170458",
+                        "text": "выполнить задания",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304235",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304235"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773360000",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 3,
+                "completedLessonsWithHomeworksCount": 2
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304010",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773392400",
+                    "endTime": "1773395100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Урок обобщения ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396825545245310",
+                        "name": "Химия",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001728199@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304010",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304010"
+                },
+                {
+                    "id": "2442186583448303901",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773395400",
+                    "endTime": "1773398100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Суммативное оценивание за 3 четверть",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2463750480370201029",
+                        "text": "32.27",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303901",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303901"
+                },
+                {
+                    "id": "2442186583448304077",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773398400",
+                    "endTime": "1773401100",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Summative assessment for the term 3",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268616458116864799",
+                        "name": "Иностранный язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000009142840@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304077",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304077"
+                },
+                {
+                    "id": "2442186583448304185",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773402000",
+                    "endTime": "1773404700",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "СОЧ №3",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617716542282530",
+                        "name": "История Казахстана",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2451961057135655082",
+                        "text": "пересказ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304185",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304185"
+                },
+                {
+                    "id": "2442186583448303961",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773405000",
+                    "endTime": "1773407700",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Суммативное оценивание за 3 четверть\t",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396808365376122",
+                        "name": "Биология",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465643521565651255",
+                        "text": "тестовые задания, создать комикс, задания в чат отправлены",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000011675291@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303961",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303961"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773619200",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 3,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448303892",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773654600",
+                    "endTime": "1773657300",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Работа над ошибками СОЧ ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303892",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303892"
+                },
+                {
+                    "id": "2442186583448304176",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773657600",
+                    "endTime": "1773660300",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Краеведение   Летопись родного края",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617716542282530",
+                        "name": "История Казахстана",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2451961061430622379",
+                        "text": ",",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304176",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304176"
+                },
+                {
+                    "id": "2442186583448304068",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773661200",
+                    "endTime": "1773663900",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Edutaiment",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268616458116864799",
+                        "name": "Иностранный язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000009142840@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304068",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304068"
+                },
+                {
+                    "id": "2442186583448304020",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773664200",
+                    "endTime": "1773666900",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Соч №3",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268612485272115992",
+                        "name": "Русский язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465690920824677929",
+                        "text": "упр417",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304020",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304020"
+                },
+                {
+                    "id": "2442186583448303991",
+                    "groupId": "2370210495004756744",
+                    "number": 6,
+                    "place": null,
+                    "startTime": "1773667500",
+                    "endTime": "1773670200",
+                    "hours": {
+                        "startHour": "18",
+                        "startMinute": "25",
+                        "endHour": "19",
+                        "endMinute": "10"
+                    },
+                    "isCanceled": false,
+                    "theme": "Урок-повторение «Физический марафон»",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396821250278013",
+                        "name": "Физика",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001726362@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303991",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303991"
+                },
+                {
+                    "id": "2442186583448304049",
+                    "groupId": "2370210495004756744",
+                    "number": 7,
+                    "place": null,
+                    "startTime": "1773670800",
+                    "endTime": "1773673500",
+                    "hours": {
+                        "startHour": "19",
+                        "startMinute": "20",
+                        "endHour": "20",
+                        "endMinute": "05"
+                    },
+                    "isCanceled": false,
+                    "theme": "Разработка игровых комбинаций",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268614370762758941",
+                        "name": "Физическая культура",
+                        "knowledgeArea": "PhysicalCulture"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465685148388630595",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001796093@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304049",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304049"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773705600",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 2,
+                "completedLessonsWithHomeworksCount": 0
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448304116",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773738000",
+                    "endTime": "1773740700",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Наурыз сәні-зергерлік бұйымдар",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304116",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304116"
+                },
+                {
+                    "id": "2442186583448303931",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773741000",
+                    "endTime": "1773743700",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Организуем выбор",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396786890539637",
+                        "name": "Информатика",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000014419460@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303931",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303931"
+                },
+                {
+                    "id": "2442186583448304225",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773744000",
+                    "endTime": "1773746700",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Комическое в рассказе  М. М. Зощенко «Золотые слова». Образы  Миньки и Лельки.",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268619687932271401",
+                        "name": "Русская литература",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304225",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304225"
+                },
+                {
+                    "id": "2442186583448304039",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773747600",
+                    "endTime": "1773750300",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Разработка альтернативной игры",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268614370762758941",
+                        "name": "Физическая культура",
+                        "knowledgeArea": "PhysicalCulture"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465685182748368969",
+                        "text": "-",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000001796093@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304039",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304039"
+                },
+                {
+                    "id": "2442186583448304195",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773750600",
+                    "endTime": "1773753300",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Как сформировалась мировая колониальная система?",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617832506399523",
+                        "name": "Всемирная история",
+                        "knowledgeArea": "HumanAndSociety"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465638290295483296",
+                        "text": "пересказ",
+                        "url": "",
+                        "isCompleted": false,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000002599394@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304195",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304195"
+                }
+            ],
+            "sorSochs": []
+        },
+        {
+            "date": "1773792000",
+            "utcOffset": 300,
+            "hasImportantWork": false,
+            "dayHomeworksProgress": {
+                "totalLessonsWithHomeworksCount": 1,
+                "completedLessonsWithHomeworksCount": 1
+            },
+            "behaviorNotes": [],
+            "lessons": [
+                {
+                    "id": "2442186583448303951",
+                    "groupId": "2370210495004756744",
+                    "number": 1,
+                    "place": null,
+                    "startTime": "1773824400",
+                    "endTime": "1773827100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "00",
+                        "endHour": "14",
+                        "endMinute": "45"
+                    },
+                    "isCanceled": false,
+                    "theme": "Влияние алкоголя, курения и других наркотических веществ на работу нервной системы.",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396808365376122",
+                        "name": "Биология",
+                        "knowledgeArea": "NaturalScience"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000011675291@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303951",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303951"
+                },
+                {
+                    "id": "2442186583448303921",
+                    "groupId": "2370210495004756744",
+                    "number": 2,
+                    "place": null,
+                    "startTime": "1773827400",
+                    "endTime": "1773830100",
+                    "hours": {
+                        "startHour": "14",
+                        "startMinute": "50",
+                        "endHour": "15",
+                        "endMinute": "35"
+                    },
+                    "isCanceled": false,
+                    "theme": "Повторение ",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396774005637746",
+                        "name": "Геометрия",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": {
+                        "id": "2465650414988163346",
+                        "text": "повторение",
+                        "url": "",
+                        "isCompleted": true,
+                        "workIsAttachRequired": true,
+                        "attachments": [],
+                        "userAttachments": [],
+                        "lessonId": null
+                    },
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303921",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303921"
+                },
+                {
+                    "id": "2442186583448303911",
+                    "groupId": "2370210495004756744",
+                    "number": 3,
+                    "place": null,
+                    "startTime": "1773830400",
+                    "endTime": "1773833100",
+                    "hours": {
+                        "startHour": "15",
+                        "startMinute": "40",
+                        "endHour": "16",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Алгебраическая дробь",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "396769710670449",
+                        "name": "Алгебра",
+                        "knowledgeArea": "MathematicsAndInformatics"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000010448644@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448303911",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448303911"
+                },
+                {
+                    "id": "2442186583448304126",
+                    "groupId": "2370210495004756744",
+                    "number": 4,
+                    "place": null,
+                    "startTime": "1773834000",
+                    "endTime": "1773836700",
+                    "hours": {
+                        "startHour": "16",
+                        "startMinute": "40",
+                        "endHour": "17",
+                        "endMinute": "25"
+                    },
+                    "isCanceled": false,
+                    "theme": "Нәтиже сабақ. Мен не үйрендім?",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268617506088885024",
+                        "name": "Казахский язык и лит",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012661970@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304126",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304126"
+                },
+                {
+                    "id": "2442186583448304029",
+                    "groupId": "2370210495004756744",
+                    "number": 5,
+                    "place": null,
+                    "startTime": "1773837000",
+                    "endTime": "1773839700",
+                    "hours": {
+                        "startHour": "17",
+                        "startMinute": "30",
+                        "endHour": "18",
+                        "endMinute": "15"
+                    },
+                    "isCanceled": false,
+                    "theme": "Морфология и Здоровое питание орфография. Итоговое повторение по разделу",
+                    "meeting": null,
+                    "smartWorkInfo": null,
+                    "subject": {
+                        "id": "2268612485272115992",
+                        "name": "Русский язык",
+                        "knowledgeArea": "LanguageAndLiterature"
+                    },
+                    "importantWorks": [],
+                    "homework": null,
+                    "smartHomeworks": [],
+                    "hasAttachment": false,
+                    "workMarks": [],
+                    "isEmpty": false,
+                    "logEntry": null,
+                    "isHomeBasedEducation": false,
+                    "chatJid": "user_1000012962138@xmpp.kundelik.kz",
+                    "teacherPeerId": null,
+                    "url": "https://schools.kundelik.kz/v2/lesson?school=1000001828996&lesson=2442186583448304029",
+                    "parentUrl": "https://schools.kundelik.kz/v2/children/lesson?child=1000016003118&school=1000001828996&lesson=2442186583448304029"
+                }
+            ],
+            "sorSochs": []
+        }
+    ],
+    "ratingsMarksInfo": {},
+    "personalRatingBySubject": []
+}

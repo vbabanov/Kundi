@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: kundi-postgres
+    environment:
+      POSTGRES_DB: kundi
+      POSTGRES_USER: kundi
+      POSTGRES_PASSWORD: kundi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: kundi-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: kundi
+      MINIO_ROOT_PASSWORD: kundi123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:

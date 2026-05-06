@@ -1,0 +1,80 @@
+# Production Repository Tree (Verified)
+
+```text
+backend/
+  cmd/{api,worker_jobs,worker_ai,worker_whatsapp}
+  internal/
+    app/bootstrap.go
+    contracts/api_contracts.go
+    platform/{config,logger,db,http,auth,crypto,storage,observability,idempotency,clock,validate,apperrors}
+    modules/
+      auth/
+      students/
+      guardians/
+      profiles/
+      diary_ingest/
+      academic/
+      attendance/
+      homework/
+      grades/
+      media/
+      assistant/
+        avatar_cues/
+        context_builder/
+        moderation/
+        pedagogy_policy/
+        persona_policy/
+        response_renderer/
+        tts/
+      persona/
+      whatsapp/
+      jobs/
+      analytics/
+      audit/
+    transport/http/v1
+  migrations/{0001_extensions.sql,0002_core_schema.sql,0003_indexes.sql,0004_constraints_hardening.sql}
+  tests/{unit,integration}
+
+mobile/
+  lib/
+    app/
+    core/
+      db/{app_database,canonical_cache_store,sync_queue_repository}
+      errors/
+      network/
+      storage/
+    platform/
+    runtimes/
+      connector_runtime/
+        contracts/
+        source_adapters/{kundelik,dnevnikru,edupage}
+        anti_bot/
+        session/
+        raw_payload/
+        mappers/
+        sync_queue/
+        diagnostics/
+      avatar_runtime/{contracts,bridge,facade}
+    features/{auth,profile,schedule,homework,lessons,grades,attendance,gamification,assistant,whatsapp,settings}
+    shared/{providers,theme,widgets}
+  test/{widget,unit,runtimes}
+
+avatar_unity/
+  Assets/Kundi/{Runtime,Bridge,Playback,LipSync,Emotion,Gesture,Timeline,Content,Addressables,Editor,Tests}
+
+infra/
+  docker/docker-compose.yml
+  k8s/backend-api-deployment.yaml
+  scripts/dev-up.ps1
+  terraform/main.tf
+
+docs/
+  architecture/
+  backend/
+  mobile/
+  avatar/
+  infra/
+  legacy/
+  migration/
+```
+

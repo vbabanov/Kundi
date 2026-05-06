@@ -1,0 +1,34 @@
+.dart_tool/
+build/
+.idea/
+.vscode/
+android/.gradle/
+ios/Pods/
+backend/bin/
+backend/tmp/
+.env
+*.log
+# Local runtime artifacts
+
+backend/dist/
+backend/backend/dist/
+reports/
+*.db
+*.db-journal
+mobile/android/java_pid*.hprof
+tmp_*
+wa_adapter_journal.txt
+**/window_dump*.xml
+**/pkg_dump*.txt
+**/wa_qr_live.png
+mobile/.flutter-plugins-dependencies
+
+# hygiene rules
+legacy/
+mobile/build/
+mobile/.dart_tool/
+mobile/android/.gradle/
+*.hprof
+*.apk
+*.zip
+.flutter-plugins-dependencies

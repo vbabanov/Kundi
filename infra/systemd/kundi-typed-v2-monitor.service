@@ -1,0 +1,15 @@
+[Unit]
+Description=Kundi Typed V2 Monitoring Snapshot + Telegram Notify
+After=network-online.target kundi-prod-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/kundi-prod/shared/ops/typed-v2
+EnvironmentFile=/root/kundi-prod/shared/env/typed-v2-monitoring.env
+ExecStart=/usr/bin/bash /root/kundi-prod/shared/ops/typed-v2/typed-v2-monitoring-loop.sh
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

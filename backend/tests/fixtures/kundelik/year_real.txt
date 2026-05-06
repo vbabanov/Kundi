@@ -1,0 +1,838 @@
+https://kundelik.kz/api/v2/marks/final/school/1000001828996/person/1000016003118?groupId=2370210495004756744&timestamp=1773238443928
+
+{
+    "groupId": "2370210495004756744",
+    "schoolId": "1000001828996",
+    "periodId": "final",
+    "halfYearMarksAvailable": false,
+    "subjects": [
+        {
+            "id": "396769710670449",
+            "name": "Алгебра",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414434093919477464",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414434093919477464",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437791908486562454",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437791908486562454",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396808365376122",
+            "name": "Биология",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414177353659392503",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414177353659392503",
+                            "value": "4",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437220484562652314",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437220484562652314",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268617832506399523",
+            "name": "Всемирная история",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2436760678248819271",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2436760678248819271",
+                            "value": "4",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396816955310716",
+            "name": "География",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2437369275114704289",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437369275114704289",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396774005637746",
+            "name": "Геометрия",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2437572384118122326",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437572384118122326",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268616458116864799",
+            "name": "Иностранный язык",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414388773424574499",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414388773424574499",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437848799623325543",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437848799623325543",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396786890539637",
+            "name": "Информатика",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2437826951124723477",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437826951124723477",
+                            "value": "4",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268617716542282530",
+            "name": "История Казахстана",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414452532214038948",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414452532214038948",
+                            "value": "4",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2436760081248364542",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2436760081248364542",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268617506088885024",
+            "name": "Казахский язык и лит",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414592208845492144",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414592208845492144",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437571963211326701",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437571963211326701",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268619687932271401",
+            "name": "Русская литература",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414408843806709920",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414408843806709920",
+                            "value": "4",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437794545596486411",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437794545596486411",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268612485272115992",
+            "name": "Русский язык",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414409509526641411",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414409509526641411",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437803174185731827",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437803174185731827",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396821250278013",
+            "name": "Физика",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414169176041713797",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414169176041713797",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437496758333932388",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437496758333932388",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268614370762758941",
+            "name": "Физическая культура",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414117052318605402",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414117052318605402",
+                            "value": "ЗЧ",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437788944959123444",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437788944959123444",
+                            "value": "ЗЧ",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "396825545245310",
+            "name": "Химия",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2414172839648757594",
+                    "periodNumber": 0,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2414172839648757594",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013990"
+                },
+                {
+                    "workId": "2437757905230472719",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437757905230472719",
+                            "value": "3",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Average",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        },
+        {
+            "id": "2268618064434633508",
+            "name": "Художественный труд",
+            "odoGroupId": "0",
+            "average": null,
+            "weightedAverage": null,
+            "trainingPercent": null,
+            "periodSection": null,
+            "sumPercent": null,
+            "thematicAverage": null,
+            "isHomeBasedSubject": false,
+            "totalLessonNumber": 0,
+            "countBeingLate": 0,
+            "countAbsence": 0,
+            "countIllAbsence": 0,
+            "works": null,
+            "thematicWorks": null,
+            "finalWorks": [
+                {
+                    "workId": "2437439734053150147",
+                    "periodNumber": 1,
+                    "type": "Period",
+                    "marks": [
+                        {
+                            "id": "2437439734053150147",
+                            "value": "ЗЧ",
+                            "score": null,
+                            "type": "Mark5",
+                            "mood": "Good",
+                            "homeworkUrl": null,
+                            "workUrl": null,
+                            "comment": ""
+                        }
+                    ],
+                    "periodId": "2395845913549013991"
+                }
+            ],
+            "lessonLogEntries": null,
+            "summativeMarks": null,
+            "isCriteriaJournal": true,
+            "recommendedMarks": null,
+            "formativePercent": null
+        }
+    ],
+    "isAllRussianTestWorksEnabled": false,
+    "isGroupSummative": false,
+    "ratingsMarksInfo": null
+}

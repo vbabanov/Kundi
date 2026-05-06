@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: kundi-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kundi}
+      POSTGRES_USER: ${POSTGRES_USER:-kundi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kundi}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kundi} -d ${POSTGRES_DB:-kundi}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${STAGING_POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: kundi-staging-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kundi}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-kundi123}
+    ports:
+      - "${STAGING_MINIO_API_HOST_PORT:-9000}:9000"
+      - "${STAGING_MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  migrator:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TARGET: ./cmd/migrator
+    container_name: kundi-staging-migrator
+    env_file:
+      - ../env/backend.staging.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["/app/app"]
+    restart: "no"
+
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TARGET: ./cmd/api
+    container_name: kundi-staging-api
+    env_file:
+      - ../env/backend.staging.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    ports:
+      - "${STAGING_API_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/readyz >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker_jobs:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TARGET: ./cmd/worker_jobs
+    container_name: kundi-staging-worker-jobs
+    env_file:
+      - ../env/backend.staging.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+
+  worker_ai:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TARGET: ./cmd/worker_ai
+    container_name: kundi-staging-worker-ai
+    env_file:
+      - ../env/backend.staging.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+
+  worker_whatsapp:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+      args:
+        TARGET: ./cmd/worker_whatsapp
+    container_name: kundi-staging-worker-whatsapp
+    env_file:
+      - ../env/backend.staging.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  minio_data:
