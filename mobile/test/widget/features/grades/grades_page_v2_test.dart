@@ -39,8 +39,73 @@ void main() {
     expect(find.byKey(const Key('grades-tab-totals')), findsOneWidget);
     expect(find.text('Оценки'), findsOneWidget);
     expect(find.text('Главная'), findsOneWidget);
-    expect(find.text('Неделя'), findsOneWidget);
+    expect(find.text('За неделю'), findsOneWidget);
     expect(find.text('Итоговые'), findsOneWidget);
+  });
+
+  testWidgets('main tab renders latest cards and stats card', (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grades-main-latest-card')), findsOneWidget);
+    expect(find.byKey(const Key('grades-main-summative-card')), findsOneWidget);
+    expect(find.byKey(const Key('grades-main-stats-card')), findsOneWidget);
+    expect(find.text('Последние оценки'), findsOneWidget);
+    expect(find.text('Последние СОР и СОЧ'), findsOneWidget);
+    expect(find.text('Средний балл'), findsOneWidget);
+    expect(find.text('Качество знаний'), findsOneWidget);
+    expect(find.text('Динамика'), findsOneWidget);
+    expect(find.text('Algebra'), findsWidgets);
+  });
+
+  testWidgets('main tab shows empty states when latest/summative data missing',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2DataMainEmpty());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Оценок пока нет'), findsOneWidget);
+    expect(find.text('СОР и СОЧ пока нет'), findsOneWidget);
+    expect(find.byKey(const Key('grades-main-stats-card')), findsOneWidget);
+  });
+
+  testWidgets('main card actions navigate to week and totals tabs',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-main-action-latest')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('grades-week-switcher')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('grades-tab-main')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('grades-main-action-works')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('grades-totals-period-year')), findsOneWidget);
   });
 
   testWidgets('no mojibake patterns in visible labels', (tester) async {
@@ -450,8 +515,7 @@ void main() {
     expect(find.text('—'), findsWidgets);
     expect(find.text('3.23'), findsNothing);
   });
-  testWidgets('summative mood is primary over fraction fallback',
-      (tester) async {
+  testWidgets('summative items render in main card', (tester) async {
     final repository = _FakeGradesRepository(_v2DataSummativeMoodPriority());
     await tester.pumpWidget(
       ProviderScope(
@@ -463,7 +527,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('7/10'), findsOneWidget);
+    expect(find.byKey(const Key('grades-main-summative-card')), findsOneWidget);
+    expect(find.textContaining('СОР:'), findsOneWidget);
+    expect(find.textContaining('Summative'), findsOneWidget);
+    expect(find.text('7/10'), findsOneWidget);
   });
 
   testWidgets('renders full empty-state when no data exists', (tester) async {
@@ -698,6 +765,42 @@ GradesScreenData _v2DataWeeklyEmpty() {
         mood: 'good',
       ),
     ],
+    summativeBySubject: <SubjectSummativeSection>[],
+    aggregatesBySubject: <SubjectAggregateSection>[],
+  );
+}
+
+GradesScreenData _v2DataMainEmpty() {
+  const week = GradesWeekOption(
+    weekKey: '2026-04-20',
+    weekStartDate: '2026-04-20',
+    weekEndDate: '2026-04-26',
+    label: '20.04 - 26.04',
+  );
+
+  return const GradesScreenData(
+    readMode: 'v2',
+    provider: 'kundelik',
+    windowKey: 'kundi:wk',
+    snapshotAt: '2026-04-20T12:00:00Z',
+    availableWeeks: <GradesWeekOption>[week],
+    weeklyRowsByWeek: <String, List<WeeklySubjectGradesRow>>{
+      '2026-04-20': <WeeklySubjectGradesRow>[
+        WeeklySubjectGradesRow(
+          subjectKey: 'sub-empty',
+          subjectName: 'Empty Subject',
+          cellsByWeekday: <int, WeeklyGradeCell>{
+            1: WeeklyGradeCell(
+              date: '2026-04-20',
+              hasLesson: true,
+              regularMarks: <String>[],
+              attendanceCodes: <String>[],
+            ),
+          },
+        ),
+      ],
+    },
+    latestRegularResults: <LatestRegularResultItem>[],
     summativeBySubject: <SubjectSummativeSection>[],
     aggregatesBySubject: <SubjectAggregateSection>[],
   );

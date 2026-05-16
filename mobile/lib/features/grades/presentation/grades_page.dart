@@ -81,7 +81,7 @@ class _GradesPageState extends ConsumerState<GradesPage> {
               children: [
                 _tabChip('Главная', _GradesTab.main, 'grades-tab-main'),
                 const SizedBox(width: KundiSpace.xs),
-                _tabChip('Неделя', _GradesTab.week, 'grades-tab-week'),
+                _tabChip('За неделю', _GradesTab.week, 'grades-tab-week'),
                 const SizedBox(width: KundiSpace.xs),
                 _tabChip('Итоговые', _GradesTab.totals, 'grades-tab-totals'),
               ],
@@ -147,110 +147,310 @@ class _GradesPageState extends ConsumerState<GradesPage> {
   }
 
   Widget _mainTab(BuildContext context, GradesScreenData data) {
-    final latest = data.latestRegularResults.take(8).toList(growable: false);
-    if (latest.isEmpty) {
-      return const KundiEmptyState(
-          icon: Icons.auto_graph_outlined,
-          label: 'Последние оценки пока отсутствуют');
-    }
-
-    final summativePreview =
-        data.summativeBySubject.take(4).toList(growable: false);
+    final latestGrades = _buildLatestGradesForMain(data);
+    final latestSummative = _buildLatestSummativeForMain(data);
+    final stats = _buildMainStats(data);
 
     return ListView(
+      key: const Key('grades-main-scroll'),
       padding: const EdgeInsets.fromLTRB(
           KundiSpace.sm, KundiSpace.xs, KundiSpace.sm, KundiSpace.sm),
       children: [
-        const KundiSectionHeader(title: 'Последние оценки'),
-        const SizedBox(height: KundiSpace.xs),
-        Wrap(
-          spacing: KundiSpace.xs,
-          runSpacing: KundiSpace.xs,
-          children: latest.map((item) {
-            return SizedBox(
-              width: (MediaQuery.of(context).size.width - 36) / 2,
-              child: KundiSectionCard(
-                margin: EdgeInsets.zero,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        _MainGlassCard(
+          key: const Key('grades-main-latest-card'),
+          header: _MainCardHeader(
+            icon: Icons.star_outline_rounded,
+            title: 'Последние оценки',
+            actionLabel: 'Все оценки',
+            actionKey: 'latest',
+            onActionTap: () => setState(() => _tab = _GradesTab.week),
+          ),
+          child: latestGrades.isEmpty
+              ? const _MainCardEmpty(label: 'Оценок пока нет')
+              : Column(
                   children: [
-                    Text(
-                      item.subjectName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _QualityBadge(
-                            value: item.value,
-                            palette: _gradePaletteFromMark(item.value)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item.recordedOn,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .kundiTextSecondary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    for (var i = 0; i < latestGrades.length; i++)
+                      _MainLatestGradeRow(
+                        entry: latestGrades[i],
+                        showDivider: i != latestGrades.length - 1,
+                      ),
                   ],
                 ),
-              ),
-            );
-          }).toList(growable: false),
         ),
-        const SizedBox(height: KundiSpace.sm),
-        const KundiSectionHeader(title: 'СОР / СОЧ'),
-        const SizedBox(height: KundiSpace.xs),
-        if (summativePreview.isEmpty)
-          const KundiEmptyState(
-              icon: Icons.rule_folder_outlined,
-              label: 'СОР/СОЧ пока отсутствуют')
-        else
-          ...summativePreview.map(
-            (item) => KundiSectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.subjectName,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: item.items.take(4).map((mark) {
-                      return _QualityBadge(
-                        value: mark.value,
-                        palette: _paletteForSummative(
-                            mood: mark.mood, value: mark.value),
-                      );
-                    }).toList(growable: false),
-                  ),
-                ],
-              ),
-            ),
+        const SizedBox(height: 14),
+        _MainGlassCard(
+          key: const Key('grades-main-summative-card'),
+          header: _MainCardHeader(
+            icon: Icons.assignment_rounded,
+            title: 'Последние СОР и СОЧ',
+            actionLabel: 'Все работы',
+            actionKey: 'works',
+            onActionTap: () => setState(() => _tab = _GradesTab.totals),
           ),
+          child: latestSummative.isEmpty
+              ? const _MainCardEmpty(label: 'СОР и СОЧ пока нет')
+              : Column(
+                  children: [
+                    for (var i = 0; i < latestSummative.length; i++)
+                      _MainSummativeRow(
+                        entry: latestSummative[i],
+                        showDivider: i != latestSummative.length - 1,
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 14),
+        _MainStatsCard(stats: stats),
       ],
     );
+  }
+
+  List<_MainLatestGradeEntry> _buildLatestGradesForMain(GradesScreenData data) {
+    final result = data.latestRegularResults
+        .map(
+          (item) => _MainLatestGradeEntry(
+            subjectName: item.subjectName,
+            typeLabel: 'Оценка',
+            dateLabel: _formatMainDate(item.recordedOn),
+            displayValue: _mainGradeValue(item.value),
+            mood: item.mood,
+            sortKey: item.recordedOn,
+          ),
+        )
+        .toList(growable: false);
+    result.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+    return result.take(5).toList(growable: false);
+  }
+
+  List<_MainSummativeEntry> _buildLatestSummativeForMain(
+      GradesScreenData data) {
+    final result = <_MainSummativeEntry>[];
+    for (final section in data.summativeBySubject) {
+      for (final item in section.items) {
+        final kindLabel = _normalizeSummativeKind(item.kind);
+        final titleSuffix = _normalizeSummativeTitle(item.termLabel);
+        result.add(
+          _MainSummativeEntry(
+            title: '$kindLabel: $titleSuffix',
+            subtitle:
+                '${section.subjectName} • ${_formatMainDate(item.recordedOn)}',
+            displayValue: _mainRawGradeValue(item.value),
+            mood: item.mood,
+            accentColor: kindLabel == 'СОР'
+                ? const Color(0xFFA66BFF)
+                : const Color(0xFFFFB14A),
+            sortKey: item.recordedOn,
+          ),
+        );
+      }
+    }
+    result.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+    return result.take(4).toList(growable: false);
+  }
+
+  _MainStatsData _buildMainStats(GradesScreenData data) {
+    final monthAverage = _computeMonthAverage(data);
+    final knowledgePercent = _computeCurrentWeekKnowledgePercent(data);
+    final trend = _computeWeeklyTrend(data);
+    final monthLabel = _monthLabelFromSnapshot(data.snapshotAt);
+    return _MainStatsData(
+      monthAverage: monthAverage,
+      monthLabel: monthLabel,
+      knowledgePercent: knowledgePercent,
+      trend: trend,
+    );
+  }
+
+  double? _computeMonthAverage(GradesScreenData data) {
+    final anchor = DateTime.tryParse(data.snapshotAt) ?? DateTime.now();
+    final values = <double>[];
+    for (final item in data.latestRegularResults) {
+      final date = DateTime.tryParse(item.recordedOn);
+      if (date == null ||
+          date.month != anchor.month ||
+          date.year != anchor.year) {
+        continue;
+      }
+      final value = _parseToFiveScale(item.value);
+      if (value != null) values.add(value);
+    }
+    for (final section in data.summativeBySubject) {
+      for (final item in section.items) {
+        final date = DateTime.tryParse(item.recordedOn);
+        if (date == null ||
+            date.month != anchor.month ||
+            date.year != anchor.year) {
+          continue;
+        }
+        final value = _parseToFiveScale(item.value);
+        if (value != null) values.add(value);
+      }
+    }
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  int? _computeCurrentWeekKnowledgePercent(GradesScreenData data) {
+    if (data.availableWeeks.isEmpty) return null;
+    final index =
+        data.availableWeeks.indexWhere((w) => w.weekKey == _selectedWeekKey);
+    final safeIndex = index < 0 ? data.availableWeeks.length - 1 : index;
+    final week = data.availableWeeks[safeIndex];
+    final rows =
+        data.weeklyRowsByWeek[week.weekKey] ?? const <WeeklySubjectGradesRow>[];
+
+    var total = 0;
+    var quality = 0;
+    for (final row in rows) {
+      for (final cell in row.cellsByWeekday.values) {
+        for (final mark in cell.regularMarks) {
+          final normalized = _pickDisplayMark(<String>[mark]);
+          if (normalized.isEmpty) continue;
+          final value = _parseToFiveScale(normalized);
+          if (value == null) continue;
+          total++;
+          if (value >= 4.0) quality++;
+        }
+      }
+    }
+    if (total == 0) return null;
+    return ((quality / total) * 100).round();
+  }
+
+  double? _computeWeeklyTrend(GradesScreenData data) {
+    if (data.availableWeeks.length < 2) return null;
+    final index =
+        data.availableWeeks.indexWhere((w) => w.weekKey == _selectedWeekKey);
+    final safeIndex = index < 0 ? data.availableWeeks.length - 1 : index;
+    if (safeIndex <= 0) return null;
+
+    final current = _weekAverageToFiveScale(
+      data.weeklyRowsByWeek[data.availableWeeks[safeIndex].weekKey] ??
+          const <WeeklySubjectGradesRow>[],
+    );
+    final previous = _weekAverageToFiveScale(
+      data.weeklyRowsByWeek[data.availableWeeks[safeIndex - 1].weekKey] ??
+          const <WeeklySubjectGradesRow>[],
+    );
+    if (current == null || previous == null) return null;
+    return current - previous;
+  }
+
+  double? _weekAverageToFiveScale(List<WeeklySubjectGradesRow> rows) {
+    final values = <double>[];
+    for (final row in rows) {
+      for (final cell in row.cellsByWeekday.values) {
+        for (final mark in cell.regularMarks) {
+          final normalized = _pickDisplayMark(<String>[mark]);
+          if (normalized.isEmpty) continue;
+          final parsed = _parseToFiveScale(normalized);
+          if (parsed != null) values.add(parsed);
+        }
+      }
+    }
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) => a + b) / values.length;
+  }
+
+  String _mainGradeValue(String raw) {
+    final parsed = _parseToFiveScale(raw);
+    if (parsed == null) return '—';
+    final rounded = parsed.round().clamp(2, 5);
+    return '$rounded';
+  }
+
+  String _mainRawGradeValue(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty || value == '-' || value == '—') return '—';
+    if (value.contains('/')) {
+      final parts = value.split('/');
+      if (parts.length == 2) {
+        final left = parts[0].trim();
+        final right = parts[1].trim();
+        if (left.isNotEmpty && right.isNotEmpty) {
+          return '$left/$right';
+        }
+      }
+    }
+    return value;
+  }
+
+  double? _parseToFiveScale(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty || value == '-' || value == '—') return null;
+    if (value.contains('/')) {
+      final parts = value.split('/');
+      if (parts.length != 2) return null;
+      final numerator = double.tryParse(parts[0].trim().replaceAll(',', '.'));
+      final denominator = double.tryParse(parts[1].trim().replaceAll(',', '.'));
+      if (numerator == null || denominator == null || denominator <= 0) {
+        return null;
+      }
+      return (numerator / denominator) * 5;
+    }
+
+    final numeric = double.tryParse(value.replaceAll(',', '.'));
+    if (numeric == null) return null;
+    if (numeric <= 5) return numeric;
+    if (numeric <= 10) return numeric / 2;
+    return null;
+  }
+
+  String _normalizeSummativeKind(String kind) {
+    final normalized = kind.trim().toLowerCase();
+    if (normalized == 'sor') return 'СОР';
+    if (normalized == 'soch') return 'СОЧ';
+    return normalized.isEmpty ? 'СОР/СОЧ' : kind.toUpperCase();
+  }
+
+  String _normalizeSummativeTitle(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty || value.toLowerCase() == 'unknown') return 'Работа';
+    if (value.toLowerCase().contains('term')) {
+      final digits = RegExp(r'\d+').firstMatch(value)?.group(0);
+      if (digits != null) return '$digits четверть';
+    }
+    return value;
+  }
+
+  String _formatMainDate(String raw) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    const monthShort = <int, String>{
+      1: 'янв',
+      2: 'фев',
+      3: 'мар',
+      4: 'апр',
+      5: 'май',
+      6: 'июн',
+      7: 'июл',
+      8: 'авг',
+      9: 'сен',
+      10: 'окт',
+      11: 'ноя',
+      12: 'дек',
+    };
+    return '${parsed.day} ${monthShort[parsed.month] ?? ''}'.trim();
+  }
+
+  String _monthLabelFromSnapshot(String snapshotAt) {
+    final parsed = DateTime.tryParse(snapshotAt);
+    if (parsed == null) return '—';
+    const monthLabel = <int, String>{
+      1: 'январь',
+      2: 'февраль',
+      3: 'март',
+      4: 'апрель',
+      5: 'май',
+      6: 'июнь',
+      7: 'июль',
+      8: 'август',
+      9: 'сентябрь',
+      10: 'октябрь',
+      11: 'ноябрь',
+      12: 'декабрь',
+    };
+    return monthLabel[parsed.month] ?? '—';
   }
 
   Widget _weekTab(BuildContext context, GradesScreenData data) {
@@ -867,6 +1067,527 @@ class _GradesPageState extends ConsumerState<GradesPage> {
     }
     if (values.isEmpty) return null;
     return values.reduce((a, b) => a + b) / values.length;
+  }
+}
+
+class _MainLatestGradeEntry {
+  const _MainLatestGradeEntry({
+    required this.subjectName,
+    required this.typeLabel,
+    required this.dateLabel,
+    required this.displayValue,
+    required this.mood,
+    required this.sortKey,
+  });
+
+  final String subjectName;
+  final String typeLabel;
+  final String dateLabel;
+  final String displayValue;
+  final String mood;
+  final String sortKey;
+}
+
+class _MainSummativeEntry {
+  const _MainSummativeEntry({
+    required this.title,
+    required this.subtitle,
+    required this.displayValue,
+    required this.mood,
+    required this.accentColor,
+    required this.sortKey,
+  });
+
+  final String title;
+  final String subtitle;
+  final String displayValue;
+  final String mood;
+  final Color accentColor;
+  final String sortKey;
+}
+
+class _MainStatsData {
+  const _MainStatsData({
+    required this.monthAverage,
+    required this.monthLabel,
+    required this.knowledgePercent,
+    required this.trend,
+  });
+
+  final double? monthAverage;
+  final String monthLabel;
+  final int? knowledgePercent;
+  final double? trend;
+}
+
+class _MainGlassCard extends StatelessWidget {
+  const _MainGlassCard({
+    super.key,
+    required this.header,
+    required this.child,
+  });
+
+  final Widget header;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF11102B), Color(0xFF1A1438)],
+        ),
+        border: Border.all(color: const Color(0xB2302356)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1D251160),
+            blurRadius: 12,
+            spreadRadius: 0.4,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+        child: Column(
+          children: [
+            header,
+            const SizedBox(height: 6),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MainCardHeader extends StatelessWidget {
+  const _MainCardHeader({
+    required this.icon,
+    required this.title,
+    required this.actionLabel,
+    this.actionKey,
+    this.onActionTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String actionLabel;
+  final String? actionKey;
+  final VoidCallback? onActionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6D49D7), Color(0xFF8A5DFF)],
+            ),
+            border: Border.all(color: const Color(0x80C7A1FF)),
+          ),
+          child: Icon(icon, color: const Color(0xFFE9DDFF), size: 19),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 17.2,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ),
+        InkWell(
+          key: Key('grades-main-action-${actionKey ?? actionLabel}'),
+          onTap: onActionTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x6A6B4FC7)),
+              color: const Color(0x2B17103A),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  actionLabel,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: const Color(0xFFE1D8FF),
+                        fontSize: 12.4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(Icons.chevron_right_rounded,
+                    color: Color(0xFFE1D8FF), size: 16),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MainCardEmpty extends StatelessWidget {
+  const _MainCardEmpty({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xCCB8AEE2),
+              fontSize: 12.8,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _MainLatestGradeRow extends StatelessWidget {
+  const _MainLatestGradeRow({
+    required this.entry,
+    required this.showDivider,
+  });
+
+  final _MainLatestGradeEntry entry;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key('grades-main-latest-row-${entry.subjectName}'),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: showDivider
+              ? const BorderSide(color: Color(0x5A302356), width: 1)
+              : BorderSide.none,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.subjectName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 14.6,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  entry.typeLabel,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: const Color(0xFFA66BFF),
+                        fontSize: 11.6,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            entry.dateLabel,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: const Color(0xCDB8AEE2),
+                  fontSize: 12.2,
+                ),
+          ),
+          const SizedBox(width: 8),
+          _MainGradeBadge(
+            value: entry.displayValue,
+            mood: entry.mood,
+            summativeStyle: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MainSummativeRow extends StatelessWidget {
+  const _MainSummativeRow({
+    required this.entry,
+    required this.showDivider,
+  });
+
+  final _MainSummativeEntry entry;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key('grades-main-summative-row-${entry.title}'),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: showDivider
+              ? const BorderSide(color: Color(0x5A302356), width: 1)
+              : BorderSide.none,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 34,
+            decoration: BoxDecoration(
+              color: entry.accentColor,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 14.2,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  entry.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xCCB8AEE2),
+                        fontSize: 11.8,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          _MainGradeBadge(
+            value: entry.displayValue,
+            mood: entry.mood,
+            summativeStyle: true,
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right_rounded,
+              color: Color(0xCCB8AEE2), size: 18),
+        ],
+      ),
+    );
+  }
+}
+
+class _MainGradeBadge extends StatelessWidget {
+  const _MainGradeBadge({
+    required this.value,
+    required this.mood,
+    required this.summativeStyle,
+  });
+
+  final String value;
+  final String mood;
+  final bool summativeStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final clean = value.trim();
+    final normalized = clean.isEmpty ? '—' : clean;
+    final isDash = normalized == '—' || normalized == '-';
+    final palette = summativeStyle
+        ? _paletteForSummative(mood: mood, value: normalized)
+        : (_paletteFromMood(mood) ?? _gradePaletteFromMark(normalized));
+
+    final compact = normalized.length <= 1;
+    final width = compact ? 28.0 : 44.0;
+    final fontSize = compact ? 16.0 : 12.0;
+
+    return Container(
+      key: Key('grades-main-grade-badge-$normalized'),
+      width: width,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: isDash ? const Color(0x33211742) : palette.fill,
+        border: Border.all(
+          color: isDash ? const Color(0xA34A3479) : palette.border,
+        ),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Text(
+            normalized,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w900,
+                  color: isDash ? const Color(0xFF8177A8) : Colors.white,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MainStatsCard extends StatelessWidget {
+  const _MainStatsCard({required this.stats});
+
+  final _MainStatsData stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final trendColor = stats.trend == null
+        ? Colors.white
+        : stats.trend! > 0
+            ? const Color(0xFFB985FF)
+            : stats.trend! < 0
+                ? const Color(0xFFFF4B55)
+                : Colors.white;
+
+    return Container(
+      key: const Key('grades-main-stats-card'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF11102B), Color(0xFF1A1438)],
+        ),
+        border: Border.all(color: const Color(0xB2302356)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _MainStatColumn(
+              icon: Icons.star_border_rounded,
+              value: stats.monthAverage == null
+                  ? '—'
+                  : stats.monthAverage!.toStringAsFixed(1),
+              valueColor: Colors.white,
+              title: 'Средний балл',
+              subtitle: 'за ${stats.monthLabel}',
+            ),
+          ),
+          _mainStatsDivider(),
+          Expanded(
+            child: _MainStatColumn(
+              icon: Icons.check_circle_outline_rounded,
+              value: stats.knowledgePercent == null
+                  ? '—'
+                  : '${stats.knowledgePercent}%',
+              valueColor: const Color(0xFF66E36E),
+              title: 'Качество знаний',
+              subtitle: 'за неделю',
+            ),
+          ),
+          _mainStatsDivider(),
+          Expanded(
+            child: _MainStatColumn(
+              icon: Icons.trending_up_rounded,
+              value: stats.trend == null
+                  ? '—'
+                  : '${stats.trend! >= 0 ? '+' : ''}${stats.trend!.toStringAsFixed(1)}',
+              valueColor: trendColor,
+              title: 'Динамика',
+              subtitle: 'за неделю',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mainStatsDivider() => Container(
+        width: 1,
+        height: 64,
+        color: const Color(0x66302356),
+      );
+}
+
+class _MainStatColumn extends StatelessWidget {
+  const _MainStatColumn({
+    required this.icon,
+    required this.value,
+    required this.valueColor,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color valueColor;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(9),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6D49D7), Color(0xFF8A5DFF)],
+            ),
+          ),
+          child: Icon(icon, size: 18, color: const Color(0xFFE9DDFF)),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: valueColor,
+                height: 1.0,
+              ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: const Color(0xE0CCC4EE),
+                fontSize: 11.2,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: const Color(0xCCB8AEE2),
+                fontSize: 10.8,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ],
+    );
   }
 }
 
