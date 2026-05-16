@@ -52,6 +52,14 @@ class KundiPalette {
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
   static const Color danger = Color(0xFFF44336);
+
+  static const Color deepNavy = Color(0xFF070B2A);
+  static const Color deepIndigo = Color(0xFF141244);
+  static const Color glassPurple = Color(0xFF1C1B4A);
+  static const Color borderPurple = Color(0xFF5A4FC8);
+  static const Color glowPurple = Color(0xFF8B5CF6);
+  static const Color chipMutedFill = Color(0x33282652);
+  static const Color chipMutedBorder = Color(0x668B80AE);
 }
 
 extension KundiColorSchemeX on ColorScheme {

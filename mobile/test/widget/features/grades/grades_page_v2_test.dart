@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/grades/application/grades_controller.dart';
@@ -20,11 +20,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('grades-tab-main')), findsOneWidget);
-    expect(find.text('Algebra'), findsWidgets);
-    expect(find.text('9'), findsWidgets);
   });
 
-  testWidgets('weekly matrix renders marks and lesson dots', (tester) async {
+  testWidgets('top segmented contains expected labels', (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grades-tab-main')), findsOneWidget);
+    expect(find.byKey(const Key('grades-tab-week')), findsOneWidget);
+    expect(find.byKey(const Key('grades-tab-totals')), findsOneWidget);
+    expect(find.text('Оценки'), findsOneWidget);
+    expect(find.text('Главная'), findsOneWidget);
+    expect(find.text('Неделя'), findsOneWidget);
+    expect(find.text('Итоговые'), findsOneWidget);
+  });
+
+  testWidgets('no mojibake patterns in visible labels', (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final allTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .join(' ');
+    for (final bad in [
+      '\u0420\u0452',
+      '\u0420\u045f',
+      '\u0432\u0402',
+      '\u00D0',
+      '\u00D1'
+    ]) {
+      expect(allTexts.contains(bad), isFalse);
+    }
+  });
+
+  testWidgets('weekly tab renders compact switcher/day selector/legend',
+      (tester) async {
     final repository = _FakeGradesRepository(_v2Data());
     await tester.pumpWidget(
       ProviderScope(
@@ -39,12 +85,40 @@ void main() {
     await tester.tap(find.byKey(const Key('grades-tab-week')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('grades-week-switcher')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-prev')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-next')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-day-selector')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-legend')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-summary-card')), findsOneWidget);
+    expect(find.text('Отлично'), findsOneWidget);
+    expect(find.text('Хорошо'), findsOneWidget);
+    expect(find.text('Удовл.'), findsOneWidget);
+    expect(find.text('Не был'), findsOneWidget);
+    expect(find.text('Нет оценки'), findsOneWidget);
+    for (final weekday in [1, 2, 3, 4, 5, 6, 7]) {
+      expect(
+          find
+              .byKey(Key('grades-week-day-chip-$weekday-selected'))
+              .evaluate()
+              .length,
+          inInclusiveRange(0, 1));
+      expect(
+          find
+              .byKey(Key('grades-week-day-chip-$weekday-normal'))
+              .evaluate()
+              .length,
+          inInclusiveRange(0, 1));
+    }
+    expect(find.byKey(const Key('grades-week-day-chip-1-selected')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-table-header')), findsNothing);
+    expect(find.byKey(const Key('grades-week-row-sub-math')), findsOneWidget);
     expect(find.text('Algebra'), findsOneWidget);
-    expect(find.text('9'), findsWidgets);
-    expect(find.text('·'), findsWidgets);
   });
 
-  testWidgets('weekly cell priority is mark then attendance then dot then empty', (tester) async {
+  testWidgets('weekly cell rules: mark > attendance > dot > empty',
+      (tester) async {
     final repository = _FakeGradesRepository(_v2DataWeeklyPriority());
     await tester.pumpWidget(
       ProviderScope(
@@ -59,12 +133,129 @@ void main() {
     await tester.tap(find.byKey(const Key('grades-tab-week')));
     await tester.pumpAndSettle();
 
-    expect(find.text('8'), findsOneWidget);
-    expect(find.text('Б'), findsOneWidget);
-    expect(find.text('·'), findsWidgets);
+    expect(
+        find.byKey(const Key('grades-week-row-sub-priority')), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-priority-1-mark-1')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-priority-2-attendance')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-priority-3-dot')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-priority-4-dot')),
+        findsNothing);
   });
 
-  testWidgets('term/year mode renders aggregates and opens SOR/SOCH drill-down', (tester) async {
+  testWidgets('weekly merges duplicate subjects by canonical name',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2DataWeeklyDuplicateSubjects());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('grades-tab-week')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Информатика'), findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-inf-1-1-mark-1')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-cell-sub-inf-1-2-mark-1')),
+        findsOneWidget);
+  });
+
+  testWidgets(
+      'weekly shows 6 columns when saturday has lessons and sunday does not',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2DataWeeklySixDayColumns());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-week')));
+    await tester.pumpAndSettle();
+
+    for (final weekday in [1, 2, 3, 4, 5, 6]) {
+      final selected = find
+          .byKey(Key('grades-week-day-chip-$weekday-selected'))
+          .evaluate()
+          .length;
+      final normal = find
+          .byKey(Key('grades-week-day-chip-$weekday-normal'))
+          .evaluate()
+          .length;
+      expect(selected + normal, 1);
+    }
+    final sundaySelected = find
+        .byKey(const Key('grades-week-day-chip-7-selected'))
+        .evaluate()
+        .length;
+    final sundayNormal = find
+        .byKey(const Key('grades-week-day-chip-7-normal'))
+        .evaluate()
+        .length;
+    expect(sundaySelected + sundayNormal, 1);
+    expect(find.byKey(const Key('grades-week-cell-sub-six-6-mark-1')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades-week-column-sub-six-7')), findsNothing);
+  });
+
+  testWidgets('weekly summary is fixed and has no date subtitle',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('grades-tab-week')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grades-week-summary-card')), findsOneWidget);
+    expect(find.text('Итоги недели'), findsOneWidget);
+    final summaryScope = find.descendant(
+      of: find.byKey(const Key('grades-week-summary-card')),
+      matching: find.byType(Text),
+    );
+    for (final text in tester.widgetList<Text>(summaryScope)) {
+      final value = text.data ?? '';
+      expect(value.contains('апреля'), isFalse);
+      expect(value.contains('мая'), isFalse);
+    }
+  });
+
+  testWidgets('weekly empty data renders empty state card', (tester) async {
+    final repository = _FakeGradesRepository(_v2DataWeeklyEmpty());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-week')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grades-week-empty-state')), findsOneWidget);
+  });
+
+  testWidgets('quarter mode renders aggregates list', (tester) async {
     final repository = _FakeGradesRepository(_v2Data());
     await tester.pumpWidget(
       ProviderScope(
@@ -79,16 +270,188 @@ void main() {
     await tester.tap(find.byKey(const Key('grades-tab-totals')));
     await tester.pumpAndSettle();
 
-    final subjectMath = find.byKey(const Key('grades-aggregate-subject-sub-math'));
+    expect(find.byKey(const Key('grades-aggregate-subject-sub-math')),
+        findsOneWidget);
+  });
+
+  testWidgets('totals period selector contains year period key',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('grades-totals-period-3')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('grades-totals-period-year')), findsOneWidget);
+    expect(find.text('Год'), findsOneWidget);
+  });
+
+  testWidgets('period switch changes collapsed row value between year and term',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+
+    final collapsedValue =
+        find.byKey(const Key('grades-totals-collapsed-value-sub-math'));
+    expect(collapsedValue, findsOneWidget);
+    final yearText = tester.widget<Text>(collapsedValue).data ?? '';
+    expect(yearText, '—');
+
+    await tester.tap(find.byKey(const Key('grades-totals-period-1')));
+    await tester.pumpAndSettle();
+
+    final termText = tester.widget<Text>(collapsedValue).data ?? '';
+    expect(termText, '—');
+  });
+
+  testWidgets('term expanded renders mini work tiles without quarter labels',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-totals-period-3')));
+    await tester.pumpAndSettle();
+
+    final subjectMath =
+        find.byKey(const Key('grades-aggregate-subject-sub-math'));
     await tester.ensureVisible(subjectMath);
     await tester.tap(subjectMath);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('12/15'), findsOneWidget);
-    expect(find.textContaining('18/20'), findsOneWidget);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_sor_1')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_sor_2')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_sor_3')),
+        findsOneWidget);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_soch')),
+        findsOneWidget);
+
+    expect(find.textContaining('1 четв.'), findsNothing);
+    expect(find.textContaining('2 четв.'), findsNothing);
+    expect(find.textContaining('3 четв.'), findsNothing);
+    expect(find.textContaining('4 четв.'), findsNothing);
+    expect(find.textContaining('СОР (формативные)'), findsNothing);
+    expect(find.textContaining('СОЧ (суммативные)'), findsNothing);
   });
 
-  testWidgets('summative mood is primary over fraction fallback', (tester) async {
+  testWidgets('term mode collapsed row shows single selected quarter value',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('grades-totals-period-3')));
+    await tester.pumpAndSettle();
+
+    final collapsedValue =
+        find.byKey(const Key('grades-totals-collapsed-value-sub-math'));
+    expect(collapsedValue, findsOneWidget);
+    final selectedText = tester.widget<Text>(collapsedValue).data ?? '';
+    expect(selectedText, '4');
+  });
+
+  testWidgets('year mode rows are non-expandable and hero has no-data dash',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+
+    final subjectMath =
+        find.byKey(const Key('grades-aggregate-subject-sub-math'));
+    expect(subjectMath, findsOneWidget);
+    expect(
+        find.byKey(const Key('grades-totals-chevron-sub-math')), findsNothing);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_sor_1')),
+        findsNothing);
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_soch')),
+        findsNothing);
+
+    await tester.tap(subjectMath);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('grades_totals_expanded_work_tile_sor_1')),
+        findsNothing);
+
+    expect(find.text('—'), findsWidgets);
+    expect(find.text('Нет данных'), findsWidgets);
+    expect(find.text('Средний балл за год'), findsOneWidget);
+    final yearValue = tester.widget<Text>(
+        find.byKey(const Key('grades-totals-collapsed-value-sub-math')));
+    expect(yearValue.data, '—');
+  });
+
+  testWidgets('year average does not fallback from quarter values',
+      (tester) async {
+    final repository = _FakeGradesRepository(_v2Data());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('grades-tab-totals')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('—'), findsWidgets);
+    expect(find.text('3.23'), findsNothing);
+  });
+  testWidgets('summative mood is primary over fraction fallback',
+      (tester) async {
     final repository = _FakeGradesRepository(_v2DataSummativeMoodPriority());
     await tester.pumpWidget(
       ProviderScope(
@@ -289,6 +652,133 @@ GradesScreenData _v2DataWeeklyPriority() {
               date: '2026-04-16',
               hasLesson: false,
               regularMarks: <String>[],
+              attendanceCodes: <String>[],
+            ),
+          },
+        ),
+      ],
+    },
+    latestRegularResults: <LatestRegularResultItem>[
+      LatestRegularResultItem(
+        subjectKey: 'sub-anchor',
+        subjectName: 'Anchor',
+        value: '5',
+        recordedOn: '2026-04-20',
+        mood: 'good',
+      ),
+    ],
+    summativeBySubject: <SubjectSummativeSection>[],
+    aggregatesBySubject: <SubjectAggregateSection>[],
+  );
+}
+
+GradesScreenData _v2DataWeeklyEmpty() {
+  const week = GradesWeekOption(
+    weekKey: '2026-04-20',
+    weekStartDate: '2026-04-20',
+    weekEndDate: '2026-04-26',
+    label: '20.04 - 26.04',
+  );
+
+  return const GradesScreenData(
+    readMode: 'v2',
+    provider: 'kundelik',
+    windowKey: 'kundi:wk',
+    snapshotAt: '2026-04-20T12:00:00Z',
+    availableWeeks: <GradesWeekOption>[week],
+    weeklyRowsByWeek: <String, List<WeeklySubjectGradesRow>>{
+      '2026-04-20': <WeeklySubjectGradesRow>[],
+    },
+    latestRegularResults: <LatestRegularResultItem>[
+      LatestRegularResultItem(
+        subjectKey: 'sub-anchor',
+        subjectName: 'Anchor',
+        value: '5',
+        recordedOn: '2026-04-20',
+        mood: 'good',
+      ),
+    ],
+    summativeBySubject: <SubjectSummativeSection>[],
+    aggregatesBySubject: <SubjectAggregateSection>[],
+  );
+}
+
+GradesScreenData _v2DataWeeklyDuplicateSubjects() {
+  const week = GradesWeekOption(
+    weekKey: '2026-04-27',
+    weekStartDate: '2026-04-27',
+    weekEndDate: '2026-05-03',
+    label: '27.04 - 03.05',
+  );
+  return const GradesScreenData(
+    readMode: 'v2',
+    provider: 'kundelik',
+    windowKey: 'kundi:wk',
+    snapshotAt: '2026-04-27T12:00:00Z',
+    availableWeeks: <GradesWeekOption>[week],
+    weeklyRowsByWeek: <String, List<WeeklySubjectGradesRow>>{
+      '2026-04-27': <WeeklySubjectGradesRow>[
+        WeeklySubjectGradesRow(
+          subjectKey: 'sub-inf-1',
+          subjectName: 'Информатика',
+          cellsByWeekday: <int, WeeklyGradeCell>{
+            1: WeeklyGradeCell(
+              date: '2026-04-27',
+              hasLesson: true,
+              regularMarks: <String>['5'],
+              attendanceCodes: <String>[],
+            ),
+          },
+        ),
+        WeeklySubjectGradesRow(
+          subjectKey: 'sub-inf-2',
+          subjectName: ' Информатика ',
+          cellsByWeekday: <int, WeeklyGradeCell>{
+            2: WeeklyGradeCell(
+              date: '2026-04-28',
+              hasLesson: true,
+              regularMarks: <String>['4'],
+              attendanceCodes: <String>[],
+            ),
+          },
+        ),
+      ],
+    },
+    latestRegularResults: <LatestRegularResultItem>[],
+    summativeBySubject: <SubjectSummativeSection>[],
+    aggregatesBySubject: <SubjectAggregateSection>[],
+  );
+}
+
+GradesScreenData _v2DataWeeklySixDayColumns() {
+  const week = GradesWeekOption(
+    weekKey: '2026-05-11',
+    weekStartDate: '2026-05-11',
+    weekEndDate: '2026-05-17',
+    label: '11.05 - 17.05',
+  );
+  return const GradesScreenData(
+    readMode: 'v2',
+    provider: 'kundelik',
+    windowKey: 'kundi:wk',
+    snapshotAt: '2026-05-11T12:00:00Z',
+    availableWeeks: <GradesWeekOption>[week],
+    weeklyRowsByWeek: <String, List<WeeklySubjectGradesRow>>{
+      '2026-05-11': <WeeklySubjectGradesRow>[
+        WeeklySubjectGradesRow(
+          subjectKey: 'sub-six',
+          subjectName: 'Субботний предмет',
+          cellsByWeekday: <int, WeeklyGradeCell>{
+            1: WeeklyGradeCell(
+              date: '2026-05-11',
+              hasLesson: true,
+              regularMarks: <String>[],
+              attendanceCodes: <String>[],
+            ),
+            6: WeeklyGradeCell(
+              date: '2026-05-16',
+              hasLesson: true,
+              regularMarks: <String>['5'],
               attendanceCodes: <String>[],
             ),
           },

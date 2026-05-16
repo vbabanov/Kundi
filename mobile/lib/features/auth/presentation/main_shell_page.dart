@@ -36,9 +36,15 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
   ];
 
   static const _rootLabels = <String>[
-    'ДЗ / Тема',
+    'ДЗ',
     'Главная',
     'Оценки',
+  ];
+
+  static const _rootIcons = <IconData>[
+    Icons.home_outlined,
+    Icons.wb_sunny_outlined,
+    Icons.bar_chart_rounded,
   ];
 
   @override
@@ -171,54 +177,75 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
           },
           children: _rootPages,
         ),
-        bottomNavigationBar: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withValues(alpha: 0.45),
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF0B0921), Color(0xFF171033)],
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            border: Border(
+              top: BorderSide(color: Color(0xB334275F), width: 1),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 76,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   _rootLabels.length,
                   (index) {
                     final selected = index == _rootPageIndex;
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                        );
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          color: selected
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : Colors.transparent,
-                        ),
-                        child: Text(
-                          _rootLabels[index],
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
+                    final color = selected
+                        ? const Color(0xFFF74FC8)
+                        : const Color(0xD99A8FC8);
+                    return Expanded(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: selected ? 64 : 0,
+                                height: selected ? 3 : 0,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF4FCB),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Icon(
+                                _rootIcons[index],
+                                size: selected ? 25 : 23,
+                                color: color,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _rootLabels[index],
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelMedium
+                                    ?.copyWith(
+                                      fontSize: selected ? 11.9 : 11.2,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      color: color,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          ),
                         ),
                       ),
                     );
