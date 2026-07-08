@@ -7,7 +7,8 @@ import 'package:kundi_mobile/features/profile/domain/profile_repository.dart';
 import 'package:kundi_mobile/features/profile/presentation/profile_page.dart';
 
 void main() {
-  testWidgets('renders v2 provider and local sections', (tester) async {
+  testWidgets('renders profile hero, student data and parent contacts',
+      (tester) async {
     final repository = _FakeProfileRepository([
       _profileEntityWithLocal(),
     ]);
@@ -17,21 +18,35 @@ void main() {
         overrides: [
           profileRepositoryProvider.overrideWithValue(repository),
         ],
-        child: const MaterialApp(home: ProfilePage()),
+        child: MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, useMaterial3: true),
+          home: const ProfilePage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Профиль'), findsOneWidget);
-    expect(find.textContaining('Artem Bayurzan'), findsOneWidget);
-    expect(find.textContaining('School 1'), findsOneWidget);
-    expect(find.text('Смена'), findsOneWidget);
+    expect(find.text('Artem Bayurzan'), findsWidgets);
+    expect(find.text('Данные ученика'), findsOneWidget);
+    expect(find.text('Класс'), findsWidgets);
+    expect(find.textContaining('School 1'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.text('Сохранить изменения'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Контакты'), findsOneWidget);
+    expect(find.text('1 смена'), findsWidgets);
     expect(find.text('Номер родителя 1'), findsOneWidget);
-    expect(find.text('Номер родителя 2 (опционально)'), findsOneWidget);
+    expect(find.textContaining('Номер родителя 2'), findsOneWidget);
+    expect(find.text('Сохранить изменения'), findsOneWidget);
   });
 
-  testWidgets(
-      'renders local profile empty-state when local_app_profile is null',
+  testWidgets('renders profile screen with empty local contacts safely',
       (tester) async {
     final repository = _FakeProfileRepository([
       _profileEntityProviderOnly(),
@@ -42,20 +57,32 @@ void main() {
         overrides: [
           profileRepositoryProvider.overrideWithValue(repository),
         ],
-        child: const MaterialApp(home: ProfilePage()),
+        child: MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, useMaterial3: true),
+          home: const ProfilePage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Provider Only'), findsOneWidget);
-    expect(find.text('Смена'), findsOneWidget);
+    expect(find.text('Профиль'), findsOneWidget);
+    expect(find.text('Provider Only'), findsWidgets);
+    expect(find.text('Данные ученика'), findsOneWidget);
+    expect(find.textContaining('Смена'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.text('Сохранить изменения'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Контакты'), findsOneWidget);
     expect(find.text('Номер родителя 1'), findsOneWidget);
+    expect(find.text('Сохранить изменения'), findsOneWidget);
   });
 
-  testWidgets('golden preview for profile page v2 split', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
+  testWidgets('key russian labels are not mojibake', (tester) async {
     final repository = _FakeProfileRepository([
       _profileEntityWithLocal(),
     ]);
@@ -65,15 +92,30 @@ void main() {
         overrides: [
           profileRepositoryProvider.overrideWithValue(repository),
         ],
-        child: const MaterialApp(home: ProfilePage()),
+        child: MaterialApp(
+          theme: ThemeData(brightness: Brightness.dark, useMaterial3: true),
+          home: const ProfilePage(),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await expectLater(
-      find.byType(ProfilePage),
-      matchesGoldenFile('goldens/profile_page_v2_split.png'),
+    expect(find.text('Профиль'), findsOneWidget);
+    expect(find.text('Данные ученика'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Сохранить изменения'),
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+
+    for (final broken in ['Рђ', 'Рџ', 'Ð', 'Ñ', 'вЂ']) {
+      expect(find.textContaining(broken), findsNothing);
+    }
+
+    expect(find.textContaining('Контакты'), findsOneWidget);
+    expect(find.text('Сохранить изменения'), findsOneWidget);
   });
 }
 

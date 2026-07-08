@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/homework/presentation/homework_page.dart';
@@ -6,35 +6,102 @@ import 'package:kundi_mobile/features/lessons/application/lessons_controller.dar
 import 'package:kundi_mobile/features/lessons/domain/lessons_entity.dart';
 
 void main() {
-  testWidgets(
-    'homework shell supports mode toggle, day switch, danger highlight',
-    (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
-          ],
-          child: const MaterialApp(home: HomeworkPage()),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 250));
+  testWidgets('homework page renders header/selector/summary/mode/button',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('ДЗ'), findsWidgets);
-      expect(find.text('Тема'), findsWidgets);
-      expect(find.byIcon(Icons.chevron_left), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+    expect(find.text('ДЗ'), findsWidgets);
+    expect(find.byKey(const Key('homework-week-switcher')), findsNothing);
+    expect(find.byKey(const Key('homework-week-day-selector')), findsOneWidget);
+    expect(find.byKey(const Key('homework-summary-card')), findsOneWidget);
+    expect(find.byKey(const Key('homework-mode-toggle')), findsOneWidget);
+    expect(find.text('Тема урока'), findsOneWidget);
+    expect(find.text('Отправить в WhatsApp за сегодня'), findsOneWidget);
+    expect(find.text('Пн'), findsOneWidget);
+    expect(find.text('Вт'), findsOneWidget);
+    expect(find.text('Ср'), findsOneWidget);
+    expect(find.text('Чт'), findsOneWidget);
+    expect(find.text('Пт'), findsOneWidget);
+    expect(find.text('Сб'), findsOneWidget);
+    expect(find.text('Вс'), findsOneWidget);
+  });
 
-      expect(find.textContaining('Algebra'), findsOneWidget);
-      expect(find.text('Контроль'), findsOneWidget);
-      expect(find.byIcon(Icons.add_a_photo_outlined), findsNothing);
-      expect(find.textContaining('Solve #12'), findsOneWidget);
+  testWidgets('homework mode shows homework text and time', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Тема').first);
-      await tester.pump(const Duration(milliseconds: 220));
-      expect(find.textContaining('Quadratic review (СОР)'), findsOneWidget);
-    },
-  );
+    expect(find.textContaining('Algebra'), findsOneWidget);
+    expect(find.textContaining('Solve #12'), findsOneWidget);
+    expect(find.text('08:30 — 09:15'), findsOneWidget);
+  });
+
+  testWidgets('topic mode shows topic text', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Тема урока'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Quadratic review (СОР)'), findsOneWidget);
+    expect(find.textContaining('Solve #12'), findsNothing);
+  });
+
+  testWidgets('empty state shows no lessons message', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider
+              .overrideWith(_FakeLessonsEmptyController.new),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('homework-empty-day-card')), findsOneWidget);
+    expect(find.text('На этот день уроков нет'), findsOneWidget);
+  });
+
+  testWidgets('no mojibake patterns in homework page labels', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final allTexts = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((text) => text.data ?? '')
+        .join(' ');
+    for (final bad in ['Рђ', 'Рџ', 'вЂ', 'Ð', 'Ñ']) {
+      expect(allTexts.contains(bad), isFalse);
+    }
+  });
 }
 
 class _FakeLessonsController extends LessonsController {
@@ -43,7 +110,7 @@ class _FakeLessonsController extends LessonsController {
         LessonsEntity(
           id: 'lesson-1',
           date: '2026-04-10',
-          lessonNumber: 2,
+          lessonNumber: 1,
           startTime: '08:30',
           endTime: '09:15',
           lessonPlace: '312',
@@ -51,15 +118,15 @@ class _FakeLessonsController extends LessonsController {
           topic: 'Quadratic review (СОР)',
           homeworkText: 'Solve #12',
           requiresPhoto: false,
-          gradeValue: '',
+          gradeValue: '5',
           attendanceCode: '',
         ),
         LessonsEntity(
           id: 'lesson-2',
           date: '2026-04-10',
-          lessonNumber: 3,
-          startTime: '09:20',
-          endTime: '10:05',
+          lessonNumber: 2,
+          startTime: '09:25',
+          endTime: '10:10',
           lessonPlace: '207',
           subjectName: 'Biology',
           topic: 'Cells',
@@ -69,6 +136,16 @@ class _FakeLessonsController extends LessonsController {
           attendanceCode: '',
         ),
       ];
+
+  @override
+  Future<void> refreshFromCache() async {
+    state = await AsyncValue.guard(build);
+  }
+}
+
+class _FakeLessonsEmptyController extends LessonsController {
+  @override
+  Future<List<LessonsEntity>> build() async => const <LessonsEntity>[];
 
   @override
   Future<void> refreshFromCache() async {

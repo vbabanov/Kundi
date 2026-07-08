@@ -191,7 +191,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
           child: SafeArea(
             top: false,
             child: SizedBox(
-              height: 76,
+              height: 42,
               child: Row(
                 children: List.generate(
                   _rootLabels.length,
@@ -212,38 +212,38 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
                             );
                           },
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                width: selected ? 64 : 0,
-                                height: selected ? 3 : 0,
+                                width: selected ? 54 : 0,
+                                height: selected ? 2 : 0,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFF4FCB),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
                               ),
-                              const SizedBox(height: 5),
+                              const SizedBox(height: 2),
                               Icon(
                                 _rootIcons[index],
-                                size: selected ? 25 : 23,
+                                size: selected ? 20 : 18,
                                 color: color,
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 1),
                               Text(
                                 _rootLabels[index],
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelMedium
                                     ?.copyWith(
-                                      fontSize: selected ? 11.9 : 11.2,
+                                      fontSize: selected ? 10.0 : 9.5,
                                       fontWeight: selected
                                           ? FontWeight.w700
                                           : FontWeight.w600,
                                       color: color,
                                     ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 1),
                             ],
                           ),
                         ),

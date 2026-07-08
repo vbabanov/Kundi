@@ -35,13 +35,13 @@ void main() {
 
     await tester.drag(find.byType(PageView), const Offset(-450, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Оценки'), findsWidgets);
+    expect(find.byKey(const Key('grades-tab-main')), findsOneWidget);
 
     await tester.drag(find.byType(PageView), const Offset(450, 0));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(PageView), const Offset(450, 0));
     await tester.pumpAndSettle();
-    expect(find.text('ДЗ / Тема'), findsWidgets);
+    expect(find.byKey(const Key('homework-week-day-selector')), findsOneWidget);
   });
 
   testWidgets('homework mode/day state survives root swipe transitions',
@@ -63,12 +63,12 @@ void main() {
     await tester.drag(find.byType(PageView), const Offset(450, 0));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Решить №12'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Тема').first);
+    expect(find.textContaining('Solve #12'), findsOneWidget);
+    await tester.tap(find.text('Тема урока'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Квадратичные уравнения'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.chevron_right).first);
+    await tester.tap(find.byKey(const Key('homework-weekday-chip-6-off')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Электролиты и растворы'), findsOneWidget);
 
@@ -82,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Электролиты и растворы'), findsOneWidget);
-    expect(find.textContaining('Решить №12'), findsNothing);
+    expect(find.textContaining('Solve #12'), findsNothing);
   });
 }
 
@@ -177,7 +177,7 @@ const _fakeLessons = <LessonsEntity>[
     endTime: '09:15',
     subjectName: 'Algebra',
     topic: 'Квадратичные уравнения',
-    homeworkText: 'Решить №12',
+    homeworkText: 'Solve #12',
     requiresPhoto: false,
     gradeValue: '',
     attendanceCode: '',

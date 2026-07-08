@@ -64,9 +64,11 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     super.build(context);
     final lessonsState = ref.watch(lessonsControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('ДЗ / Тема')),
       body: lessonsState.when(
-        data: (lessons) => _buildContent(context, lessons),
+        data: (lessons) => SafeArea(
+          bottom: false,
+          child: _buildContent(context, lessons),
+        ),
         loading: () => const KundiStateBody.loading(),
         error: (error, _) => KundiStateBody.error(
           label: 'Не удалось загрузить карточки уроков',
@@ -78,14 +80,18 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
   }
 
   Widget _buildContent(BuildContext context, List<LessonsEntity> lessons) {
-    if (lessons.isEmpty) {
-      return const KundiStateBody.empty(label: 'Уроки пока не загружены');
-    }
+    final lessonDayKeys = _collectLessonDayKeys(lessons);
+    final safeSelectedDay = _ensureSelectedDay(lessonDayKeys);
+    final selectedDate = _parseDayKey(safeSelectedDay) ?? DateTime.now();
+    final weekStart = _startOfWeek(selectedDate);
+    final weekDates = List<DateTime>.generate(
+      7,
+      (index) => weekStart.add(Duration(days: index)),
+      growable: false,
+    );
 
-    final dayOptions = _collectDayOptions(lessons);
-    final safeSelected = _ensureSelectedDay(dayOptions);
     final selectedLessons = lessons
-        .where((lesson) => _dayKey(lesson.date) == safeSelected)
+        .where((lesson) => _dayKey(lesson.date) == safeSelectedDay)
         .toList(growable: false)
       ..sort((a, b) {
         final lessonCompare = a.lessonNumber.compareTo(b.lessonNumber);
@@ -94,95 +100,203 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         if (timeCompare != 0) return timeCompare;
         return a.subjectName.compareTo(b.subjectName);
       });
-    final selectedIndex =
-        dayOptions.indexWhere((option) => option.dayKey == safeSelected);
+    final completedPrefixCount = _completedPrefixCount(selectedLessons);
 
-    return Column(
+    final doneCount = selectedLessons.where(_isLessonCompleted).length;
+    final lessonsCount = selectedLessons.length;
+    final progressPercent =
+        lessonsCount == 0 ? null : ((doneCount / lessonsCount) * 100).round();
+
+    return Stack(
       children: [
-        const SizedBox(height: KundiSpace.xs),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: KundiSpace.sm),
-          child: _ModeToggle(
-            mode: _mode,
-            onModeChanged: (nextMode) {
-              HapticFeedback.selectionClick();
-              setState(() => _mode = nextMode);
-            },
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: _HomeworkTopDecor(),
           ),
         ),
-        const SizedBox(height: KundiSpace.xs),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: KundiSpace.sm),
-          child: _DaySwitch(
-            label: dayOptions[selectedIndex].display,
-            canGoBack: selectedIndex > 0,
-            canGoForward: selectedIndex < dayOptions.length - 1,
-            onBack: () {
-              if (selectedIndex > 0) {
-                setState(() =>
-                    _selectedDayKey = dayOptions[selectedIndex - 1].dayKey);
-              }
-            },
-            onForward: () {
-              if (selectedIndex < dayOptions.length - 1) {
-                setState(() =>
-                    _selectedDayKey = dayOptions[selectedIndex + 1].dayKey);
-              }
-            },
-          ),
-        ),
-        const SizedBox(height: KundiSpace.xs),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: KundiSpace.sm),
-          child: KundiSectionCard(
-            margin: EdgeInsets.zero,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Сегодня ${selectedLessons.length} уроков',
-                style: Theme.of(context).textTheme.titleMedium,
+        Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+              child: Row(
+                children: [
+                  _HeaderIconButton(
+                    icon: Icons.menu_rounded,
+                    onTap: () {},
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'ДЗ',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _HeaderIconButton(
+                    icon: Icons.search_rounded,
+                    onTap: () {},
+                  ),
+                ],
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: KundiSpace.xs),
-        Expanded(
-          child: selectedLessons.isEmpty
-              ? const KundiStateBody.empty(
-                  label: 'Сегодня уроков нет, отдыхайте!')
-              : ListView.builder(
-                  padding: const EdgeInsets.only(
-                      top: KundiSpace.xs, bottom: KundiSpace.sm),
-                  itemCount: selectedLessons.length,
-                  itemBuilder: (context, index) {
-                    final lesson = selectedLessons[index];
-                    return _HomeworkLessonCard(
-                      lesson: lesson,
-                      mode: _mode,
-                      isDanger: _isDangerLesson(lesson),
-                      sendStatus: _sendStatusByLesson[lesson.id] ??
-                          _LessonSendStatus.idle,
-                      onLessonTap: () {
-                        HapticFeedback.lightImpact();
-                        _runManualPhotoWhatsAppFlow(lesson);
-                      },
-                    );
-                  },
-                ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              KundiSpace.sm, KundiSpace.xs, KundiSpace.sm, KundiSpace.sm),
-          child: SizedBox(
-            width: double.infinity,
-            child: KundiWhatsAppButton(
-              label: 'Отправить в WhatsApp',
-              onPressed: () => _sendDayDigest(dayKey: safeSelected),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _HomeworkWeekdaySelector(
+                weekDates: weekDates,
+                selectedDayKey: safeSelectedDay,
+                onBack: () => setState(() {
+                  _selectedDayKey =
+                      _toDayKey(selectedDate.subtract(const Duration(days: 7)));
+                }),
+                onForward: () => setState(() {
+                  _selectedDayKey =
+                      _toDayKey(selectedDate.add(const Duration(days: 7)));
+                }),
+                onSelectDay: (dayKey) =>
+                    setState(() => _selectedDayKey = dayKey),
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _HomeworkSummaryCard(
+                lessonsCount: lessonsCount,
+                doneCount: doneCount,
+                progressPercent: progressPercent,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _HomeworkModeToggle(
+                mode: _mode,
+                onModeChanged: (nextMode) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _mode = nextMode);
+                },
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: selectedLessons.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 18),
+                      child: _HomeworkEmptyDayCard(),
+                    )
+                  : ListView.separated(
+                      key: const Key('homework-lessons-list'),
+                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
+                      itemCount: selectedLessons.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
+                      itemBuilder: (context, index) {
+                        final lesson = selectedLessons[index];
+                        return _HomeworkLessonCard(
+                          lesson: lesson,
+                          mode: _mode,
+                          isDone: _isLessonCompleted(lesson),
+                          progressActive: index < completedPrefixCount,
+                          sendStatus: _sendStatusByLesson[lesson.id] ??
+                              _LessonSendStatus.idle,
+                          isFirst: index == 0,
+                          isLast: index == selectedLessons.length - 1,
+                          onLessonTap: () {
+                            HapticFeedback.lightImpact();
+                            _runManualPhotoWhatsAppFlow(lesson);
+                          },
+                        );
+                      },
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 2, 18, 6),
+              child: SizedBox(
+                width: double.infinity,
+                child: _HomeworkWhatsAppButton(
+                  label: 'Отправить в WhatsApp за сегодня',
+                  onPressed: () => _sendDayDigest(dayKey: safeSelectedDay),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  bool _isLessonCompleted(LessonsEntity lesson) {
+    final status = _sendStatusByLesson[lesson.id];
+    if (status == _LessonSendStatus.sent) return true;
+    if (status == _LessonSendStatus.sending ||
+        status == _LessonSendStatus.failed) {
+      return false;
+    }
+    return lesson.gradeValue.trim().isNotEmpty;
+  }
+
+  int _completedPrefixCount(List<LessonsEntity> lessons) {
+    var count = 0;
+    for (final lesson in lessons) {
+      if (_isLessonCompleted(lesson)) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+
+  Set<String> _collectLessonDayKeys(List<LessonsEntity> lessons) {
+    final result = <String>{};
+    for (final lesson in lessons) {
+      final key = _dayKey(lesson.date);
+      if (key != _unknownDayKey) result.add(key);
+    }
+    return result;
+  }
+
+  DateTime _startOfWeek(DateTime day) {
+    final base = DateTime(day.year, day.month, day.day);
+    return base.subtract(Duration(days: base.weekday - DateTime.monday));
+  }
+
+  String _ensureSelectedDay(Set<String> dayKeys) {
+    if (_selectedDayKey != null && _selectedDayKey != _unknownDayKey) {
+      return _selectedDayKey!;
+    }
+    final todayKey = _toDayKey(DateTime.now());
+    if (dayKeys.contains(todayKey)) {
+      _selectedDayKey = todayKey;
+      return todayKey;
+    }
+    if (dayKeys.isNotEmpty) {
+      final sorted = dayKeys.toList()..sort();
+      _selectedDayKey = sorted.first;
+      return _selectedDayKey!;
+    }
+    _selectedDayKey = todayKey;
+    return todayKey;
+  }
+
+  String _toDayKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  DateTime? _parseDayKey(String value) {
+    if (value == _unknownDayKey) return null;
+    return DateTime.tryParse(value);
+  }
+
+  String _dayKey(String rawDate) {
+    final trimmed = rawDate.trim();
+    if (trimmed.length >= 10 && trimmed[4] == '-' && trimmed[7] == '-') {
+      return trimmed.substring(0, 10);
+    }
+    return _unknownDayKey;
   }
 
   Future<void> _sendDayDigest({required String dayKey}) async {
@@ -334,8 +448,9 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         );
         if (!mounted) return _SendFlowOutcome.cancelled;
         if (retryAction == _FailureAction.retry) continue;
-        if (retryAction == _FailureAction.retake)
+        if (retryAction == _FailureAction.retake) {
           return _SendFlowOutcome.retakeRequired;
+        }
         return _SendFlowOutcome.cancelled;
       }
     }
@@ -395,12 +510,12 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         ? 'Предмет не указан'
         : lesson.subjectName.trim();
     final homework = lesson.homeworkText.trim().isEmpty
-        ? 'не задано'
+        ? 'Не задано'
         : lesson.homeworkText.trim();
     final date = _dayKey(lesson.date) == _unknownDayKey
         ? lesson.date.trim()
         : _dayKey(lesson.date);
-    return '*📚 $subject*\n$homework\n*📅 $date*';
+    return '📚 $subject\n$homework\n📅 $date';
   }
 
   String _buildIdempotencyKey(String lessonId) {
@@ -412,7 +527,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     if (localProfile == null) return const <String>[];
     final values = <String>[
       localProfile.parentPhone1.toString(),
-      localProfile.parentPhone2.toString()
+      localProfile.parentPhone2.toString(),
     ];
     final result = <String>[];
     for (final value in values) {
@@ -450,68 +565,174 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
+}
 
-  String _ensureSelectedDay(List<_DayOption> options) {
-    if (options.isEmpty) {
-      _selectedDayKey = _unknownDayKey;
-      return _unknownDayKey;
-    }
-    final keys = options.map((option) => option.dayKey).toSet();
-    if (_selectedDayKey != null && keys.contains(_selectedDayKey)) {
-      return _selectedDayKey!;
-    }
-    final today = DateTime.now();
-    final todayKey =
-        '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    if (keys.contains(todayKey)) {
-      _selectedDayKey = todayKey;
-      return todayKey;
-    }
-    _selectedDayKey = options.first.dayKey;
-    return _selectedDayKey!;
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Ink(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          color: const Color(0x4A130E30),
+          border: Border.all(color: const Color(0x70302466)),
+        ),
+        child: Icon(icon, color: const Color(0xFFE6DBFF), size: 23),
+      ),
+    );
   }
+}
 
-  List<_DayOption> _collectDayOptions(List<LessonsEntity> lessons) {
-    final grouped = <String, String>{};
-    for (final lesson in lessons) {
-      final key = _dayKey(lesson.date);
-      grouped.putIfAbsent(key, () => _formatDayLabel(key));
-    }
-    final options = grouped.entries
-        .map((entry) => _DayOption(dayKey: entry.key, display: entry.value))
-        .toList(growable: false)
-      ..sort((a, b) => a.dayKey.compareTo(b.dayKey));
-    return options;
+class _HomeworkTopDecor extends StatelessWidget {
+  const _HomeworkTopDecor();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          top: -130,
+          left: -40,
+          right: -40,
+          child: Container(
+            height: 320,
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.4),
+                radius: 0.95,
+                colors: [
+                  Color(0x34196BFF),
+                  Color(0x160D3CC0),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+        for (final star in const <Offset>[
+          Offset(56, 72),
+          Offset(188, 58),
+          Offset(280, 86),
+          Offset(318, 132),
+          Offset(214, 152),
+        ])
+          Positioned(
+            left: star.dx,
+            top: star.dy,
+            child: Container(
+              width: 3.2,
+              height: 3.2,
+              decoration: const BoxDecoration(
+                color: Color(0x88B98AFF),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
   }
+}
 
-  bool _isDangerLesson(LessonsEntity lesson) {
-    final normalized = _normalizeDangerText(
-        [lesson.subjectName, lesson.topic, lesson.homeworkText].join(' '));
-    if (normalized.isEmpty) return false;
-    final tokens =
-        normalized.split(RegExp(r'\s+')).where((token) => token.isNotEmpty);
-    return tokens.any((token) =>
-        token == 'сор' ||
-        token == 'соч' ||
-        token == 'sor' ||
-        token == 'soch' ||
-        token.startsWith('контрольн'));
+class _WeekArrow extends StatelessWidget {
+  const _WeekArrow({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Ink(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0x291A103D),
+          border: Border.all(color: const Color(0x57352362)),
+        ),
+        child: Icon(icon, color: const Color(0xFFD9CDFD), size: 20),
+      ),
+    );
   }
+}
 
-  String _dayKey(String rawDate) {
-    final trimmed = rawDate.trim();
-    if (trimmed.length >= 10 && trimmed[4] == '-' && trimmed[7] == '-') {
-      return trimmed.substring(0, 10);
-    }
-    return _unknownDayKey;
+class _HomeworkWeekdaySelector extends StatelessWidget {
+  const _HomeworkWeekdaySelector({
+    required this.weekDates,
+    required this.selectedDayKey,
+    required this.onBack,
+    required this.onForward,
+    required this.onSelectDay,
+  });
+
+  final List<DateTime> weekDates;
+  final String selectedDayKey;
+  final VoidCallback onBack;
+  final VoidCallback onForward;
+  final ValueChanged<String> onSelectDay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('homework-week-day-selector'),
+      height: 82,
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF120D2C), Color(0xFF1A1338)],
+        ),
+        border: Border.all(color: const Color(0x6F3A2A69)),
+      ),
+      child: Row(
+        children: [
+          _WeekArrow(icon: Icons.chevron_left_rounded, onTap: onBack),
+          const SizedBox(width: 5),
+          for (final date in weekDates)
+            Expanded(
+              child: _WeekdayChip(
+                date: date,
+                selected:
+                    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}' ==
+                        selectedDayKey,
+                onTap: () => onSelectDay(
+                  '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ),
+          const SizedBox(width: 5),
+          _WeekArrow(icon: Icons.chevron_right_rounded, onTap: onForward),
+        ],
+      ),
+    );
   }
+}
 
-  String _formatDayLabel(String dayKey) {
-    if (dayKey == _unknownDayKey) return 'Без даты';
-    final parsed = DateTime.tryParse(dayKey);
-    if (parsed == null) return dayKey;
+class _WeekdayChip extends StatelessWidget {
+  const _WeekdayChip({
+    required this.date,
+    required this.selected,
+    required this.onTap,
+  });
 
-    const weekdays = <int, String>{
+  final DateTime date;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const shortWeekday = <int, String>{
       DateTime.monday: 'Пн',
       DateTime.tuesday: 'Вт',
       DateTime.wednesday: 'Ср',
@@ -520,12 +741,14 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
       DateTime.saturday: 'Сб',
       DateTime.sunday: 'Вс',
     };
-    const months = <int, String>{
+    final isWeekend =
+        date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+    const shortMonth = <int, String>{
       1: 'янв',
       2: 'фев',
       3: 'мар',
       4: 'апр',
-      5: 'май',
+      5: 'мая',
       6: 'июн',
       7: 'июл',
       8: 'авг',
@@ -534,45 +757,60 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
       11: 'ноя',
       12: 'дек',
     };
-    final weekday = weekdays[parsed.weekday] ?? '';
-    final month = months[parsed.month] ?? '';
-    return '$weekday, ${parsed.day} $month';
-  }
-}
 
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({required this.mode, required this.onModeChanged});
-
-  final _HomeworkMode mode;
-  final ValueChanged<_HomeworkMode> onModeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.all(4),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: AnimatedContainer(
+        key: Key(
+            'homework-weekday-chip-${date.weekday}-${selected ? 'on' : 'off'}'),
+        duration: const Duration(milliseconds: 170),
+        margin: const EdgeInsets.symmetric(horizontal: 1.5),
         decoration: BoxDecoration(
-          color: scheme.kundiElevated.withValues(alpha: 0.72),
-          borderRadius: KundiRadius.pill,
-          border: Border.all(color: scheme.kundiBorder),
+          borderRadius: BorderRadius.circular(12),
+          color: selected ? const Color(0x5A4D2FA0) : Colors.transparent,
+          border: Border.all(
+            color: selected ? const Color(0xA78E62FF) : Colors.transparent,
+          ),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x4A8E56FF),
+                    blurRadius: 10,
+                  ),
+                ]
+              : const [],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _ModePill(
-              label: 'ДЗ',
-              icon: Icons.check_rounded,
-              selected: mode == _HomeworkMode.homework,
-              onTap: () => onModeChanged(_HomeworkMode.homework),
+            Text(
+              shortWeekday[date.weekday] ?? '',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    fontSize: 10.8,
+                    color: isWeekend
+                        ? const Color(0xFFFF6F95)
+                        : const Color(0xCFCDC2F5),
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
-            const SizedBox(width: 6),
-            _ModePill(
-              label: 'Тема',
-              icon: Icons.menu_book_rounded,
-              selected: mode == _HomeworkMode.topic,
-              onTap: () => onModeChanged(_HomeworkMode.topic),
+            const SizedBox(height: 1),
+            Text(
+              '${date.day}',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontSize: 13.4,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 0.5),
+            Text(
+              shortMonth[date.month] ?? '',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: const Color(0xB59D91C9),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ],
         ),
@@ -581,123 +819,207 @@ class _ModeToggle extends StatelessWidget {
   }
 }
 
-class _DaySwitch extends StatelessWidget {
-  const _DaySwitch({
-    required this.label,
-    required this.canGoBack,
-    required this.canGoForward,
-    required this.onBack,
-    required this.onForward,
+class _HomeworkSummaryCard extends StatelessWidget {
+  const _HomeworkSummaryCard({
+    required this.lessonsCount,
+    required this.doneCount,
+    required this.progressPercent,
   });
 
-  final String label;
-  final bool canGoBack;
-  final bool canGoForward;
-  final VoidCallback onBack;
-  final VoidCallback onForward;
+  final int lessonsCount;
+  final int doneCount;
+  final int? progressPercent;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return KundiSectionCard(
-      margin: EdgeInsets.zero,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    final progressValue = progressPercent == null
+        ? 0.0
+        : (progressPercent!.clamp(0, 100) / 100.0);
+
+    return Container(
+      key: const Key('homework-summary-card'),
+      height: 84,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF120E2B), Color(0xFF1A1238)],
+        ),
+        border: Border.all(color: const Color(0x7A392965)),
+      ),
       child: Row(
         children: [
-          _EarButton(
-              icon: Icons.chevron_left, enabled: canGoBack, onPressed: onBack),
-          Expanded(
-            child: Center(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
-                    ),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6D49D7), Color(0xFF8A5DFF)],
               ),
             ),
+            child: const Icon(Icons.assignment_outlined,
+                color: Color(0xFFE8DFFF), size: 21),
           ),
-          _EarButton(
-              icon: Icons.chevron_right,
-              enabled: canGoForward,
-              onPressed: onForward),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lessonsCount == 0
+                      ? 'Сегодня уроков нет'
+                      : 'Сегодня $lessonsCount уроков',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 14.8,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                RichText(
+                  text: TextSpan(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 11.8,
+                          color: const Color(0xDAB8AEE2),
+                        ),
+                    children: [
+                      const TextSpan(text: 'Из них '),
+                      TextSpan(
+                        text: '$doneCount задания',
+                        style: const TextStyle(
+                          color: Color(0xFFA66BFF),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const TextSpan(text: ' выполнено'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 54,
+            height: 54,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: CircularProgressIndicator(
+                    value: 1,
+                    strokeWidth: 6.2,
+                    color: Color(0x4C8C72CA),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: CircularProgressIndicator(
+                    value: progressPercent == null ? 0 : progressValue,
+                    strokeWidth: 6.2,
+                    color: const Color(0xFF9B55FF),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                Text(
+                  progressPercent == null ? '—' : '${progressPercent!}%',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 15.4,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _EarButton extends StatelessWidget {
-  const _EarButton(
-      {required this.icon, required this.enabled, required this.onPressed});
+class _HomeworkModeToggle extends StatelessWidget {
+  const _HomeworkModeToggle({
+    required this.mode,
+    required this.onModeChanged,
+  });
 
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onPressed;
+  final _HomeworkMode mode;
+  final ValueChanged<_HomeworkMode> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: enabled ? onPressed : null,
-      icon: Icon(icon),
-      visualDensity: VisualDensity.compact,
-      splashRadius: 18,
+    return Container(
+      key: const Key('homework-mode-toggle'),
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF130D2F), Color(0xFF1B133C)],
+        ),
+        border: Border.all(color: const Color(0x88372663)),
+      ),
+      child: Row(
+        children: [
+          _ModeSegment(
+            label: 'ДЗ',
+            selected: mode == _HomeworkMode.homework,
+            onTap: () => onModeChanged(_HomeworkMode.homework),
+          ),
+          _ModeSegment(
+            label: 'Тема урока',
+            selected: mode == _HomeworkMode.topic,
+            onTap: () => onModeChanged(_HomeworkMode.topic),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _ModePill extends StatelessWidget {
-  const _ModePill(
-      {required this.label,
-      required this.icon,
-      required this.selected,
-      required this.onTap});
+class _ModeSegment extends StatelessWidget {
+  const _ModeSegment({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
-  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      borderRadius: KundiRadius.pill,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: KundiRadius.pill,
-          color: selected
-              ? scheme.primary.withValues(alpha: 0.30)
-              : Colors.transparent,
-          border: Border.all(
-              color: selected
-                  ? scheme.primary.withValues(alpha: 0.65)
-                  : Colors.transparent),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: selected
-                  ? scheme.onPrimaryContainer
-                  : scheme.kundiTextSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 170),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: selected
+                ? const LinearGradient(
+                    colors: [Color(0xFF6E42E0), Color(0xFF8E56FF)],
+                  )
+                : null,
+            color: selected ? null : Colors.transparent,
+          ),
+          child: Center(
+            child: Text(
               label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 14.0,
+                    color: selected ? Colors.white : const Color(0xD0B8AEE2),
                     fontWeight: FontWeight.w700,
-                    color: selected
-                        ? scheme.onPrimaryContainer
-                        : scheme.kundiTextSecondary,
                   ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -708,77 +1030,324 @@ class _HomeworkLessonCard extends StatelessWidget {
   const _HomeworkLessonCard({
     required this.lesson,
     required this.mode,
-    required this.isDanger,
+    required this.isDone,
+    required this.progressActive,
     required this.sendStatus,
+    required this.isFirst,
+    required this.isLast,
     required this.onLessonTap,
   });
 
   final LessonsEntity lesson;
   final _HomeworkMode mode;
-  final bool isDanger;
+  final bool isDone;
+  final bool progressActive;
   final _LessonSendStatus sendStatus;
+  final bool isFirst;
+  final bool isLast;
   final VoidCallback onLessonTap;
 
   @override
   Widget build(BuildContext context) {
     final subject = lesson.subjectName.trim().isEmpty
-        ? 'Без предмета'
+        ? 'Предмет не указан'
         : lesson.subjectName.trim();
     final content = mode == _HomeworkMode.homework
         ? lesson.homeworkText.trim()
         : lesson.topic.trim();
+    final fallback = mode == _HomeworkMode.homework
+        ? 'Домашнее задание не задано'
+        : 'Тема урока не указана';
     final timeRange =
         (lesson.startTime.trim().isNotEmpty && lesson.endTime.trim().isNotEmpty)
-            ? '${lesson.startTime.trim()}-${lesson.endTime.trim()}'
+            ? '${lesson.startTime.trim()} — ${lesson.endTime.trim()}'
             : '';
-    final headerLine =
-        'Урок ${lesson.lessonNumber} · $subject${timeRange.isEmpty ? '' : ' · $timeRange'}';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: KundiSpace.sm, vertical: KundiSpace.xs),
-      child: InkWell(
-        borderRadius: KundiRadius.md,
-        onTap: sendStatus == _LessonSendStatus.sending ? null : onLessonTap,
-        child: KundiAttentionPulse(
-          active: isDanger,
-          child: KundiSectionCard(
-            margin: EdgeInsets.zero,
-            padding: const EdgeInsets.symmetric(
-                horizontal: KundiSpace.sm, vertical: 12),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: sendStatus == _LessonSendStatus.sending ? null : onLessonTap,
+      child: Container(
+        key: Key('homework-lesson-card-${lesson.id}'),
+        constraints: const BoxConstraints(minHeight: 74),
+        padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF110D2B), Color(0xFF1A1238)],
+          ),
+          border: Border.all(color: const Color(0x7A392965)),
+        ),
+        child: Row(
+          children: [
+            _TimelineNode(
+              number: lesson.lessonNumber,
+              isFirst: isFirst,
+              isLast: isLast,
+              active: progressActive,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    subject,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontSize: 13.8,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                  ),
+                  const SizedBox(height: 0.5),
+                  Text(
+                    content.isEmpty ? fallback : content,
+                    softWrap: true,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 11.8,
+                          color: const Color(0xD5B8AEE2),
+                        ),
+                  ),
+                  if (timeRange.isNotEmpty) ...[
+                    const SizedBox(height: 0.5),
+                    Text(
+                      timeRange,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontSize: 11.2,
+                            color: const Color(0xC38177A8),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            _LessonCompletionIndicator(
+              done: isDone || sendStatus == _LessonSendStatus.sent,
+              sending: sendStatus == _LessonSendStatus.sending,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineNode extends StatelessWidget {
+  const _TimelineNode({
+    required this.number,
+    required this.isFirst,
+    required this.isLast,
+    required this.active,
+  });
+
+  final int number;
+  final bool isFirst;
+  final bool isLast;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: isFirst ? 18 : -6,
+            bottom: isLast ? 18 : -6,
+            child: Container(
+              width: 2,
+              color: active ? const Color(0x8A8F4CFF) : const Color(0x6548347A),
+            ),
+          ),
+          if (!isLast)
+            Positioned(
+              bottom: -1,
+              child: Container(
+                width: 6.5,
+                height: 6.5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active
+                      ? const Color(0xD18F4CFF)
+                      : const Color(0x7C5F4A9E),
+                ),
+              ),
+            ),
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: const Color(0x4E1A103D),
+              border: Border.all(color: const Color(0x7A3B2A69)),
+            ),
+            child: Text(
+              '$number',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 14.2,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LessonCompletionIndicator extends StatelessWidget {
+  const _LessonCompletionIndicator({
+    required this.done,
+    required this.sending,
+  });
+
+  final bool done;
+  final bool sending;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sending) {
+      return const SizedBox(
+        width: 32,
+        height: 32,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: done ? const Color(0xFF59D84A) : Colors.transparent,
+        border: Border.all(
+          color: done ? const Color(0xFF59D84A) : const Color(0x8A6D60A5),
+          width: 2,
+        ),
+      ),
+      child: done
+          ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
+          : null,
+    );
+  }
+}
+
+class _HomeworkEmptyDayCard extends StatelessWidget {
+  const _HomeworkEmptyDayCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('homework-empty-day-card'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF110D28), Color(0xFF1A1238)],
+        ),
+        border: Border.all(color: const Color(0x7A392965)),
+      ),
+      child: const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 22),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.coffee_rounded, color: Color(0xFFB6A6E6), size: 34),
+              SizedBox(height: 8),
+              Text(
+                'На этот день уроков нет',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Можно отдохнуть или выбрать другой день.',
+                style: TextStyle(
+                  color: Color(0xCCB8AEE2),
+                  fontSize: 13.6,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeworkWhatsAppButton extends StatelessWidget {
+  const _HomeworkWhatsAppButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C3CFF), Color(0xFFB15CFF)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x5E8F4CFF),
+            blurRadius: 16,
+            spreadRadius: 0.4,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        headerLine,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: KundiSpace.xs),
-                      Text(
-                        content.isNotEmpty
-                            ? content
-                            : mode == _HomeworkMode.homework
-                                ? 'Домашнее задание не задано'
-                                : 'Тема урока не указана',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontStyle: FontStyle.italic),
-                      ),
-                    ],
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.8)),
+                  ),
+                  child: const Icon(
+                    Icons.phone_in_talk_rounded,
+                    color: Colors.white,
+                    size: 15,
                   ),
                 ),
-                const SizedBox(width: KundiSpace.xs),
-                _StatusSlot(danger: isDanger, sendStatus: sendStatus),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontSize: 14.6,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -788,57 +1357,12 @@ class _HomeworkLessonCard extends StatelessWidget {
   }
 }
 
-class _StatusSlot extends StatelessWidget {
-  const _StatusSlot({required this.danger, required this.sendStatus});
-
-  final bool danger;
-  final _LessonSendStatus sendStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final badgeColor = Theme.of(context).colorScheme.error;
-    final successColor = Colors.green.shade400;
-    const pendingColor = Color(0xFF8E82A8);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (danger)
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: KundiSpace.xs, vertical: KundiSpace.xxs),
-            decoration: BoxDecoration(
-              color: badgeColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: badgeColor.withValues(alpha: 0.55)),
-            ),
-            child: Text(
-              'Контроль',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: badgeColor, fontWeight: FontWeight.w700),
-            ),
-          ),
-        const SizedBox(height: KundiSpace.xs),
-        if (sendStatus == _LessonSendStatus.sent)
-          Icon(Icons.check_circle, color: successColor, size: 30)
-        else if (sendStatus == _LessonSendStatus.sending)
-          const SizedBox(
-              width: 30,
-              height: 30,
-              child: CircularProgressIndicator(strokeWidth: 2))
-        else
-          const Icon(Icons.radio_button_unchecked_rounded,
-              color: pendingColor, size: 30),
-      ],
-    );
-  }
-}
-
 class _PhotoPreviewPage extends StatelessWidget {
-  const _PhotoPreviewPage(
-      {required this.lesson, required this.mode, required this.photoPath});
+  const _PhotoPreviewPage({
+    required this.lesson,
+    required this.mode,
+    required this.photoPath,
+  });
 
   final LessonsEntity lesson;
   final _HomeworkMode mode;
@@ -859,8 +1383,11 @@ class _PhotoPreviewPage extends StatelessWidget {
                 padding: const EdgeInsets.all(KundiSpace.sm),
                 child: ClipRRect(
                   borderRadius: KundiRadius.md,
-                  child: Image.file(File(photoPath),
-                      width: double.infinity, fit: BoxFit.contain),
+                  child: Image.file(
+                    File(photoPath),
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -872,13 +1399,16 @@ class _PhotoPreviewPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                        'Предмет: ${lesson.subjectName.trim().isEmpty ? 'Не указан' : lesson.subjectName.trim()}'),
+                      'Предмет: ${lesson.subjectName.trim().isEmpty ? 'Не указан' : lesson.subjectName.trim()}',
+                    ),
                     const SizedBox(height: KundiSpace.xxs),
                     Text(
-                        '${mode == _HomeworkMode.homework ? 'Задание' : 'Тема'}: ${content.isEmpty ? 'Не указано' : content}'),
+                      '${mode == _HomeworkMode.homework ? 'Задание' : 'Тема'}: ${content.isEmpty ? 'Не указано' : content}',
+                    ),
                     const SizedBox(height: KundiSpace.xxs),
                     Text(
-                        'Дата: ${lesson.date.trim().isEmpty ? 'Не указана' : lesson.date.trim()}'),
+                      'Дата: ${lesson.date.trim().isEmpty ? 'Не указана' : lesson.date.trim()}',
+                    ),
                   ],
                 ),
               ),
@@ -922,19 +1452,8 @@ class _PhotoPreviewPage extends StatelessWidget {
   }
 }
 
-class _DayOption {
-  const _DayOption({required this.dayKey, required this.display});
-
-  final String dayKey;
-  final String display;
-}
-
 String _normalizeDangerText(String value) {
-  final lowered = value
-      .toLowerCase()
-      .replaceAll('ё', 'е')
-      .replaceAll('cор', 'сор')
-      .replaceAll('cоч', 'соч');
+  final lowered = value.toLowerCase().replaceAll('ё', 'е');
   return lowered
       .replaceAll(RegExp(r'[^a-zа-я0-9]+', unicode: true), ' ')
       .trim();
