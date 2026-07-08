@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/core/db/app_database.dart';
 import 'package:kundi_mobile/core/network/api_client.dart';
 import 'package:kundi_mobile/core/network/read_source_policy.dart';
-import 'package:kundi_mobile/core/storage/secure_storage_service.dart';
 import 'package:kundi_mobile/core/db/sync_queue_repository.dart';
 import 'package:kundi_mobile/features/auth/data/auth_repository_impl.dart';
 import 'package:kundi_mobile/features/auth/data/academic_year_window.dart';
@@ -16,19 +14,8 @@ import 'package:kundi_mobile/runtimes/connector_runtime/sync_queue/sync_orchestr
 import 'package:kundi_mobile/runtimes/connector_runtime/sync_queue/sync_queue_service.dart';
 import 'package:kundi_mobile/runtimes/connector_runtime/contracts/models.dart';
 import 'package:kundi_mobile/core/db/canonical_cache_store.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
-class _NoopSecureStorageService extends SecureStorageService {
-  _NoopSecureStorageService() : super(const FlutterSecureStorage());
-
-  @override
-  Future<void> saveDiaryCredentials({
-    required String source,
-    required String login,
-    required String password,
-  }) async {}
-}
+import '../test_support/fake_secure_storage_service.dart';
 
 class _FakeQueueGateway implements SyncQueueGateway {
   @override
@@ -84,7 +71,7 @@ void main() {
   AuthRepositoryImpl buildRepository(String baseUrl) {
     return AuthRepositoryImpl(
       apiClient: ApiClient(baseUrl: baseUrl),
-      secureStorage: _NoopSecureStorageService(),
+      secureStorage: FakeSecureStorageService(),
       connectorRuntime: ConnectorRuntime(),
       canonicalCacheStore: CanonicalCacheStore(),
       syncQueueService: SyncQueueService(),

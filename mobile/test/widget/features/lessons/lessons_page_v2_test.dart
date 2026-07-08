@@ -10,7 +10,7 @@ import 'package:kundi_mobile/features/summary/domain/summary_entity.dart';
 import 'package:kundi_mobile/features/summary/domain/summary_repository.dart';
 
 void main() {
-  testWidgets('lessons page renders compact summary and human-readable lessons',
+  testWidgets('lessons page renders current hero, tutor block and lessons list',
       (tester) async {
     final lessonsRepo = _FakeLessonsRepository(
       const <LessonsEntity>[
@@ -69,21 +69,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Summary'), findsOneWidget);
-    expect(find.text('Lessons: 300'), findsOneWidget);
-    expect(find.text('Homework: 210'), findsOneWidget);
-    expect(find.text('Results: 229'), findsOneWidget);
-    expect(find.text('Attendance: 99'), findsOneWidget);
-    expect(find.textContaining('Algebra: 8'), findsOneWidget);
-    expect(find.textContaining('2026-04-06 Biology - Cells'), findsOneWidget);
-    expect(find.text('Algebra'), findsOneWidget);
-    expect(find.textContaining('Quadratic equations'), findsOneWidget);
-    expect(find.textContaining('HW: p.12 ex.3'), findsOneWidget);
-    expect(find.textContaining('Grade: 8'), findsOneWidget);
+    expect(find.byType(AppBar), findsOneWidget);
+    expect(find.text('Algebra'), findsWidgets);
+    expect(find.textContaining('Quadratic equations'), findsNothing);
+    expect(find.textContaining('p.12 ex.3'), findsNothing);
+    expect(find.textContaining('Центр дня'), findsOneWidget);
+    expect(find.textContaining('Ближайшие уроки'), findsOneWidget);
     expect(find.textContaining('l-1'), findsNothing);
+    expect(find.textContaining('Спросите Kundi'), findsOneWidget);
   });
 
-  testWidgets('lessons page handles empty lessons with summary card',
+  testWidgets('lessons page handles empty lessons with current empty state',
       (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -100,8 +96,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Summary unavailable'), findsOneWidget);
-    expect(find.text('No lessons yet'), findsOneWidget);
+    expect(find.textContaining('Центр дня'), findsOneWidget);
+    expect(find.textContaining('Ближайшие уроки'), findsOneWidget);
+    expect(find.textContaining('Уроки пока не загружены'), findsOneWidget);
   });
 }
 
