@@ -63,3 +63,24 @@ Do not touch in next UI-pass:
 - `mobile/assets/icon.png` unless product explicitly accepts the new icon
 - backend/API/contracts/runtime code for visual cleanup only
 - archived report folders unless replacing them with a new accepted baseline
+
+## Stable tested checkpoint
+
+- Stable tested commit: `97b19bc`
+- Intended tag: `mobile-ui-stable-tested`
+- Tag creation status: blocked in Codex Windows terminal by `CryptUnprotectData failed: 2148073483`
+- Manual command:
+  ```powershell
+  cd D:\Kundi
+  git status --short
+  git tag mobile-ui-stable-tested 97b19bc
+  git tag --list | findstr mobile-ui-stable-tested
+  ```
+
+## Accepted Home dashboard checkpoint
+
+- Home commit: `01f747f` (`feat(home): add Kundi dashboard and weekly gamification`)
+- Main page now includes the Kundi hero, greeting, and Kundi action row.
+- Gamification summary shows `ДЗ сегодня`, `ДЗ за неделю`, and `Посещаемость`.
+- Verification after the Home commit: `flutter test` PASS (155 tests); debug APK build PASS with `USE_TYPED_V2_READ=true` and `ENABLE_V2_PARITY_SHADOW=true`.
+- The intended `mobile-ui-stable-tested` tag is still not created because the Codex Windows terminal is blocked by `CryptUnprotectData failed: 2148073483`.
