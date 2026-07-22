@@ -29,12 +29,6 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
       PageController(initialPage: _initialPage);
   int _rootPageIndex = _initialPage;
 
-  static const _rootPages = <Widget>[
-    HomeworkPage(),
-    LessonsPage(),
-    GradesPage(),
-  ];
-
   static const _rootLabels = <String>[
     'ДЗ',
     'Главная',
@@ -150,6 +144,14 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
     return '${normalized.substring(0, 180)}...';
   }
 
+  void _showRootPage(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -164,6 +166,15 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
       systemNavigationBarDividerColor: Colors.transparent,
     );
 
+    final rootPages = <Widget>[
+      const HomeworkPage(),
+      LessonsPage(
+        onHomeworkTap: () => _showRootPage(0),
+        onGradesTap: () => _showRootPage(2),
+      ),
+      const GradesPage(),
+    ];
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: Scaffold(
@@ -175,7 +186,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
             }
             setState(() => _rootPageIndex = index);
           },
-          children: _rootPages,
+          children: rootPages,
         ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
@@ -205,11 +216,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            _pageController.animateToPage(
-                              index,
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutCubic,
-                            );
+                            _showRootPage(index);
                           },
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,

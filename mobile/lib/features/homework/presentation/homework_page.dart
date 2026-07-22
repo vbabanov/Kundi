@@ -13,6 +13,7 @@ import '../../../shared/widgets/kundi_surface.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../homework/data/homework_day_whatsapp_repository.dart';
 import '../../homework/data/homework_whatsapp_send_repository.dart';
+import '../../homework/domain/homework_progress.dart';
 import '../../lessons/application/lessons_controller.dart';
 import '../../lessons/domain/lessons_entity.dart';
 import '../../profile/application/profile_controller.dart';
@@ -235,7 +236,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         status == _LessonSendStatus.failed) {
       return false;
     }
-    return lesson.gradeValue.trim().isNotEmpty;
+    return isHomeworkCompleted(lesson);
   }
 
   int _completedPrefixCount(List<LessonsEntity> lessons) {

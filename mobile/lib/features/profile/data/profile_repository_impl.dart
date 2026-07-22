@@ -143,6 +143,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
       classLabel: classLabel,
       classTeacherFullName: (row['class_teacher_full_name'] ?? '').toString(),
       gradeLevel: _extractGradeLevel(classLabel),
+      studentFirstName: resolveStudentFirstName(
+        explicitFirstName: '',
+        fullName: (row['student_full_name'] ?? '').toString(),
+      ),
     );
   }
 
@@ -177,6 +181,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
       classTeacherFullName: '',
       gradeLevel: int.tryParse((row['grade_level'] ?? '').toString()) ??
           _extractGradeLevel(classLabel),
+      studentFirstName: resolveStudentFirstName(
+        explicitFirstName: firstName,
+        fullName: '$firstName $lastName',
+      ),
     );
   }
 
