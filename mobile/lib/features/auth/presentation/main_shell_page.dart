@@ -10,6 +10,7 @@ import '../../grades/application/grades_controller.dart';
 import '../../grades/presentation/grades_page.dart';
 import '../../homework/application/homework_controller.dart';
 import '../../homework/presentation/homework_page.dart';
+import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../lessons/application/lessons_controller.dart';
 import '../../lessons/presentation/lessons_page.dart';
 import '../../profile/application/profile_controller.dart';
@@ -23,11 +24,13 @@ class MainShellPage extends ConsumerStatefulWidget {
   ConsumerState<MainShellPage> createState() => _MainShellPageState();
 }
 
-class _MainShellPageState extends ConsumerState<MainShellPage> {
+class _MainShellPageState extends ConsumerState<MainShellPage>
+    with WidgetsBindingObserver {
   static const _initialPage = 1;
   late final PageController _pageController =
       PageController(initialPage: _initialPage);
   int _rootPageIndex = _initialPage;
+  late final bool _behaviorCoreEnabled;
 
   static const _rootLabels = <String>[
     'ДЗ',
@@ -44,16 +47,31 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
   @override
   void initState() {
     super.initState();
+    _behaviorCoreEnabled = ref.read(kundiBehaviorCoreEnabledProvider);
+    if (_behaviorCoreEnabled) {
+      WidgetsBinding.instance.addObserver(this);
+    }
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.portraitUp,
     ]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (_behaviorCoreEnabled) {
+        final behavior = ref.read(kundiBehaviorControllerProvider.notifier);
+        behavior.appOpened();
+        behavior.homeVisible();
+      }
       _bootstrapMainScreen();
     });
   }
 
   @override
   void dispose() {
+    if (_behaviorCoreEnabled) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
@@ -61,6 +79,15 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
     ]);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_behaviorCoreEnabled &&
+        state == AppLifecycleState.resumed &&
+        _rootPageIndex == _initialPage) {
+      ref.read(kundiBehaviorControllerProvider.notifier).homeVisible();
+    }
   }
 
   Future<void> _bootstrapMainScreen() async {
@@ -185,6 +212,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage> {
               return;
             }
             setState(() => _rootPageIndex = index);
+            if (_behaviorCoreEnabled && index == _initialPage) {
+              ref.read(kundiBehaviorControllerProvider.notifier).homeVisible();
+            }
           },
           children: rootPages,
         ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kundi_mobile/features/kundi_behavior/application/kundi_behavior_clock.dart';
+import 'package:kundi_mobile/features/kundi_behavior/application/kundi_behavior_controller.dart';
+import 'package:kundi_mobile/features/kundi_behavior/domain/kundi_behavior_event.dart';
 import 'package:kundi_mobile/features/lessons/application/lessons_controller.dart';
 import 'package:kundi_mobile/features/lessons/domain/lessons_entity.dart';
 import 'package:kundi_mobile/features/lessons/domain/lessons_repository.dart';
@@ -68,6 +71,81 @@ void main() {
     expect(find.byKey(const Key('home-action-grades')), findsOneWidget);
     expect(find.byKey(const Key('home-action-kundi')), findsOneWidget);
     _expectNoMojibake(tester);
+  });
+
+  testWidgets('behavior flag false preserves the stable Home contract',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    final clock = _FrozenBehaviorClock(DateTime.utc(2026, 4, 5, 7, 45));
+    final behavior = KundiBehaviorController(clock: clock)
+      ..dispatch(
+        KundiBehaviorEvent(
+          type: KundiBehaviorEventType.homeworkCompleted,
+          id: 'modeled-celebration',
+          occurredAt: clock.now(),
+        ),
+      );
+
+    await tester.pumpWidget(
+      _testApp(
+        lessons: const <LessonsEntity>[],
+        summary: SummaryEntity.empty,
+        studentName: '',
+        behaviorCoreEnabled: false,
+        behaviorController: behavior,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Давай посмотрим, что запланировано на сегодня.'),
+      findsOneWidget,
+    );
+    expect(find.text('Отличная работа!'), findsNothing);
+    expect(find.byKey(KundiHomeHero.heroKey), findsOneWidget);
+    expect(find.byKey(const Key('home-action-kundi')), findsOneWidget);
+  });
+
+  testWidgets('behavior flag true changes copy without changing Home geometry',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    final clock = _FrozenBehaviorClock(DateTime.utc(2026, 4, 5, 7, 45));
+    final behavior = KundiBehaviorController(clock: clock);
+
+    await tester.pumpWidget(
+      _testApp(
+        lessons: _sixLessons,
+        summary: _summaryWithGrades,
+        studentName: 'Артем',
+        behaviorCoreEnabled: true,
+        behaviorController: behavior,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final hero = find.byKey(KundiHomeHero.heroKey);
+    final actions = find.byKey(const Key('home-action-rows'));
+    final heroRectBefore = tester.getRect(hero);
+    final actionsRectBefore = tester.getRect(actions);
+
+    behavior.dispatch(
+      KundiBehaviorEvent(
+        type: KundiBehaviorEventType.homeworkCompleted,
+        id: 'modeled-celebration',
+        occurredAt: clock.now(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Отличная работа!'), findsOneWidget);
+    expect(tester.getRect(hero), heroRectBefore);
+    expect(tester.getRect(actions), actionsRectBefore);
+    final image = tester.widget<Image>(find.byKey(KundiHomeHero.assetKey));
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/images/kundi/home/kundi_home.webp',
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('homework and grades rows use existing callbacks',
@@ -163,6 +241,15 @@ void main() {
   testWidgets('narrow screen, long name and font scale 1.2 do not overflow',
       (tester) async {
     await _setSurface(tester, const Size(360, 800));
+    final clock = _FrozenBehaviorClock(DateTime.utc(2026, 4, 5, 7, 45));
+    final behavior = KundiBehaviorController(clock: clock)
+      ..dispatch(
+        KundiBehaviorEvent(
+          type: KundiBehaviorEventType.assistantFailure,
+          id: 'modeled-error',
+          occurredAt: clock.now(),
+        ),
+      );
     await tester.pumpWidget(
       _testApp(
         lessons: _sixLessonsWithLongHomework,
@@ -171,6 +258,8 @@ void main() {
             'АлександрОченьДлинноеИмяДляПроверки ПереполненияИнтерфейса',
         textScale: 1.2,
         withBottomNavigation: true,
+        behaviorCoreEnabled: true,
+        behaviorController: behavior,
       ),
     );
     await tester.pumpAndSettle();
@@ -197,6 +286,8 @@ Widget _testApp({
   VoidCallback? onGradesTap,
   double textScale = 1,
   bool withBottomNavigation = false,
+  bool behaviorCoreEnabled = false,
+  KundiBehaviorController? behaviorController,
 }) {
   final page = LessonsPage(
     now: DateTime(2026, 4, 5, 7, 45),
@@ -219,6 +310,11 @@ Widget _testApp({
       profileControllerProvider.overrideWith(
         () => _FakeProfileController(studentName),
       ),
+      kundiBehaviorCoreEnabledProvider.overrideWithValue(behaviorCoreEnabled),
+      if (behaviorController != null)
+        kundiBehaviorControllerProvider.overrideWith(
+          (ref) => behaviorController,
+        ),
     ],
     child: MaterialApp(
       theme: ThemeData.dark(useMaterial3: true),
@@ -288,6 +384,34 @@ class _FakeProfileController extends ProfileController {
         ),
         localAppProfile: null,
       );
+}
+
+class _FrozenBehaviorClock implements KundiBehaviorClock {
+  _FrozenBehaviorClock(this.current);
+
+  DateTime current;
+
+  @override
+  DateTime now() => current;
+
+  @override
+  KundiBehaviorTimerHandle schedule(
+    DateTime deadline,
+    void Function() callback,
+  ) {
+    return _FrozenTimerHandle();
+  }
+
+  @override
+  void cancel(KundiBehaviorTimerHandle handle) {
+    if (handle is _FrozenTimerHandle) {
+      handle.canceled = true;
+    }
+  }
+}
+
+class _FrozenTimerHandle implements KundiBehaviorTimerHandle {
+  bool canceled = false;
 }
 
 const _summaryWithGrades = SummaryEntity(

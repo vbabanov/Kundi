@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/widgets/kundi_surface.dart';
+import '../../kundi_behavior/application/kundi_behavior_controller.dart';
+import '../../kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
 import '../../profile/domain/profile_entity.dart';
 import '../../profile/application/profile_controller.dart';
 import '../../profile/presentation/profile_page.dart';
@@ -36,6 +38,10 @@ class LessonsPage extends ConsumerWidget {
         ref.watch(homeGamificationMetricsProvider(currentTime));
     final summaryState = ref.watch(summaryControllerProvider);
     final profileState = ref.watch(profileControllerProvider);
+    final behaviorCoreEnabled = ref.watch(kundiBehaviorCoreEnabledProvider);
+    final behaviorState = behaviorCoreEnabled
+        ? ref.watch(kundiBehaviorControllerProvider)
+        : null;
     final lessons = lessonsState.valueOrNull ?? const <LessonsEntity>[];
     final summary = summaryState.valueOrNull;
     final today = _TodaySnapshot.from(
@@ -48,6 +54,27 @@ class LessonsPage extends ConsumerWidget {
       explicitFirstName: identity?.studentFirstName ?? '',
       fullName: identity?.studentFullName ?? '',
     );
+    final greeting = homeGreetingFor(currentTime, studentName);
+    final heroMessage = _heroMessage(
+      lessonsState: lessonsState,
+      snapshot: today,
+    );
+    final semanticState = today.hasData
+        ? 'План на сегодня доступен'
+        : 'План на сегодня пока пуст';
+    KundiHomePresentation? behaviorPresentation;
+    if (behaviorState != null) {
+      try {
+        behaviorPresentation = const KundiHomePresentationAdapter().adapt(
+          state: behaviorState,
+          neutralTitle: greeting,
+          neutralMessage: heroMessage,
+          neutralSemanticLabel: semanticState,
+        );
+      } catch (_) {
+        behaviorPresentation = null;
+      }
+    }
 
     return Scaffold(
       body: KundiGradientBackground(
@@ -85,15 +112,14 @@ class LessonsPage extends ConsumerWidget {
               ],
               const SizedBox(height: 14),
               _HeroActionStack(
-                greeting: homeGreetingFor(currentTime, studentName),
+                greeting: behaviorPresentation?.title ?? greeting,
                 dateLabel: russianDateLabel(currentTime),
-                heroMessage: _heroMessage(
-                  lessonsState: lessonsState,
-                  snapshot: today,
-                ),
-                semanticState: today.hasData
-                    ? 'План на сегодня доступен'
-                    : 'План на сегодня пока пуст',
+                heroMessage: behaviorPresentation?.message ?? heroMessage,
+                semanticState:
+                    behaviorPresentation?.semanticLabel ?? semanticState,
+                heroAssetPath:
+                    behaviorPresentation?.assetPath ??
+                    LessonsPage._heroAssetPath,
                 homeworkText: _homeworkActionText(today.homeworkCount),
                 gradesTitle: _recentResultsTitle(summary),
                 gradesText: _latestGradesText(summary),
@@ -379,6 +405,7 @@ class _HeroActionStack extends StatelessWidget {
     required this.dateLabel,
     required this.heroMessage,
     required this.semanticState,
+    required this.heroAssetPath,
     required this.homeworkText,
     required this.gradesTitle,
     required this.gradesText,
@@ -390,6 +417,7 @@ class _HeroActionStack extends StatelessWidget {
   final String dateLabel;
   final String heroMessage;
   final String semanticState;
+  final String heroAssetPath;
   final String homeworkText;
   final String gradesTitle;
   final String gradesText;
@@ -448,7 +476,7 @@ class _HeroActionStack extends StatelessWidget {
           title: greeting,
           dateLabel: dateLabel,
           message: heroMessage,
-          assetPath: LessonsPage._heroAssetPath,
+          assetPath: heroAssetPath,
           semanticState: semanticState,
         ),
       ],
