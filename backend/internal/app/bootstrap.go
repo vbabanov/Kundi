@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,6 +11,8 @@ import (
 	analyticsmodule "github.com/kundi/kundi/backend/internal/modules/analytics"
 	assistantmodule "github.com/kundi/kundi/backend/internal/modules/assistant"
 	assistantllm "github.com/kundi/kundi/backend/internal/modules/assistant/llm"
+	assistantratelimit "github.com/kundi/kundi/backend/internal/modules/assistant/ratelimit"
+	assistantsafety "github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	assistanttts "github.com/kundi/kundi/backend/internal/modules/assistant/tts"
 	auditmodule "github.com/kundi/kundi/backend/internal/modules/audit"
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
@@ -87,10 +90,26 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	academicService := academic.NewService(pool, observe)
 	analyticsService := analyticsmodule.NewService(pool)
 	personaService := persona.NewService()
-	assistantService := assistantmodule.NewService(
+	assistantService := assistantmodule.NewServiceWithOptions(
 		personaService,
 		resolveLLMProvider(cfg.AI.LLMProvider, cfg.AI.LLMBaseURL, cfg.AI.LLMAPIKey),
 		resolveTTSProvider(cfg.AI.TTSProvider, cfg.AI.TTSBaseURL, cfg.AI.TTSAPIKey),
+		assistantmodule.Options{
+			InputLimits: assistantsafety.Limits{
+				MaxTextRunes:           cfg.AI.AssistantMaxTextRunes,
+				MaxHistoryMessages:     cfg.AI.AssistantMaxHistoryMessages,
+				MaxHistoryMessageRunes: cfg.AI.AssistantMaxHistoryMessageRunes,
+				MaxHistoryRunes:        cfg.AI.AssistantMaxHistoryRunes,
+			},
+			RateLimiter: assistantratelimit.NewInMemory(assistantratelimit.Config{
+				Limit:         cfg.AI.AssistantRateLimit,
+				Window:        cfg.AI.AssistantRateWindow,
+				MaxIdentities: cfg.AI.AssistantRateLimiterMaxIdentities,
+			}),
+			AudioURLValidator: assistantsafety.NewAudioURLValidator(trustedAudioHosts(cfg.AI.TTSBaseURL, cfg.AI.TTSTrustedHosts)),
+			LLMTimeout:        cfg.AI.AssistantLLMTimeout,
+			Logger:            log,
+		},
 	)
 
 	jobsRepo := jobsmodule.NewPostgresRepository(pool)
@@ -154,6 +173,15 @@ func resolveTTSProvider(providerName string, baseURL string, apiKey string) assi
 	default:
 		return assistanttts.NewService(baseURL)
 	}
+}
+
+func trustedAudioHosts(baseURL string, configured []string) []string {
+	hosts := append([]string(nil), configured...)
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	if err == nil && parsed.Hostname() != "" {
+		hosts = append(hosts, parsed.Hostname())
+	}
+	return hosts
 }
 
 func resolveWhatsAppProvider(providerName string, baseURL string, apiKey string) whatsappmodule.Provider {

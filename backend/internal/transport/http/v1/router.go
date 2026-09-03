@@ -26,6 +26,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/integrations/providerstatus"
 	"github.com/kundi/kundi/backend/internal/modules/academic"
 	assistantmodule "github.com/kundi/kundi/backend/internal/modules/assistant"
+	assistantsafety "github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
 	ingestmodule "github.com/kundi/kundi/backend/internal/modules/diary_ingest"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
@@ -407,16 +408,18 @@ func (a *API) assistantMessage(w http.ResponseWriter, r *http.Request) {
 		Text       string                       `json:"text"`
 		History    []assistantmodule.ChatRecord `json:"history"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, assistantsafety.DefaultMaxRequestBodyBytes)
 	if err := decodeJSONStrict(r, &req); err != nil {
 		httpx.JSONError(w, apperrors.BadRequest("invalid_json", "request body is not valid JSON"))
 		return
 	}
 	result, err := a.deps.AssistantService.Message(r.Context(), assistantmodule.MessageCommand{
-		StudentID:  studentID.String(),
-		Mode:       assistantmodule.Mode(strings.TrimSpace(req.Mode)),
-		GradeLevel: req.GradeLevel,
-		Text:       req.Text,
-		History:    req.History,
+		StudentID:        studentID.String(),
+		Mode:             assistantmodule.Mode(strings.TrimSpace(req.Mode)),
+		GradeLevel:       req.GradeLevel,
+		Text:             req.Text,
+		History:          req.History,
+		EnforceRateLimit: true,
 	})
 	if err != nil {
 		httpx.JSONError(w, err)

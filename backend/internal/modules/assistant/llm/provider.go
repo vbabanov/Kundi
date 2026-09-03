@@ -3,8 +3,41 @@ package llm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 )
+
+type ErrorKind string
+
+const (
+	ErrorClient        ErrorKind = "provider_client_error"
+	ErrorServer        ErrorKind = "provider_server_error"
+	ErrorMalformed     ErrorKind = "provider_malformed_response"
+	ErrorConfiguration ErrorKind = "provider_configuration_error"
+)
+
+type ProviderError struct {
+	Kind       ErrorKind
+	StatusCode int
+	Err        error
+}
+
+func (e *ProviderError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.StatusCode != 0 {
+		return fmt.Sprintf("llm provider error (%s, status %d)", e.Kind, e.StatusCode)
+	}
+	return fmt.Sprintf("llm provider error (%s)", e.Kind)
+}
+
+func (e *ProviderError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
 
 type Request struct {
 	Mode        string

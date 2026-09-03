@@ -28,7 +28,7 @@ func NewHTTPProvider(baseURL string, apiKey string) *HTTPProvider {
 
 func (p *HTTPProvider) Generate(ctx context.Context, req Request) (Response, error) {
 	if p.baseURL == "" {
-		return Response{}, fmt.Errorf("llm base URL is required for http provider")
+		return Response{}, &ProviderError{Kind: ErrorConfiguration, Err: fmt.Errorf("llm base URL is required")}
 	}
 	body, err := json.Marshal(map[string]any{
 		"mode":         req.Mode,
@@ -57,17 +57,21 @@ func (p *HTTPProvider) Generate(ctx context.Context, req Request) (Response, err
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode >= 400 {
-		return Response{}, fmt.Errorf("llm provider returned status %d", httpResp.StatusCode)
+		kind := ErrorClient
+		if httpResp.StatusCode >= http.StatusInternalServerError {
+			kind = ErrorServer
+		}
+		return Response{}, &ProviderError{Kind: kind, StatusCode: httpResp.StatusCode}
 	}
 
 	var payload struct {
 		Text string `json:"text"`
 	}
 	if err := json.NewDecoder(httpResp.Body).Decode(&payload); err != nil {
-		return Response{}, err
+		return Response{}, &ProviderError{Kind: ErrorMalformed, Err: err}
 	}
 	if strings.TrimSpace(payload.Text) == "" {
-		return Response{}, fmt.Errorf("llm response text is empty")
+		return Response{}, &ProviderError{Kind: ErrorMalformed, Err: fmt.Errorf("llm response text is empty")}
 	}
 	return Response{Text: strings.TrimSpace(payload.Text)}, nil
 }
