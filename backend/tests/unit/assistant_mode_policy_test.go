@@ -8,7 +8,6 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/llm"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tts"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
-	"github.com/kundi/kundi/backend/internal/platform/apperrors"
 )
 
 func TestAssistantModeRoutingAndGradeBand(t *testing.T) {
@@ -64,15 +63,15 @@ func TestAssistantModerationRestriction(t *testing.T) {
 		tts.NewService(""),
 	)
 
-	_, err := svc.Message(context.Background(), assistant.MessageCommand{
+	response, err := svc.Message(context.Background(), assistant.MessageCommand{
 		StudentID: "8d8d8ec8-27e6-4623-a325-c2e7e9db2da2",
 		Mode:      assistant.ModeTutor,
-		Text:      "I want to kill yourself",
+		Text:      "I want to kill myself",
 	})
-	if err == nil {
-		t.Fatalf("expected moderation block error")
+	if err != nil {
+		t.Fatalf("moderation block must use the assistant response contract: %v", err)
 	}
-	if !apperrors.Is(err, "assistant_moderation_blocked") {
-		t.Fatalf("expected assistant_moderation_blocked, got %v", err)
+	if !response.Pedagogy.SafetyIntervention || response.AudioStatus != assistant.AudioStatusUnavailable {
+		t.Fatalf("expected a safe intervention response, got %#v", response)
 	}
 }

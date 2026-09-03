@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +13,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/app"
 	assistantmodule "github.com/kundi/kundi/backend/internal/modules/assistant"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/llm"
-	"github.com/kundi/kundi/backend/internal/modules/assistant/tts"
+	"github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	platformauth "github.com/kundi/kundi/backend/internal/platform/auth"
 	"github.com/kundi/kundi/backend/internal/platform/config"
@@ -27,10 +28,11 @@ func TestAssistantEndpointHappyPath(t *testing.T) {
 	deps := &app.Bootstrap{
 		Config:       config.Config{App: config.AppConfig{Name: "test"}},
 		AccessTokens: tokens,
-		AssistantService: assistantmodule.NewService(
+		AssistantService: assistantmodule.NewServiceWithOptions(
 			persona.NewService(),
 			llm.NewDeterministicProvider(),
-			tts.NewService(""),
+			integrationTrustedTTS{},
+			assistantmodule.Options{AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
 		),
 	}
 
@@ -81,4 +83,10 @@ func TestAssistantEndpointHappyPath(t *testing.T) {
 	if behavior["grade_band"] != "primary" {
 		t.Fatalf("expected primary grade_band, got %#v", behavior["grade_band"])
 	}
+}
+
+type integrationTrustedTTS struct{}
+
+func (integrationTrustedTTS) Render(context.Context, string) (string, error) {
+	return "https://media.example.com/audio/assistant.mp3", nil
 }
