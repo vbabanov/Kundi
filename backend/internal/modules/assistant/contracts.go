@@ -8,11 +8,12 @@ const (
 )
 
 type MessageCommand struct {
-	StudentID  string       `json:"student_id"`
-	Mode       Mode         `json:"mode"`
-	GradeLevel int          `json:"grade_level"`
-	Text       string       `json:"text"`
-	History    []ChatRecord `json:"history"`
+	StudentID        string       `json:"student_id"`
+	Mode             Mode         `json:"mode"`
+	GradeLevel       int          `json:"grade_level"`
+	Text             string       `json:"text"`
+	History          []ChatRecord `json:"history"`
+	EnforceRateLimit bool         `json:"-"`
 }
 
 type ChatRecord struct {
