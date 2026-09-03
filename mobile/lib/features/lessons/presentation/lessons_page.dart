@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../runtimes/kundi_native_avatar/kundi_home_avatar_loading_frame.dart';
 import '../../../shared/widgets/kundi_surface.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
@@ -22,6 +23,10 @@ class LessonsPage extends ConsumerWidget {
     this.onHomeworkTap,
     this.onGradesTap,
     this.now,
+    this.realtimeAvatarEnabled = false,
+    this.realtimeAvatarPreparing = false,
+    this.realtimeAvatarLoadingFrame,
+    this.isHomeVisible = true,
   });
 
   static const _heroAssetPath = 'assets/images/kundi/home/kundi_home.webp';
@@ -29,6 +34,10 @@ class LessonsPage extends ConsumerWidget {
   final VoidCallback? onHomeworkTap;
   final VoidCallback? onGradesTap;
   final DateTime? now;
+  final bool realtimeAvatarEnabled;
+  final bool realtimeAvatarPreparing;
+  final KundiHomeAvatarLoadingFrame? realtimeAvatarLoadingFrame;
+  final bool isHomeVisible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,6 +84,10 @@ class LessonsPage extends ConsumerWidget {
         behaviorPresentation = null;
       }
     }
+    final animationCueName = behaviorPresentation?.animationCueName ?? 'neutral';
+    final animationIdentity = animationCueName == 'neutral' || behaviorState == null
+        ? 'home:greeting:initial'
+        : behaviorState.sourceEventId;
 
     return Scaffold(
       body: KundiGradientBackground(
@@ -120,6 +133,12 @@ class LessonsPage extends ConsumerWidget {
                 heroAssetPath:
                     behaviorPresentation?.assetPath ??
                     LessonsPage._heroAssetPath,
+                realtimeAvatarEnabled: realtimeAvatarEnabled,
+                realtimeAvatarPreparing: realtimeAvatarPreparing,
+                realtimeAvatarLoadingFrame: realtimeAvatarLoadingFrame,
+                isHomeVisible: isHomeVisible,
+                animationCueName: animationCueName,
+                animationIdentity: animationIdentity,
                 homeworkText: _homeworkActionText(today.homeworkCount),
                 gradesTitle: _recentResultsTitle(summary),
                 gradesText: _latestGradesText(summary),
@@ -406,6 +425,12 @@ class _HeroActionStack extends StatelessWidget {
     required this.heroMessage,
     required this.semanticState,
     required this.heroAssetPath,
+    required this.realtimeAvatarEnabled,
+    required this.realtimeAvatarPreparing,
+    required this.realtimeAvatarLoadingFrame,
+    required this.isHomeVisible,
+    required this.animationCueName,
+    required this.animationIdentity,
     required this.homeworkText,
     required this.gradesTitle,
     required this.gradesText,
@@ -418,6 +443,12 @@ class _HeroActionStack extends StatelessWidget {
   final String heroMessage;
   final String semanticState;
   final String heroAssetPath;
+  final bool realtimeAvatarEnabled;
+  final bool realtimeAvatarPreparing;
+  final KundiHomeAvatarLoadingFrame? realtimeAvatarLoadingFrame;
+  final bool isHomeVisible;
+  final String animationCueName;
+  final String animationIdentity;
   final String homeworkText;
   final String gradesTitle;
   final String gradesText;
@@ -478,6 +509,12 @@ class _HeroActionStack extends StatelessWidget {
           message: heroMessage,
           assetPath: heroAssetPath,
           semanticState: semanticState,
+          realtimeAvatarEnabled: realtimeAvatarEnabled,
+          realtimeAvatarPreparing: realtimeAvatarPreparing,
+          preparedLoadingFrame: realtimeAvatarLoadingFrame,
+          isVisible: isHomeVisible,
+          animationCueName: animationCueName,
+          animationIdentity: animationIdentity,
         ),
       ],
     );

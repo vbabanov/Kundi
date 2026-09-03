@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -15,10 +16,18 @@ import '../../lessons/application/lessons_controller.dart';
 import '../../lessons/presentation/lessons_page.dart';
 import '../../profile/application/profile_controller.dart';
 import '../../summary/application/summary_controller.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_home_avatar_loading_frame.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_feature.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_prewarm.dart';
 import '../application/auth_controller.dart';
 
 class MainShellPage extends ConsumerStatefulWidget {
-  const MainShellPage({super.key});
+  const MainShellPage({
+    this.avatarLoadingFrame,
+    super.key,
+  });
+
+  final KundiHomeAvatarLoadingFrame? avatarLoadingFrame;
 
   @override
   ConsumerState<MainShellPage> createState() => _MainShellPageState();
@@ -30,7 +39,10 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   late final PageController _pageController =
       PageController(initialPage: _initialPage);
   int _rootPageIndex = _initialPage;
+  bool _homePageSettled = true;
   late final bool _behaviorCoreEnabled;
+  bool _avatarRuntimeReady = false;
+  bool _avatarRuntimeResolved = false;
 
   static const _rootLabels = <String>[
     'ДЗ',
@@ -47,6 +59,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   @override
   void initState() {
     super.initState();
+    _pageController.addListener(_handleRootPageScroll);
     _behaviorCoreEnabled = ref.read(kundiBehaviorCoreEnabledProvider);
     if (_behaviorCoreEnabled) {
       WidgetsBinding.instance.addObserver(this);
@@ -63,12 +76,16 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         behavior.appOpened();
         behavior.homeVisible();
       }
+      if (KundiNativeAvatarFeature.enabled) {
+        unawaited(_prewarmAvatar());
+      }
       _bootstrapMainScreen();
     });
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_handleRootPageScroll);
     if (_behaviorCoreEnabled) {
       WidgetsBinding.instance.removeObserver(this);
     }
@@ -79,6 +96,15 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     ]);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _handleRootPageScroll() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page;
+    if (page == null) return;
+    final settled = (page - _initialPage).abs() < 0.001;
+    if (_homePageSettled == settled) return;
+    setState(() => _homePageSettled = settled);
   }
 
   @override
@@ -123,6 +149,23 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         outcome: 'main_screen_init_failed',
         details: {'error': _sanitizeError(error.toString())},
       );
+    }
+  }
+
+  Future<void> _prewarmAvatar() async {
+    try {
+      final result = await KundiNativeAvatarPrewarm.run();
+      if (!mounted) return;
+      setState(() {
+        _avatarRuntimeReady = KundiNativeAvatarPrewarm.isRuntimeReady(result);
+        _avatarRuntimeResolved = true;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _avatarRuntimeReady = false;
+        _avatarRuntimeResolved = true;
+      });
     }
   }
 
@@ -195,9 +238,17 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
 
     final rootPages = <Widget>[
       const HomeworkPage(),
-      LessonsPage(
-        onHomeworkTap: () => _showRootPage(0),
-        onGradesTap: () => _showRootPage(2),
+      _MainShellKeepAlivePage(
+        child: LessonsPage(
+          onHomeworkTap: () => _showRootPage(0),
+          onGradesTap: () => _showRootPage(2),
+          realtimeAvatarEnabled:
+              KundiNativeAvatarFeature.enabled && _avatarRuntimeReady,
+          realtimeAvatarPreparing:
+              KundiNativeAvatarFeature.enabled && !_avatarRuntimeResolved,
+          realtimeAvatarLoadingFrame: widget.avatarLoadingFrame,
+          isHomeVisible: _rootPageIndex == _initialPage && _homePageSettled,
+        ),
       ),
       const GradesPage(),
     ];
@@ -294,5 +345,27 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         ),
       ),
     );
+  }
+}
+
+class _MainShellKeepAlivePage extends StatefulWidget {
+  const _MainShellKeepAlivePage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_MainShellKeepAlivePage> createState() =>
+      _MainShellKeepAlivePageState();
+}
+
+class _MainShellKeepAlivePageState extends State<_MainShellKeepAlivePage>
+    with AutomaticKeepAliveClientMixin<_MainShellKeepAlivePage> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/presentation/auth_page.dart';
 import '../features/auth/presentation/main_shell_page.dart';
 import '../features/auth/application/auth_controller.dart';
+import '../runtimes/kundi_native_avatar/kundi_home_avatar_loading_frame.dart';
+import '../runtimes/kundi_native_avatar/kundi_native_avatar_feature.dart';
 import '../shared/providers/providers.dart';
 import '../shared/theme/app_theme.dart';
 
@@ -21,8 +23,15 @@ class KundiApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       home: authState.when(
-        data: (session) =>
-            session == null ? const AuthPage() : const MainShellPage(),
+        data: (session) => session == null
+            ? const AuthPage()
+            : KundiHomeAvatarLoadingFrameGate(
+                enabled: KundiNativeAvatarFeature.enabled,
+                loading: const _StartupSplash(),
+                builder: (context, frame) => MainShellPage(
+                  avatarLoadingFrame: frame,
+                ),
+              ),
         loading: () => const _StartupSplash(),
         error: (_, __) => const AuthPage(),
       ),
