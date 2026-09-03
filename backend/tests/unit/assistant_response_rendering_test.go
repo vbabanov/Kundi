@@ -7,15 +7,16 @@ import (
 
 	assistant "github.com/kundi/kundi/backend/internal/modules/assistant"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/llm"
-	"github.com/kundi/kundi/backend/internal/modules/assistant/tts"
+	"github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 )
 
 func TestAssistantRenderingContracts(t *testing.T) {
-	svc := assistant.NewService(
+	svc := assistant.NewServiceWithOptions(
 		persona.NewService(),
 		llm.NewDeterministicProvider(),
-		tts.NewService(""),
+		trustedTTS{},
+		assistant.Options{AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
 	)
 
 	tutor, err := svc.Message(context.Background(), assistant.MessageCommand{
@@ -53,6 +54,12 @@ type failingTTS struct{}
 
 func (failingTTS) Render(context.Context, string) (string, error) {
 	return "", errors.New("tts unavailable")
+}
+
+type trustedTTS struct{}
+
+func (trustedTTS) Render(context.Context, string) (string, error) {
+	return "https://media.example.com/audio/assistant.mp3", nil
 }
 
 func TestAssistantTTSFailureFallbackContract(t *testing.T) {
