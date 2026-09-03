@@ -5,10 +5,42 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val kundiHomeRealtimeAvatarEnabled =
+    providers.gradleProperty("ENABLE_KUNDI_HOME_REALTIME_AVATAR")
+        .orElse(providers.environmentVariable("ENABLE_KUNDI_HOME_REALTIME_AVATAR"))
+        .map { it.equals("true", ignoreCase = true) }
+        .orElse(false)
+        .get()
+val kundiHomeAvatarGracePeriodMillis =
+    providers.gradleProperty("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS")
+        .orElse(providers.environmentVariable("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS"))
+        .orElse("30000")
+        .get()
+        .toLongOrNull()
+        ?: error("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS must be an integer")
+check(kundiHomeAvatarGracePeriodMillis in 0L..120_000L) {
+    "KUNDI_HOME_AVATAR_GRACE_PERIOD_MS must be between 0 and 120000"
+}
+val kundiHomeAvatarSourceFile =
+    layout.projectDirectory.file("../../assets/models/kundi/kundi_home_mobile.glb")
+val generatedKundiHomeAvatarAssets =
+    layout.buildDirectory.dir("generated/kundiHomeRealtimeAvatar/assets")
+val prepareKundiHomeAvatarAsset =
+    tasks.register<Copy>("prepareKundiHomeAvatarAsset") {
+        onlyIf { kundiHomeRealtimeAvatarEnabled }
+        from(kundiHomeAvatarSourceFile)
+        into(generatedKundiHomeAvatarAssets.map { it.dir("kundi") })
+        rename { "kundi_home_mobile.glb" }
+    }
+
 android {
     namespace = "com.kundi.kundi_mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -28,6 +60,36 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        buildConfigField(
+            "boolean",
+            "KUNDI_HOME_REALTIME_AVATAR_ENABLED",
+            kundiHomeRealtimeAvatarEnabled.toString(),
+        )
+        buildConfigField(
+            "long",
+            "KUNDI_HOME_AVATAR_GRACE_PERIOD_MS",
+            "${kundiHomeAvatarGracePeriodMillis}L",
+        )
+        if (kundiHomeRealtimeAvatarEnabled) {
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
+    }
+
+    if (kundiHomeRealtimeAvatarEnabled) {
+        sourceSets.getByName("main").java.srcDir("src/nativeAvatar/kotlin")
+        sourceSets.getByName("main").assets.srcDir(generatedKundiHomeAvatarAssets)
+        sourceSets.getByName("test").java.srcDir("src/nativeAvatarTest/kotlin")
+        packaging {
+            jniLibs {
+                excludes +=
+                    setOf(
+                        "lib/armeabi-v7a/**",
+                        "lib/x86_64/**",
+                    )
+            }
+        }
     }
 
     buildTypes {
@@ -39,6 +101,22 @@ android {
     }
 }
 
+if (kundiHomeRealtimeAvatarEnabled) {
+    tasks.configureEach {
+        if (name.startsWith("merge") && name.endsWith("Assets")) {
+            dependsOn(prepareKundiHomeAvatarAsset)
+        }
+    }
+}
+
 flutter {
     source = "../.."
+}
+
+dependencies {
+    if (kundiHomeRealtimeAvatarEnabled) {
+        implementation("com.google.android.filament:filament-android:1.74.0")
+        implementation("com.google.android.filament:gltfio-android:1.74.0")
+        testImplementation("junit:junit:4.13.2")
+    }
 }
