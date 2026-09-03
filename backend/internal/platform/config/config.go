@@ -49,13 +49,22 @@ type SecurityConfig struct {
 }
 
 type AIConfig struct {
-	WorkerConcurrency int
-	LLMProvider       string
-	LLMBaseURL        string
-	LLMAPIKey         string
-	TTSProvider       string
-	TTSBaseURL        string
-	TTSAPIKey         string
+	WorkerConcurrency                 int
+	LLMProvider                       string
+	LLMBaseURL                        string
+	LLMAPIKey                         string
+	TTSProvider                       string
+	TTSBaseURL                        string
+	TTSAPIKey                         string
+	TTSTrustedHosts                   []string
+	AssistantLLMTimeout               time.Duration
+	AssistantMaxTextRunes             int
+	AssistantMaxHistoryMessages       int
+	AssistantMaxHistoryMessageRunes   int
+	AssistantMaxHistoryRunes          int
+	AssistantRateLimit                int
+	AssistantRateWindow               time.Duration
+	AssistantRateLimiterMaxIdentities int
 }
 
 type WhatsAppConfig struct {
@@ -103,13 +112,22 @@ func Load() (Config, error) {
 			FieldEncryptionKey: env("FIELD_ENCRYPTION_KEY", ""),
 		},
 		AI: AIConfig{
-			WorkerConcurrency: envInt("AI_WORKER_CONCURRENCY", 4),
-			LLMProvider:       env("AI_LLM_PROVIDER", "deterministic"),
-			LLMBaseURL:        env("AI_LLM_BASE_URL", ""),
-			LLMAPIKey:         env("AI_LLM_API_KEY", ""),
-			TTSProvider:       env("AI_TTS_PROVIDER", "deterministic"),
-			TTSBaseURL:        env("AI_TTS_BASE_URL", "https://cdn.kundi.local"),
-			TTSAPIKey:         env("AI_TTS_API_KEY", ""),
+			WorkerConcurrency:                 envInt("AI_WORKER_CONCURRENCY", 4),
+			LLMProvider:                       env("AI_LLM_PROVIDER", "deterministic"),
+			LLMBaseURL:                        env("AI_LLM_BASE_URL", ""),
+			LLMAPIKey:                         env("AI_LLM_API_KEY", ""),
+			TTSProvider:                       env("AI_TTS_PROVIDER", "deterministic"),
+			TTSBaseURL:                        env("AI_TTS_BASE_URL", "https://cdn.kundi.local"),
+			TTSAPIKey:                         env("AI_TTS_API_KEY", ""),
+			TTSTrustedHosts:                   envList("AI_TTS_TRUSTED_HOSTS"),
+			AssistantLLMTimeout:               time.Duration(envInt("AI_ASSISTANT_LLM_TIMEOUT_SEC", 12)) * time.Second,
+			AssistantMaxTextRunes:             envInt("AI_ASSISTANT_MAX_TEXT_RUNES", 4_000),
+			AssistantMaxHistoryMessages:       envInt("AI_ASSISTANT_MAX_HISTORY_MESSAGES", 20),
+			AssistantMaxHistoryMessageRunes:   envInt("AI_ASSISTANT_MAX_HISTORY_MESSAGE_RUNES", 4_000),
+			AssistantMaxHistoryRunes:          envInt("AI_ASSISTANT_MAX_HISTORY_RUNES", 12_000),
+			AssistantRateLimit:                envInt("AI_ASSISTANT_RATE_LIMIT", 20),
+			AssistantRateWindow:               time.Duration(envInt("AI_ASSISTANT_RATE_WINDOW_SEC", 60)) * time.Second,
+			AssistantRateLimiterMaxIdentities: envInt("AI_ASSISTANT_RATE_MAX_IDENTITIES", 10_000),
 		},
 		WhatsApp: WhatsAppConfig{
 			WorkerConcurrency: envInt("WHATSAPP_WORKER_CONCURRENCY", 2),
@@ -172,4 +190,18 @@ func envBool(key string, fallback bool) bool {
 	default:
 		return fallback
 	}
+}
+
+func envList(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+	items := make([]string, 0)
+	for _, item := range strings.Split(raw, ",") {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
