@@ -41,14 +41,30 @@ type SendSessionMessageCommand struct {
 }
 
 type SessionMessageResult struct {
-	UserMessage      SessionMessage `json:"user_message"`
-	AssistantMessage SessionMessage `json:"assistant_message"`
-	ResponseMode     string         `json:"response_mode"`
-	HelpLevel        string         `json:"help_level"`
-	FollowUpQuestion string         `json:"follow_up_question,omitempty"`
-	Emotion          string         `json:"emotion"`
-	AnimationCue     string         `json:"animation_cue"`
-	Suggestions      []string       `json:"suggestions"`
+	UserMessage      SessionMessage    `json:"user_message"`
+	AssistantMessage SessionMessage    `json:"assistant_message"`
+	ResponseMode     string            `json:"response_mode"`
+	HelpLevel        string            `json:"help_level"`
+	FollowUpQuestion string            `json:"follow_up_question,omitempty"`
+	Emotion          string            `json:"emotion"`
+	AnimationCue     string            `json:"animation_cue"`
+	Suggestions      []string          `json:"suggestions"`
+	Session          *AssistantSession `json:"session,omitempty"`
+}
+
+const sessionResponseMetadataVersion = 1
+
+type sessionResponseMetadata struct {
+	SchemaVersion    int             `json:"schema_version"`
+	Intent           tutoring.Intent `json:"intent,omitempty"`
+	HelpLevel        string          `json:"help_level,omitempty"`
+	FollowUpQuestion string          `json:"follow_up_question,omitempty"`
+	ReadyAnswerRisk  bool            `json:"ready_answer_risk"`
+	ActiveHomework   bool            `json:"active_homework"`
+	GradeBand        string          `json:"grade_band,omitempty"`
+	Emotion          string          `json:"emotion,omitempty"`
+	AnimationCue     string          `json:"animation_cue,omitempty"`
+	Suggestions      []string        `json:"suggestions,omitempty"`
 }
 
 func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (AssistantSession, error) {
@@ -157,7 +173,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		return SessionMessageResult{}, apperrors.Internal("assistant_idempotency_lookup_failed", "failed to check assistant message", err)
 	}
 	if found {
-		return resultFromExchange(existing, nil, "", ""), nil
+		return resultFromExchange(existing), nil
 	}
 
 	session, err := s.sessions.GetSession(ctx, studentID, sessionID)
@@ -242,19 +258,50 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 }
 
 func (s *Service) persistSessionDraft(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText string, draft tutoring.TutorResponseDraft, analysis tutoring.Analysis, provider, model, category string, suggestions []string) (SessionMessageResult, error) {
-	policy, _ := json.Marshal(map[string]any{"intent": analysis.Intent, "help_level": draft.HelpLevel, "ready_answer_risk": draft.ReadyAnswerRisk, "active_homework": analysis.ActiveHomework, "grade_band": analysis.GradeBand})
+	metadata := sessionResponseMetadata{
+		SchemaVersion: sessionResponseMetadataVersion, Intent: analysis.Intent,
+		HelpLevel: draft.HelpLevel, FollowUpQuestion: draft.FollowUpQuestion,
+		ReadyAnswerRisk: draft.ReadyAnswerRisk, ActiveHomework: analysis.ActiveHomework,
+		GradeBand: analysis.GradeBand, Emotion: draft.Emotion,
+		AnimationCue: draft.AnimationCue, Suggestions: suggestions,
+	}
+	policy, _ := json.Marshal(metadata)
 	exchange, err := s.sessions.SaveExchange(ctx, studentID, sessionID, clientMessageID, userText, SessionMessage{Content: draft.Answer, Provider: provider, Model: model, ResponseMode: string(draft.ResponseMode), TutoringPolicy: policy, SafetyCategory: category})
 	if err != nil {
 		return SessionMessageResult{}, apperrors.Internal("assistant_message_save_failed", "failed to save assistant message", err)
 	}
-	return resultFromExchange(exchange, suggestions, draft.HelpLevel, draft.FollowUpQuestion), nil
+	return resultFromExchange(exchange), nil
 }
 
-func resultFromExchange(exchange StoredExchange, suggestions []string, helpLevel, followUp string) SessionMessageResult {
-	if suggestions == nil {
-		suggestions = []string{}
+func resultFromExchange(exchange StoredExchange) SessionMessageResult {
+	metadata := sessionResponseMetadata{Emotion: "neutral", AnimationCue: "standing", Suggestions: []string{}}
+	if len(exchange.Assistant.TutoringPolicy) > 0 {
+		var stored sessionResponseMetadata
+		if err := json.Unmarshal(exchange.Assistant.TutoringPolicy, &stored); err == nil {
+			metadata = stored
+		}
 	}
-	return SessionMessageResult{UserMessage: exchange.User, AssistantMessage: exchange.Assistant, ResponseMode: exchange.Assistant.ResponseMode, HelpLevel: helpLevel, FollowUpQuestion: followUp, Emotion: "neutral", AnimationCue: "standing", Suggestions: suggestions}
+	if metadata.Emotion == "" {
+		metadata.Emotion = "neutral"
+	}
+	if metadata.AnimationCue == "" {
+		metadata.AnimationCue = "standing"
+	}
+	if metadata.Suggestions == nil {
+		metadata.Suggestions = []string{}
+	}
+	var session *AssistantSession
+	if exchange.Session.ID != "" {
+		copy := exchange.Session
+		session = &copy
+	}
+	return SessionMessageResult{
+		UserMessage: exchange.User, AssistantMessage: exchange.Assistant,
+		ResponseMode: exchange.Assistant.ResponseMode, HelpLevel: metadata.HelpLevel,
+		FollowUpQuestion: metadata.FollowUpQuestion, Emotion: metadata.Emotion,
+		AnimationCue: metadata.AnimationCue, Suggestions: metadata.Suggestions,
+		Session: session,
+	}
 }
 
 func (s *Service) sessionStudentID(raw string) (uuid.UUID, error) {

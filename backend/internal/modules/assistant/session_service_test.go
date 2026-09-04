@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,8 +42,8 @@ func TestSessionMessageUsesServerGradeAndGuardsReadyAnswerIdempotently(t *testin
 	if strings.Contains(first.AssistantMessage.Content, "42") || !strings.Contains(first.AssistantMessage.Content, "первый шаг") || strings.TrimSpace(first.FollowUpQuestion) == "" {
 		t.Fatalf("ready answer was persisted: %q", first.AssistantMessage.Content)
 	}
-	if provider.calls != 1 || !strings.Contains(provider.prompt, "Authenticated grade: 3") {
-		t.Fatalf("server grade was not used: calls=%d prompt=%q", provider.calls, provider.prompt)
+	if provider.callCount() != 1 || !strings.Contains(provider.prompt, "Authenticated grade: 3") {
+		t.Fatalf("server grade was not used: calls=%d prompt=%q", provider.callCount(), provider.prompt)
 	}
 	if strings.Contains(string(repo.lastPolicy), "system") || strings.Contains(repo.lastAssistant.Content, provider.text) {
 		t.Fatalf("unsafe intermediate or system prompt was persisted")
@@ -55,8 +57,91 @@ func TestSessionMessageUsesServerGradeAndGuardsReadyAnswerIdempotently(t *testin
 	if err != nil {
 		t.Fatalf("idempotent send: %v", err)
 	}
-	if second.AssistantMessage.ID != first.AssistantMessage.ID || provider.calls != 1 {
-		t.Fatalf("idempotency failed: first=%s second=%s calls=%d", first.AssistantMessage.ID, second.AssistantMessage.ID, provider.calls)
+	if !reflect.DeepEqual(second, first) || provider.callCount() != 1 {
+		t.Fatalf("idempotency failed: equal=%v calls=%d\nfirst=%#v\nsecond=%#v", reflect.DeepEqual(second, first), provider.callCount(), first, second)
+	}
+	if first.Session == nil || first.Session.Title != command.Text {
+		t.Fatalf("updated session snapshot was not returned: %#v", first.Session)
+	}
+}
+
+func TestExplicitReadyAnswerWithoutAcademicMatchIsReplaced(t *testing.T) {
+	studentID, sessionID := uuid.New(), uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	provider := &capturingSessionProvider{text: "Ответ: 42. Полное решение готово."}
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+		Enabled: &enabled, SessionRepository: repo,
+		AcademicContext: staticAcademicContext{context: AcademicContext{Locale: "ru-KZ", GradeLevel: 7}},
+	})
+	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Реши за меня: 2 + 2",
+	})
+	if err != nil || strings.Contains(result.AssistantMessage.Content, "42") || !strings.Contains(result.AssistantMessage.Content, "первый шаг") {
+		t.Fatalf("unmatched explicit answer was not replaced: result=%#v err=%v", result, err)
+	}
+}
+
+func TestMalformedLegacyReplayDegradesWithoutCallingProvider(t *testing.T) {
+	studentID, sessionID, clientID := uuid.New(), uuid.New(), uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	now := time.Now().UTC()
+	repo.exchanges[clientID] = StoredExchange{
+		User:      SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "user", Content: "Старый вопрос", InputMode: "text", CreatedAt: now},
+		Assistant: SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "assistant", Content: "Сохранённый ответ", InputMode: "text", ResponseMode: "answer", TutoringPolicy: json.RawMessage(`[]`), CreatedAt: now},
+		Session:   repo.session,
+	}
+	provider := &capturingSessionProvider{text: "must not be called"}
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: clientID.String(), Text: "Старый вопрос",
+	})
+	if err != nil || result.AssistantMessage.Content != "Сохранённый ответ" || result.Emotion != "neutral" || result.AnimationCue != "standing" || provider.callCount() != 0 {
+		t.Fatalf("legacy replay did not degrade safely: result=%#v calls=%d err=%v", result, provider.callCount(), err)
+	}
+}
+
+func TestConcurrentDuplicatePersistsOneExchange(t *testing.T) {
+	studentID, sessionID, clientID := uuid.New(), uuid.New(), uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	provider := &capturingSessionProvider{text: "Подсказка.", delay: 20 * time.Millisecond}
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	command := SendSessionMessageCommand{StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: clientID.String(), Text: "Объясни дроби"}
+	results := make(chan SessionMessageResult, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := service.SendSessionMessage(context.Background(), command)
+			results <- result
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent send: %v", err)
+		}
+	}
+	var firstID string
+	for result := range results {
+		if firstID == "" {
+			firstID = result.AssistantMessage.ID
+		} else if result.AssistantMessage.ID != firstID {
+			t.Fatalf("duplicate requests returned different exchanges: %s != %s", result.AssistantMessage.ID, firstID)
+		}
+	}
+	repo.mu.Lock()
+	exchangeCount := len(repo.exchanges)
+	repo.mu.Unlock()
+	if exchangeCount != 1 {
+		t.Fatalf("duplicate request persisted %d exchanges", exchangeCount)
 	}
 }
 
@@ -71,8 +156,8 @@ func TestFactualQuestionIsNotMisclassifiedAsHomework(t *testing.T) {
 	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Столица Франции?",
 	})
-	if err != nil || provider.calls != 1 || result.AssistantMessage.Content != "Париж." {
-		t.Fatalf("factual question was blocked: result=%#v calls=%d err=%v", result, provider.calls, err)
+	if err != nil || provider.callCount() != 1 || result.AssistantMessage.Content != "Париж." {
+		t.Fatalf("factual question was blocked: result=%#v calls=%d err=%v", result, provider.callCount(), err)
 	}
 	var policy map[string]any
 	if err := json.Unmarshal(repo.lastPolicy, &policy); err != nil || policy["ready_answer_risk"] != false {
@@ -91,8 +176,8 @@ func TestSessionIsolationBlocksOtherStudent(t *testing.T) {
 	_, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: uuid.NewString(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Столица Франции?",
 	})
-	if err == nil || provider.calls != 0 {
-		t.Fatalf("cross-student access was not blocked: err=%v calls=%d", err, provider.calls)
+	if err == nil || provider.callCount() != 0 {
+		t.Fatalf("cross-student access was not blocked: err=%v calls=%d", err, provider.callCount())
 	}
 }
 
@@ -110,8 +195,8 @@ func TestUnsafeInputNeverReachesProviderAndOnlySafeResponseIsStored(t *testing.T
 	if err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if provider.calls != 0 || strings.Contains(result.AssistantMessage.Content, "123456") || repo.lastAssistant.SafetyCategory != "privacy_or_secrets" {
-		t.Fatalf("unsafe input handling failed: calls=%d response=%q category=%q", provider.calls, result.AssistantMessage.Content, repo.lastAssistant.SafetyCategory)
+	if provider.callCount() != 0 || strings.Contains(result.AssistantMessage.Content, "123456") || repo.lastAssistant.SafetyCategory != "privacy_or_secrets" {
+		t.Fatalf("unsafe input handling failed: calls=%d response=%q category=%q", provider.callCount(), result.AssistantMessage.Content, repo.lastAssistant.SafetyCategory)
 	}
 }
 
@@ -146,15 +231,29 @@ func (s staticAcademicContext) Build(context.Context, uuid.UUID) (AcademicContex
 type capturingSessionProvider struct {
 	text, prompt string
 	calls        int
+	delay        time.Duration
+	mu           sync.Mutex
 }
 
 func (p *capturingSessionProvider) Generate(_ context.Context, req llm.Request) (llm.Response, error) {
+	p.mu.Lock()
 	p.calls++
 	p.prompt = req.Prompt
+	p.mu.Unlock()
+	if p.delay > 0 {
+		time.Sleep(p.delay)
+	}
 	return llm.Response{Text: p.text, Provider: "alem", Model: "exact-model"}, nil
 }
 
+func (p *capturingSessionProvider) callCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.calls
+}
+
 type memorySessionRepository struct {
+	mu            sync.Mutex
 	owner         uuid.UUID
 	session       AssistantSession
 	exchanges     map[uuid.UUID]StoredExchange
@@ -174,6 +273,8 @@ func (r *memorySessionRepository) CreateSession(context.Context, uuid.UUID, stri
 	return r.session, nil
 }
 func (r *memorySessionRepository) GetSession(_ context.Context, studentID, sessionID uuid.UUID) (AssistantSession, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if studentID != r.owner || sessionID.String() != r.session.ID {
 		return AssistantSession{}, ErrSessionNotFound
 	}
@@ -186,8 +287,10 @@ func (r *memorySessionRepository) ListSessions(_ context.Context, studentID uuid
 	return []AssistantSession{r.session}, nil
 }
 func (r *memorySessionRepository) ListMessages(_ context.Context, studentID, sessionID uuid.UUID, _ int, _ *PageCursor) ([]SessionMessage, error) {
-	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
-		return nil, err
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if studentID != r.owner || sessionID.String() != r.session.ID {
+		return nil, ErrSessionNotFound
 	}
 	out := make([]SessionMessage, 0, len(r.exchanges)*2)
 	for _, exchange := range r.exchanges {
@@ -202,23 +305,34 @@ func (r *memorySessionRepository) DeleteSession(_ context.Context, studentID, se
 	return nil
 }
 func (r *memorySessionRepository) FindExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID) (StoredExchange, bool, error) {
-	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
-		return StoredExchange{}, false, err
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if studentID != r.owner || sessionID.String() != r.session.ID {
+		return StoredExchange{}, false, ErrSessionNotFound
 	}
 	exchange, ok := r.exchanges[clientID]
+	exchange.Session = r.session
 	return exchange, ok, nil
 }
 func (r *memorySessionRepository) SaveExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID, text string, assistant SessionMessage) (StoredExchange, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if existing, ok := r.exchanges[clientID]; ok {
+		existing.Session = r.session
 		return existing, nil
 	}
-	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
-		return StoredExchange{}, err
+	if studentID != r.owner || sessionID.String() != r.session.ID {
+		return StoredExchange{}, ErrSessionNotFound
 	}
 	now := time.Now().UTC()
 	user := SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "user", Content: text, InputMode: "text", CreatedAt: now}
 	assistant.ID, assistant.SessionID, assistant.Role, assistant.InputMode, assistant.CreatedAt = uuid.NewString(), sessionID.String(), "assistant", "text", now.Add(time.Millisecond)
-	exchange := StoredExchange{User: user, Assistant: assistant}
+	if r.session.Title == "" {
+		r.session.Title = boundedTitle(text)
+	}
+	r.session.UpdatedAt = now
+	r.session.LastMessageAt = now
+	exchange := StoredExchange{User: user, Assistant: assistant, Session: r.session}
 	r.exchanges[clientID] = exchange
 	r.lastAssistant = assistant
 	r.lastPolicy = append([]byte(nil), assistant.TutoringPolicy...)

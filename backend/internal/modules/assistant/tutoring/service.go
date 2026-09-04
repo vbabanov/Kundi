@@ -72,7 +72,11 @@ func (s *Service) Analyze(text string, gradeLevel int, activeHomework bool) Anal
 		intent, mode, help = IntentConceptExplanation, ResponseModeExplanation, "guided"
 	}
 
-	risk := activeHomework && (intent == IntentRequestReadyAnswer || containsAny(normalized, bypassMarkers))
+	// An explicit request for submission-ready work is unsafe even when the
+	// academic context cannot match it to a known homework record. Bypass
+	// language is handled the same way; activeHomework remains an additional
+	// signal used by Finalize to inspect otherwise legitimate homework help.
+	risk := intent == IntentRequestReadyAnswer || containsAny(normalized, bypassMarkers)
 	if risk {
 		intent, mode, help = IntentRequestReadyAnswer, ResponseModeHint, "scaffolded"
 	}
@@ -207,7 +211,7 @@ func boundRunes(text string, max int) string {
 }
 
 var readyAnswerMarkers = []string{"только ответ", "готовый ответ", "готовое решение", "готовую работу", "полное решение", "реши за меня", "сделай за меня", "напиши сочинение", "дай решение целиком", "тек жауап", "дайын жауап", "мен үшін шеш", "just answer", "do it for me", "write my essay", "complete solution"}
-var attemptMarkers = []string{"проверь мой", "мой ответ", "я решил", "я решила", "қатемді тексер", "менің жауабым", "check my", "my answer"}
+var attemptMarkers = []string{"проверь мой", "проверь мою", "мой ответ", "моя попытка", "я решил", "я решила", "қатемді тексер", "менің жауабым", "check my", "my answer"}
 var adviceMarkers = []string{"как учить", "как подготовиться", "план подготовки", "қалай дайындал", "how to study", "study plan"}
 var homeworkMarkers = []string{"домашн", "дз", "задани", "үй тапсыр", "homework", "assignment"}
 var explanationMarkers = []string{"объясни", "почему", "как работает", "түсіндір", "неге", "explain", "how does"}

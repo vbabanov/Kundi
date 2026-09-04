@@ -3,6 +3,7 @@ package v1
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,7 +36,18 @@ func TestAssistantSessionEndpointsCRUD(t *testing.T) {
 	assertStatus(t, router, token, http.MethodPost, "/v1/assistant/sessions", `{}`, http.StatusCreated)
 	assertStatus(t, router, token, http.MethodGet, "/v1/assistant/sessions?limit=10", "", http.StatusOK)
 	assertStatus(t, router, token, http.MethodGet, "/v1/assistant/sessions/"+sessionID.String()+"/messages", "", http.StatusOK)
-	assertStatus(t, router, token, http.MethodPost, "/v1/assistant/sessions/"+sessionID.String()+"/messages", `{"client_message_id":"`+uuid.NewString()+`","text":"Столица Франции?"}`, http.StatusOK)
+	response := performRequest(router, token, http.MethodPost, "/v1/assistant/sessions/"+sessionID.String()+"/messages", `{"client_message_id":"`+uuid.NewString()+`","text":"Столица Франции?"}`)
+	if response.Code != http.StatusOK {
+		t.Fatalf("message send: got %d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Data struct {
+			Session assistantmodule.AssistantSession `json:"session"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil || payload.Data.Session.Title != "Столица Франции?" {
+		t.Fatalf("updated session snapshot missing: session=%#v err=%v", payload.Data.Session, err)
+	}
 	assertStatus(t, router, token, http.MethodDelete, "/v1/assistant/sessions/"+sessionID.String(), "", http.StatusNoContent)
 	if !repository.deleted || len(repository.messages) != 2 {
 		t.Fatalf("CRUD was incomplete: deleted=%v messages=%d", repository.deleted, len(repository.messages))
@@ -54,6 +66,13 @@ func TestAssistantEndpointsAreDisabledWithoutFlag(t *testing.T) {
 
 func assertStatus(t *testing.T, router http.Handler, token, method, path, body string, want int) {
 	t.Helper()
+	response := performRequest(router, token, method, path, body)
+	if response.Code != want {
+		t.Fatalf("%s %s: got %d want %d body=%s", method, path, response.Code, want, response.Body.String())
+	}
+}
+
+func performRequest(router http.Handler, token, method, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	if body != "" {
@@ -61,9 +80,7 @@ func assertStatus(t *testing.T, router http.Handler, token, method, path, body s
 	}
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, req)
-	if response.Code != want {
-		t.Fatalf("%s %s: got %d want %d body=%s", method, path, response.Code, want, response.Body.String())
-	}
+	return response
 }
 
 type apiLLM struct{}
@@ -78,6 +95,9 @@ type apiSessionRepository struct {
 	messages  []assistantmodule.SessionMessage
 	exchanges map[uuid.UUID]assistantmodule.StoredExchange
 	deleted   bool
+	title     string
+	createdAt time.Time
+	updatedAt time.Time
 }
 
 func (r *apiSessionRepository) StudentProfile(context.Context, uuid.UUID) (assistantmodule.StudentAssistantProfile, error) {
@@ -116,6 +136,7 @@ func (r *apiSessionRepository) FindExchange(_ context.Context, studentID, sessio
 		return assistantmodule.StoredExchange{}, false, err
 	}
 	value, ok := r.exchanges[clientID]
+	value.Session = r.session()
 	return value, ok, nil
 }
 func (r *apiSessionRepository) SaveExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID, text string, assistant assistantmodule.SessionMessage) (assistantmodule.StoredExchange, error) {
@@ -131,12 +152,22 @@ func (r *apiSessionRepository) SaveExchange(_ context.Context, studentID, sessio
 	now := time.Now().UTC()
 	user := assistantmodule.SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "user", Content: text, InputMode: "text", CreatedAt: now}
 	assistant.ID, assistant.SessionID, assistant.Role, assistant.InputMode, assistant.CreatedAt = uuid.NewString(), sessionID.String(), "assistant", "text", now.Add(time.Millisecond)
-	exchange := assistantmodule.StoredExchange{User: user, Assistant: assistant}
+	if r.title == "" {
+		r.title = text
+	}
+	r.updatedAt = now
+	exchange := assistantmodule.StoredExchange{User: user, Assistant: assistant, Session: r.session()}
 	r.messages = append(r.messages, user, assistant)
 	r.exchanges[clientID] = exchange
 	return exchange, nil
 }
 func (r *apiSessionRepository) session() assistantmodule.AssistantSession {
 	now := time.Now().UTC()
-	return assistantmodule.AssistantSession{ID: r.sessionID.String(), Locale: "ru-KZ", GradeLevel: 7, Title: "", CreatedAt: now, UpdatedAt: now, LastMessageAt: now}
+	if r.createdAt.IsZero() {
+		r.createdAt = now
+	}
+	if r.updatedAt.IsZero() {
+		r.updatedAt = r.createdAt
+	}
+	return assistantmodule.AssistantSession{ID: r.sessionID.String(), Locale: "ru-KZ", GradeLevel: 7, Title: r.title, CreatedAt: r.createdAt, UpdatedAt: r.updatedAt, LastMessageAt: r.updatedAt}
 }

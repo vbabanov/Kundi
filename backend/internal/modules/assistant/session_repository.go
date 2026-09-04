@@ -54,6 +54,7 @@ type PageCursor struct {
 type StoredExchange struct {
 	User      SessionMessage
 	Assistant SessionMessage
+	Session   AssistantSession
 }
 
 type SessionRepository interface {
@@ -174,20 +175,23 @@ func (r *PostgresSessionRepository) DeleteSession(ctx context.Context, studentID
 }
 
 func (r *PostgresSessionRepository) FindExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID) (StoredExchange, bool, error) {
-	if _, err := r.GetSession(ctx, studentID, sessionID); err != nil {
+	session, err := r.GetSession(ctx, studentID, sessionID)
+	if err != nil {
 		return StoredExchange{}, false, err
 	}
-	var exchange StoredExchange
-	err := r.pool.QueryRow(ctx, `
+	exchange := StoredExchange{Session: session}
+	err = r.pool.QueryRow(ctx, `
 		SELECT u.id::text, u.session_id::text, u.role, u.content, u.input_mode, u.created_at,
-		       a.id::text, a.session_id::text, a.role, a.content, a.input_mode, a.response_mode, a.created_at
+		       a.id::text, a.session_id::text, a.role, a.content, a.input_mode, a.response_mode,
+		       a.provider, a.model, a.tutoring_policy_result, COALESCE(a.safety_category, ''), a.created_at
 		FROM assistant_messages u
 		JOIN assistant_messages a
 		  ON a.session_id = u.session_id AND a.role = 'assistant' AND a.client_message_id = u.client_message_id
 		WHERE u.session_id = $1 AND u.student_id = $2 AND u.client_message_id = $3 AND u.role = 'user'
 	`, sessionID, studentID, clientMessageID).Scan(
 		&exchange.User.ID, &exchange.User.SessionID, &exchange.User.Role, &exchange.User.Content, &exchange.User.InputMode, &exchange.User.CreatedAt,
-		&exchange.Assistant.ID, &exchange.Assistant.SessionID, &exchange.Assistant.Role, &exchange.Assistant.Content, &exchange.Assistant.InputMode, &exchange.Assistant.ResponseMode, &exchange.Assistant.CreatedAt,
+		&exchange.Assistant.ID, &exchange.Assistant.SessionID, &exchange.Assistant.Role, &exchange.Assistant.Content, &exchange.Assistant.InputMode, &exchange.Assistant.ResponseMode,
+		&exchange.Assistant.Provider, &exchange.Assistant.Model, &exchange.Assistant.TutoringPolicy, &exchange.Assistant.SafetyCategory, &exchange.Assistant.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return StoredExchange{}, false, nil
@@ -235,20 +239,27 @@ func (r *PostgresSessionRepository) SaveExchange(ctx context.Context, studentID,
 			session_id, student_id, role, text_content, content, client_message_id, input_mode, provider, model,
 			response_mode, tutoring_policy_result, safety_category, created_at
 		) VALUES ($1, $2, 'assistant', $3, $3, $4, 'text', $5, $6, $7, $8, NULLIF($9, ''), NOW())
-		RETURNING id::text, session_id::text, role, content, input_mode, response_mode, created_at
+		RETURNING id::text, session_id::text, role, content, input_mode, response_mode,
+		          provider, model, tutoring_policy_result, COALESCE(safety_category, ''), created_at
 	`, sessionID, studentID, assistant.Content, clientMessageID, assistant.Provider, assistant.Model, assistant.ResponseMode, policy, assistant.SafetyCategory).Scan(
-		&exchange.Assistant.ID, &exchange.Assistant.SessionID, &exchange.Assistant.Role, &exchange.Assistant.Content, &exchange.Assistant.InputMode, &exchange.Assistant.ResponseMode, &exchange.Assistant.CreatedAt,
+		&exchange.Assistant.ID, &exchange.Assistant.SessionID, &exchange.Assistant.Role, &exchange.Assistant.Content, &exchange.Assistant.InputMode, &exchange.Assistant.ResponseMode,
+		&exchange.Assistant.Provider, &exchange.Assistant.Model, &exchange.Assistant.TutoringPolicy, &exchange.Assistant.SafetyCategory, &exchange.Assistant.CreatedAt,
 	)
 	if err != nil {
 		return StoredExchange{}, err
 	}
 	title := boundedTitle(userText)
-	if _, err = tx.Exec(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE assistant_sessions
 		SET title = CASE WHEN title = '' THEN $3 ELSE title END,
 		    updated_at = NOW(), last_message_at = NOW()
 		WHERE id = $1 AND student_id = $2
-	`, sessionID, studentID, title); err != nil {
+		RETURNING id::text, locale, grade_level, title, created_at, updated_at, last_message_at
+	`, sessionID, studentID, title).Scan(
+		&exchange.Session.ID, &exchange.Session.Locale, &exchange.Session.GradeLevel, &exchange.Session.Title,
+		&exchange.Session.CreatedAt, &exchange.Session.UpdatedAt, &exchange.Session.LastMessageAt,
+	)
+	if err != nil {
 		return StoredExchange{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
