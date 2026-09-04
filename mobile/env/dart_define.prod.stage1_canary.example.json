@@ -8,5 +8,6 @@
   "TYPED_V2_COHORT_DENYLIST": "",
   "FORCE_TYPED_V2_READ": "false",
   "FORCE_LEGACY_V1_READ": "false",
-  "ENABLE_KUNDI_ASSISTANT": "false"
+  "ENABLE_KUNDI_ASSISTANT": "false",
+  "ENABLE_KUNDI_VOICE_INPUT": "false"
 }

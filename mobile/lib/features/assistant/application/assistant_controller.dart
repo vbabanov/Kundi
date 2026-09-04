@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../core/network/api_client.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import '../../../shared/providers/providers.dart';
+import '../../../runtimes/kundi_system_speech/kundi_voice_qa_telemetry.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/domain/kundi_behavior_event.dart';
 import '../assistant_feature.dart';
@@ -12,7 +15,16 @@ import '../domain/assistant_entity.dart';
 import '../domain/assistant_repository.dart';
 
 final assistantRepositoryProvider = Provider<AssistantRepository>((ref) {
-  return AssistantRepositoryImpl(apiClient: ref.watch(apiClientProvider));
+  const qaBaseUrl = String.fromEnvironment(
+    'KUNDI_ASSISTANT_QA_BASE_URL',
+    defaultValue: '',
+  );
+  final apiClient = kDebugMode &&
+          kundiVoiceQaTelemetryEnabled &&
+          qaBaseUrl.isNotEmpty
+      ? ApiClient(baseUrl: qaBaseUrl)
+      : ref.watch(apiClientProvider);
+  return AssistantRepositoryImpl(apiClient: apiClient);
 });
 
 final assistantControllerProvider =
@@ -30,9 +42,11 @@ class AssistantViewState {
     this.suggestions = const <String>[],
     this.isSending = false,
     this.pendingText = '',
+    this.pendingInputMode = AssistantInputMode.text,
     this.errorMessage = '',
     this.retryText = '',
     this.retryClientMessageId = '',
+    this.retryInputMode = AssistantInputMode.text,
   });
 
   final List<AssistantSessionEntity> sessions;
@@ -43,9 +57,11 @@ class AssistantViewState {
   final List<String> suggestions;
   final bool isSending;
   final String pendingText;
+  final AssistantInputMode pendingInputMode;
   final String errorMessage;
   final String retryText;
   final String retryClientMessageId;
+  final AssistantInputMode retryInputMode;
 
   AssistantViewState copyWith({
     List<AssistantSessionEntity>? sessions,
@@ -57,9 +73,11 @@ class AssistantViewState {
     List<String>? suggestions,
     bool? isSending,
     String? pendingText,
+    AssistantInputMode? pendingInputMode,
     String? errorMessage,
     String? retryText,
     String? retryClientMessageId,
+    AssistantInputMode? retryInputMode,
   }) {
     return AssistantViewState(
       sessions: sessions ?? this.sessions,
@@ -71,9 +89,11 @@ class AssistantViewState {
       suggestions: suggestions ?? this.suggestions,
       isSending: isSending ?? this.isSending,
       pendingText: pendingText ?? this.pendingText,
+      pendingInputMode: pendingInputMode ?? this.pendingInputMode,
       errorMessage: errorMessage ?? this.errorMessage,
       retryText: retryText ?? this.retryText,
       retryClientMessageId: retryClientMessageId ?? this.retryClientMessageId,
+      retryInputMode: retryInputMode ?? this.retryInputMode,
     );
   }
 }
@@ -180,7 +200,11 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     ));
   }
 
-  Future<void> sendMessage(String text, {String? clientMessageId}) async {
+  Future<void> sendMessage(
+    String text, {
+    String? clientMessageId,
+    AssistantInputMode inputMode = AssistantInputMode.text,
+  }) async {
     final normalized = text.trim();
     final current = state.valueOrNull;
     if (normalized.isEmpty || current == null || current.isSending) return;
@@ -190,9 +214,11 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     state = AsyncData(current.copyWith(
       isSending: true,
       pendingText: normalized,
+      pendingInputMode: inputMode,
       errorMessage: '',
       retryText: normalized,
       retryClientMessageId: requestID,
+      retryInputMode: inputMode,
     ));
     _behavior(KundiBehaviorEventType.assistantQuestionSubmitted, requestID);
     try {
@@ -202,6 +228,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
                 sessionId: active.id,
                 clientMessageId: requestID,
                 text: normalized,
+                inputMode: inputMode,
               );
       final latest = state.valueOrNull ?? current;
       final updatedSession = result.session;
@@ -224,9 +251,11 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
               ]),
         isSending: false,
         pendingText: '',
+        pendingInputMode: AssistantInputMode.text,
         errorMessage: '',
         retryText: '',
         retryClientMessageId: '',
+        retryInputMode: AssistantInputMode.text,
       ));
       _neutralBehavior();
     } catch (error) {
@@ -238,9 +267,11 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
       state = AsyncData(latest.copyWith(
         isSending: false,
         pendingText: '',
+        pendingInputMode: AssistantInputMode.text,
         errorMessage: failure.message,
         retryText: failure.canRetry ? normalized : '',
         retryClientMessageId: failure.canRetry ? requestID : '',
+        retryInputMode: failure.canRetry ? inputMode : AssistantInputMode.text,
       ));
       _behavior(KundiBehaviorEventType.assistantFailure, requestID);
     }
@@ -252,6 +283,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     await sendMessage(
       current.retryText,
       clientMessageId: current.retryClientMessageId,
+      inputMode: current.retryInputMode,
     );
   }
 

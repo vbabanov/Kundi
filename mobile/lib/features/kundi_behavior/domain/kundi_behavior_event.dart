@@ -7,6 +7,7 @@ enum KundiBehaviorEventType {
   newGrade,
   absenceDetected,
   assistantQuestionSubmitted,
+  assistantListeningStarted,
   assistantResponseStarted,
   assistantResponseReady,
   audioPlaybackStarted,

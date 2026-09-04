@@ -21,6 +21,7 @@ abstract class AssistantRepository {
     required String sessionId,
     required String clientMessageId,
     required String text,
+    AssistantInputMode inputMode = AssistantInputMode.text,
   });
 
   Future<void> deleteSession({

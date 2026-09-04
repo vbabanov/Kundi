@@ -23,7 +23,15 @@ class LessonsPage extends ConsumerWidget {
     this.onHomeworkTap,
     this.onGradesTap,
     this.onAssistantTap,
+    this.onAssistantPointerDown,
+    this.onAssistantPointerUp,
+    this.onAssistantPointerCancel,
+    this.onAssistantLongPressStart,
+    this.onAssistantLongPressEnd,
+    this.onAssistantLongPressCancel,
     this.assistantEnabled = false,
+    this.voiceStatusText = '',
+    this.voiceListening = false,
     this.now,
     this.realtimeAvatarEnabled = false,
     this.realtimeAvatarPreparing = false,
@@ -36,7 +44,15 @@ class LessonsPage extends ConsumerWidget {
   final VoidCallback? onHomeworkTap;
   final VoidCallback? onGradesTap;
   final VoidCallback? onAssistantTap;
+  final PointerDownEventListener? onAssistantPointerDown;
+  final PointerUpEventListener? onAssistantPointerUp;
+  final PointerCancelEventListener? onAssistantPointerCancel;
+  final GestureLongPressStartCallback? onAssistantLongPressStart;
+  final GestureLongPressEndCallback? onAssistantLongPressEnd;
+  final VoidCallback? onAssistantLongPressCancel;
   final bool assistantEnabled;
+  final String voiceStatusText;
+  final bool voiceListening;
   final DateTime? now;
   final bool realtimeAvatarEnabled;
   final bool realtimeAvatarPreparing;
@@ -149,7 +165,15 @@ class LessonsPage extends ConsumerWidget {
                 onHomeworkTap: onHomeworkTap,
                 onGradesTap: onGradesTap,
                 onAssistantTap: onAssistantTap,
+                onAssistantPointerDown: onAssistantPointerDown,
+                onAssistantPointerUp: onAssistantPointerUp,
+                onAssistantPointerCancel: onAssistantPointerCancel,
+                onAssistantLongPressStart: onAssistantLongPressStart,
+                onAssistantLongPressEnd: onAssistantLongPressEnd,
+                onAssistantLongPressCancel: onAssistantLongPressCancel,
                 assistantEnabled: assistantEnabled,
+                voiceStatusText: voiceStatusText,
+                voiceListening: voiceListening,
               ),
             ],
           ),
@@ -443,7 +467,15 @@ class _HeroActionStack extends StatelessWidget {
     required this.onHomeworkTap,
     required this.onGradesTap,
     required this.onAssistantTap,
+    required this.onAssistantPointerDown,
+    required this.onAssistantPointerUp,
+    required this.onAssistantPointerCancel,
+    required this.onAssistantLongPressStart,
+    required this.onAssistantLongPressEnd,
+    required this.onAssistantLongPressCancel,
     required this.assistantEnabled,
+    required this.voiceStatusText,
+    required this.voiceListening,
   });
 
   final String greeting;
@@ -463,7 +495,15 @@ class _HeroActionStack extends StatelessWidget {
   final VoidCallback? onHomeworkTap;
   final VoidCallback? onGradesTap;
   final VoidCallback? onAssistantTap;
+  final PointerDownEventListener? onAssistantPointerDown;
+  final PointerUpEventListener? onAssistantPointerUp;
+  final PointerCancelEventListener? onAssistantPointerCancel;
+  final GestureLongPressStartCallback? onAssistantLongPressStart;
+  final GestureLongPressEndCallback? onAssistantLongPressEnd;
+  final VoidCallback? onAssistantLongPressCancel;
   final bool assistantEnabled;
+  final String voiceStatusText;
+  final bool voiceListening;
 
   @override
   Widget build(BuildContext context) {
@@ -528,6 +568,15 @@ class _HeroActionStack extends StatelessWidget {
           isVisible: isHomeVisible,
           animationCueName: animationCueName,
           animationIdentity: animationIdentity,
+          onAvatarTap: onAssistantTap,
+          onAvatarPointerDown: onAssistantPointerDown,
+          onAvatarPointerUp: onAssistantPointerUp,
+          onAvatarPointerCancel: onAssistantPointerCancel,
+          onAvatarLongPressStart: onAssistantLongPressStart,
+          onAvatarLongPressEnd: onAssistantLongPressEnd,
+          onAvatarLongPressCancel: onAssistantLongPressCancel,
+          voiceStatusText: voiceStatusText,
+          voiceListening: voiceListening,
         ),
       ],
     );

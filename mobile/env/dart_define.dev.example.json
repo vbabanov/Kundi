@@ -1,5 +1,6 @@
 {
   "API_BASE_URL": "http://10.0.2.2:8080",
   "ENABLE_DEBUG_SURFACES": "true",
-  "ENABLE_KUNDI_ASSISTANT": "false"
+  "ENABLE_KUNDI_ASSISTANT": "false",
+  "ENABLE_KUNDI_VOICE_INPUT": "false"
 }

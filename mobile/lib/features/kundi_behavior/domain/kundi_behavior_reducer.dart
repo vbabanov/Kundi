@@ -29,6 +29,7 @@ class KundiBehaviorReducer {
       case KundiBehaviorEventType.newGrade:
       case KundiBehaviorEventType.absenceDetected:
       case KundiBehaviorEventType.assistantQuestionSubmitted:
+      case KundiBehaviorEventType.assistantListeningStarted:
       case KundiBehaviorEventType.assistantResponseStarted:
       case KundiBehaviorEventType.assistantResponseReady:
       case KundiBehaviorEventType.audioPlaybackStarted:
@@ -116,6 +117,8 @@ class KundiBehaviorReducer {
       case KundiBehaviorEventType.assistantQuestionSubmitted:
       case KundiBehaviorEventType.assistantResponseStarted:
         return KundiBehaviorKind.thinking;
+      case KundiBehaviorEventType.assistantListeningStarted:
+        return KundiBehaviorKind.listening;
       case KundiBehaviorEventType.assistantResponseReady:
       case KundiBehaviorEventType.audioPlaybackStarted:
         return KundiBehaviorKind.speaking;

@@ -90,6 +90,7 @@ class AssistantRepositoryImpl implements AssistantRepository {
     required String sessionId,
     required String clientMessageId,
     required String text,
+    AssistantInputMode inputMode = AssistantInputMode.text,
   }) async {
     _requireToken(accessToken);
     if (text.trim().isEmpty) {
@@ -103,6 +104,7 @@ class AssistantRepositoryImpl implements AssistantRepository {
         data: <String, dynamic>{
           'client_message_id': clientMessageId,
           'text': text.trim(),
+          'input_mode': inputMode.apiValue,
         },
       );
     } on DioException catch (error) {

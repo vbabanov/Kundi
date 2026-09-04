@@ -1,5 +1,6 @@
 {
   "API_BASE_URL": "https://api.kundi.lucartmax.kz",
   "ENABLE_DEBUG_SURFACES": "false",
-  "ENABLE_KUNDI_ASSISTANT": "false"
+  "ENABLE_KUNDI_ASSISTANT": "false",
+  "ENABLE_KUNDI_VOICE_INPUT": "false"
 }

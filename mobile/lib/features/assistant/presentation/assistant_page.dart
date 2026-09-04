@@ -117,7 +117,10 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         }
         final tailIndex = messageIndex - view.messages.length;
         if (hasPending && tailIndex == 0) {
-          return _PendingUserBubble(text: view.pendingText);
+          return _PendingUserBubble(
+            text: view.pendingText,
+            inputMode: view.pendingInputMode,
+          );
         }
         return const _ThinkingBubble();
       },
@@ -283,15 +286,33 @@ class _MessageBubble extends StatelessWidget {
               : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: SelectableText(message.content),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.isUser && message.inputMode == 'voice') ...[
+              const Row(
+                key: Key('assistant-voice-message-badge'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.mic_rounded, size: 14),
+                  SizedBox(width: 4),
+                  Text('Голосом'),
+                ],
+              ),
+              const SizedBox(height: 4),
+            ],
+            SelectableText(message.content),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PendingUserBubble extends StatelessWidget {
-  const _PendingUserBubble({required this.text});
+  const _PendingUserBubble({required this.text, required this.inputMode});
   final String text;
+  final AssistantInputMode inputMode;
 
   @override
   Widget build(BuildContext context) => Align(
@@ -303,7 +324,23 @@ class _PendingUserBubble extends StatelessWidget {
             color: Theme.of(context).colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Text(text),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (inputMode == AssistantInputMode.voice) ...[
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mic_rounded, size: 14),
+                    SizedBox(width: 4),
+                    Text('Голосом'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+              ],
+              Text(text),
+            ],
+          ),
         ),
       );
 }

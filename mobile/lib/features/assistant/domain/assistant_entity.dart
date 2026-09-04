@@ -133,3 +133,10 @@ class AssistantMessageResult {
   final List<String> suggestions;
   final AssistantSessionEntity? session;
 }
+
+enum AssistantInputMode {
+  text,
+  voice;
+
+  String get apiValue => name;
+}

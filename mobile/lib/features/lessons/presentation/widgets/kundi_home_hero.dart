@@ -85,7 +85,15 @@ class KundiHomeHero extends StatelessWidget {
     required this.dateLabel,
     required this.message,
     required this.assetPath,
-    this.onTap,
+    this.onAvatarTap,
+    this.onAvatarPointerDown,
+    this.onAvatarPointerUp,
+    this.onAvatarPointerCancel,
+    this.onAvatarLongPressStart,
+    this.onAvatarLongPressEnd,
+    this.onAvatarLongPressCancel,
+    this.voiceStatusText = '',
+    this.voiceListening = false,
     this.semanticState,
     this.realtimeAvatarEnabled = false,
     this.realtimeAvatarPreparing = false,
@@ -102,7 +110,15 @@ class KundiHomeHero extends StatelessWidget {
   final String dateLabel;
   final String message;
   final String assetPath;
-  final VoidCallback? onTap;
+  final VoidCallback? onAvatarTap;
+  final PointerDownEventListener? onAvatarPointerDown;
+  final PointerUpEventListener? onAvatarPointerUp;
+  final PointerCancelEventListener? onAvatarPointerCancel;
+  final GestureLongPressStartCallback? onAvatarLongPressStart;
+  final GestureLongPressEndCallback? onAvatarLongPressEnd;
+  final VoidCallback? onAvatarLongPressCancel;
+  final String voiceStatusText;
+  final bool voiceListening;
   final String? semanticState;
   final bool realtimeAvatarEnabled;
   final bool realtimeAvatarPreparing;
@@ -115,7 +131,7 @@ class KundiHomeHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Semantics(
       label: semanticState,
-      button: onTap != null,
+      button: onAvatarTap != null,
       child: Container(
         key: heroKey,
         height: 280,
@@ -194,25 +210,74 @@ class KundiHomeHero extends StatelessWidget {
               top: KundiHomeAvatarPlacement.slotTop,
               bottom: KundiHomeAvatarPlacement.slotBottom,
               width: KundiHomeAvatarPlacement.slotWidth,
-              child: _KundiHomeAvatar(
-                assetPath: assetPath,
-                realtimeEnabled: realtimeAvatarEnabled,
-                realtimePreparing: realtimeAvatarPreparing,
-                preparedLoadingFrame: preparedLoadingFrame,
-                isVisible: isVisible,
-                animationCueName: animationCueName,
-                animationIdentity: animationIdentity,
+              child: Listener(
+                onPointerDown: onAvatarPointerDown,
+                onPointerUp: onAvatarPointerUp,
+                onPointerCancel: onAvatarPointerCancel,
+                child: GestureDetector(
+                  key: const Key('kundi-home-avatar-gesture'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onAvatarTap,
+                  onLongPressStart: onAvatarLongPressStart,
+                  onLongPressEnd: onAvatarLongPressEnd,
+                  onLongPressCancel: onAvatarLongPressCancel,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      boxShadow: voiceListening
+                          ? const <BoxShadow>[
+                              BoxShadow(
+                                color: Color(0x9958D8FF),
+                                blurRadius: 28,
+                                spreadRadius: 4,
+                              ),
+                            ]
+                          : const <BoxShadow>[],
+                    ),
+                    child: _KundiHomeAvatar(
+                      assetPath: assetPath,
+                      realtimeEnabled: realtimeAvatarEnabled,
+                      realtimePreparing: realtimeAvatarPreparing,
+                      preparedLoadingFrame: preparedLoadingFrame,
+                      isVisible: isVisible,
+                      animationCueName: animationCueName,
+                      animationIdentity: animationIdentity,
+                    ),
+                  ),
+                ),
               ),
             ),
+            if (voiceStatusText.isNotEmpty)
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: Container(
+                  key: const Key('kundi-voice-status'),
+                  constraints: const BoxConstraints(maxWidth: 230),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xE61B1746),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xAA58D8FF)),
+                  ),
+                  child: Text(
+                    voiceStatusText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Colors.white,
+                        ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
 
-    if (onTap == null) {
-      return content;
-    }
-    return GestureDetector(onTap: onTap, child: content);
+    return content;
   }
 }
 
@@ -735,7 +800,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
       reason: reason,
     );
   }
-
 }
 
 @visibleForTesting
