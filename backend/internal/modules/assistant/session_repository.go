@@ -65,7 +65,7 @@ type SessionRepository interface {
 	ListMessages(ctx context.Context, studentID, sessionID uuid.UUID, limit int, cursor *PageCursor) ([]SessionMessage, error)
 	DeleteSession(ctx context.Context, studentID, sessionID uuid.UUID) error
 	FindExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID) (StoredExchange, bool, error)
-	SaveExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText string, assistant SessionMessage) (StoredExchange, error)
+	SaveExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText, inputMode string, assistant SessionMessage) (StoredExchange, error)
 }
 
 type PostgresSessionRepository struct{ pool *pgxpool.Pool }
@@ -199,7 +199,7 @@ func (r *PostgresSessionRepository) FindExchange(ctx context.Context, studentID,
 	return exchange, err == nil, err
 }
 
-func (r *PostgresSessionRepository) SaveExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText string, assistant SessionMessage) (StoredExchange, error) {
+func (r *PostgresSessionRepository) SaveExchange(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText, inputMode string, assistant SessionMessage) (StoredExchange, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return StoredExchange{}, err
@@ -209,10 +209,10 @@ func (r *PostgresSessionRepository) SaveExchange(ctx context.Context, studentID,
 	var exchange StoredExchange
 	err = tx.QueryRow(ctx, `
 		INSERT INTO assistant_messages(session_id, student_id, role, text_content, content, client_message_id, input_mode, created_at)
-		VALUES ($1, $2, 'user', $3, $3, $4, 'text', NOW())
+		VALUES ($1, $2, 'user', $3, $3, $4, $5, NOW())
 		ON CONFLICT (session_id, client_message_id) WHERE client_message_id IS NOT NULL AND role = 'user' DO NOTHING
 		RETURNING id::text, session_id::text, role, content, input_mode, created_at
-	`, sessionID, studentID, userText, clientMessageID).Scan(
+	`, sessionID, studentID, userText, clientMessageID, inputMode).Scan(
 		&exchange.User.ID, &exchange.User.SessionID, &exchange.User.Role, &exchange.User.Content, &exchange.User.InputMode, &exchange.User.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -50,6 +50,7 @@ type SecurityConfig struct {
 
 type AIConfig struct {
 	AssistantEnabled                  bool
+	VoiceInputEnabled                 bool
 	AlemBaseURL                       string
 	AlemAPIKey                        string
 	AlemPrimaryAPIKey                 string
@@ -126,6 +127,7 @@ func Load() (Config, error) {
 		},
 		AI: AIConfig{
 			AssistantEnabled:                  envBool("KUNDI_ASSISTANT_ENABLED", false),
+			VoiceInputEnabled:                 envBool("KUNDI_VOICE_INPUT_ENABLED", false),
 			AlemBaseURL:                       env("ALEM_BASE_URL", "https://llm.alem.ai/v1"),
 			AlemAPIKey:                        env("ALEM_API_KEY", ""),
 			AlemPrimaryAPIKey:                 env("ALEM_PRIMARY_API_KEY", ""),

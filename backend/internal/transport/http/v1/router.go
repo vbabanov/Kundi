@@ -515,6 +515,7 @@ func (a *API) sendAssistantMessage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ClientMessageID string `json:"client_message_id"`
 		Text            string `json:"text"`
+		InputMode       string `json:"input_mode,omitempty"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, assistantsafety.DefaultMaxRequestBodyBytes)
 	if err := decodeJSONStrict(r, &req); err != nil {
@@ -522,7 +523,7 @@ func (a *API) sendAssistantMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := a.deps.AssistantService.SendSessionMessage(r.Context(), assistantmodule.SendSessionMessageCommand{
-		StudentID: studentID.String(), SessionID: r.PathValue("sessionID"), ClientMessageID: req.ClientMessageID, Text: req.Text,
+		StudentID: studentID.String(), SessionID: r.PathValue("sessionID"), ClientMessageID: req.ClientMessageID, Text: req.Text, InputMode: req.InputMode,
 	})
 	if err != nil {
 		httpx.JSONError(w, err)

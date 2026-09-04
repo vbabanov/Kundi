@@ -29,6 +29,7 @@ const DefaultLLMTimeout = 12 * time.Second
 
 type Options struct {
 	Enabled           *bool
+	VoiceInputEnabled *bool
 	SessionRepository SessionRepository
 	AcademicContext   AcademicContextProvider
 	InputLimits       safety.Limits
@@ -57,6 +58,7 @@ type Service struct {
 	llmTimeout    time.Duration
 	logger        *slog.Logger
 	enabled       bool
+	voiceEnabled  bool
 	sessions      SessionRepository
 	academic      AcademicContextProvider
 	tutoring      *tutoring.Service
@@ -70,6 +72,10 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 	enabled := true
 	if options.Enabled != nil {
 		enabled = *options.Enabled
+	}
+	voiceEnabled := false
+	if options.VoiceInputEnabled != nil {
+		voiceEnabled = *options.VoiceInputEnabled
 	}
 	if personaService == nil {
 		personaService = persona.NewService()
@@ -113,6 +119,7 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 		llmTimeout:    options.LLMTimeout,
 		logger:        options.Logger,
 		enabled:       enabled,
+		voiceEnabled:  voiceEnabled,
 		sessions:      options.SessionRepository,
 		academic:      options.AcademicContext,
 		tutoring:      tutoring.NewService(),

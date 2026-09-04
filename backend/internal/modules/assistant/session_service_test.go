@@ -14,7 +14,77 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/llm"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tutoring"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
+	"github.com/kundi/kundi/backend/internal/platform/apperrors"
 )
+
+func TestSessionInputModePolicyAndPersistence(t *testing.T) {
+	studentID, sessionID := uuid.New(), uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	provider := &capturingSessionProvider{text: "Начни с первого шага."}
+	enabled, voiceEnabled := true, true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+		Enabled: &enabled, VoiceInputEnabled: &voiceEnabled, SessionRepository: repo,
+	})
+
+	textResult, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Объясни дроби",
+	})
+	if err != nil || textResult.UserMessage.InputMode != InputModeText {
+		t.Fatalf("default text mode failed: mode=%q err=%v", textResult.UserMessage.InputMode, err)
+	}
+
+	voiceID := uuid.NewString()
+	voiceCommand := SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: voiceID,
+		Text: "Реши за меня: 2 + 2", InputMode: InputModeVoice,
+	}
+	voiceResult, err := service.SendSessionMessage(context.Background(), voiceCommand)
+	if err != nil || voiceResult.UserMessage.InputMode != InputModeVoice || strings.Contains(voiceResult.AssistantMessage.Content, "42") {
+		t.Fatalf("voice policy/persistence failed: result=%#v err=%v", voiceResult, err)
+	}
+	replayed, err := service.SendSessionMessage(context.Background(), voiceCommand)
+	if err != nil || replayed.UserMessage.InputMode != InputModeVoice || replayed.UserMessage.ID != voiceResult.UserMessage.ID {
+		t.Fatalf("voice replay did not preserve exchange: result=%#v err=%v", replayed, err)
+	}
+}
+
+func TestVoiceInputRequiresFlagAndRejectsInvalidMode(t *testing.T) {
+	studentID, sessionID := uuid.New(), uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), &capturingSessionProvider{text: "Подсказка."}, nil, Options{
+		Enabled: &enabled, SessionRepository: repo,
+	})
+
+	base := SendSessionMessageCommand{StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Объясни дроби"}
+	base.InputMode = InputModeVoice
+	if _, err := service.SendSessionMessage(context.Background(), base); !apperrors.Is(err, "assistant_voice_input_disabled") {
+		t.Fatalf("voice without flag: %v", err)
+	}
+	base.ClientMessageID = uuid.NewString()
+	base.InputMode = "audio"
+	if _, err := service.SendSessionMessage(context.Background(), base); !apperrors.Is(err, "assistant_input_mode_invalid") {
+		t.Fatalf("invalid input mode: %v", err)
+	}
+}
+
+func TestAssistantSessionGradeRangeIsOneThroughEleven(t *testing.T) {
+	enabled := true
+	for _, grade := range []int{1, 11} {
+		repo := newMemorySessionRepository(uuid.New(), uuid.New(), grade)
+		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{Enabled: &enabled, SessionRepository: repo})
+		if _, err := service.CreateSession(context.Background(), repo.owner.String()); err != nil {
+			t.Fatalf("grade %d should be accepted: %v", grade, err)
+		}
+	}
+	for _, grade := range []int{0, 12} {
+		repo := newMemorySessionRepository(uuid.New(), uuid.New(), grade)
+		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{Enabled: &enabled, SessionRepository: repo})
+		if _, err := service.CreateSession(context.Background(), repo.owner.String()); err == nil {
+			t.Fatalf("grade %d should be rejected", grade)
+		}
+	}
+}
 
 func TestSessionMessageUsesServerGradeAndGuardsReadyAnswerIdempotently(t *testing.T) {
 	studentID := uuid.New()
@@ -314,7 +384,7 @@ func (r *memorySessionRepository) FindExchange(_ context.Context, studentID, ses
 	exchange.Session = r.session
 	return exchange, ok, nil
 }
-func (r *memorySessionRepository) SaveExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID, text string, assistant SessionMessage) (StoredExchange, error) {
+func (r *memorySessionRepository) SaveExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID, text, inputMode string, assistant SessionMessage) (StoredExchange, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if existing, ok := r.exchanges[clientID]; ok {
@@ -325,7 +395,7 @@ func (r *memorySessionRepository) SaveExchange(_ context.Context, studentID, ses
 		return StoredExchange{}, ErrSessionNotFound
 	}
 	now := time.Now().UTC()
-	user := SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "user", Content: text, InputMode: "text", CreatedAt: now}
+	user := SessionMessage{ID: uuid.NewString(), SessionID: sessionID.String(), Role: "user", Content: text, InputMode: inputMode, CreatedAt: now}
 	assistant.ID, assistant.SessionID, assistant.Role, assistant.InputMode, assistant.CreatedAt = uuid.NewString(), sessionID.String(), "assistant", "text", now.Add(time.Millisecond)
 	if r.session.Title == "" {
 		r.session.Title = boundedTitle(text)

@@ -91,12 +91,14 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	analyticsService := analyticsmodule.NewService(pool)
 	personaService := persona.NewService()
 	assistantEnabled := cfg.AI.AssistantEnabled
+	voiceInputEnabled := cfg.AI.VoiceInputEnabled
 	assistantService := assistantmodule.NewServiceWithOptions(
 		personaService,
 		resolveAssistantLLMProvider(cfg.AI),
 		resolveTTSProvider(cfg.AI.TTSProvider, cfg.AI.TTSBaseURL, cfg.AI.TTSAPIKey),
 		assistantmodule.Options{
 			Enabled:           &assistantEnabled,
+			VoiceInputEnabled: &voiceInputEnabled,
 			SessionRepository: assistantmodule.NewPostgresSessionRepository(pool),
 			AcademicContext: assistantmodule.NewPostgresAcademicContextProviderWithOptions(pool, assistantmodule.AcademicContextOptions{
 				HomeworkRecentOverdueDays:  cfg.AI.AssistantHomeworkOverdueDays,

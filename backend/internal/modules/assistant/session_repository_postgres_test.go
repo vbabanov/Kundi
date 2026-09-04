@@ -91,7 +91,7 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			exchange, saveErr := repository.SaveExchange(ctx, studentID, uuid.MustParse(secondSession.ID), duplicateID, "Второй вопрос", assistantMessage)
+			exchange, saveErr := repository.SaveExchange(ctx, studentID, uuid.MustParse(secondSession.ID), duplicateID, "Второй вопрос", InputModeText, assistantMessage)
 			results <- exchange
 			errs <- saveErr
 		}()

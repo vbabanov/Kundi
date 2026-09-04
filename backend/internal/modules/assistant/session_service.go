@@ -38,7 +38,13 @@ type SendSessionMessageCommand struct {
 	SessionID       string
 	ClientMessageID string
 	Text            string
+	InputMode       string
 }
+
+const (
+	InputModeText  = "text"
+	InputModeVoice = "voice"
+)
 
 type SessionMessageResult struct {
 	UserMessage      SessionMessage    `json:"user_message"`
@@ -80,7 +86,7 @@ func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (Assis
 	if locale == "" {
 		locale = "ru-KZ"
 	}
-	if profile.GradeLevel < 1 || profile.GradeLevel > 12 {
+	if profile.GradeLevel < 1 || profile.GradeLevel > 11 {
 		return AssistantSession{}, apperrors.Internal("assistant_profile_invalid", "assistant profile is invalid", errors.New("grade level is outside supported range"))
 	}
 	item, err := s.sessions.CreateSession(ctx, studentID, locale, profile.GradeLevel)
@@ -156,6 +162,10 @@ func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw 
 
 func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessageCommand) (SessionMessageResult, error) {
 	startedAt := time.Now()
+	inputMode, err := s.normalizeInputMode(cmd.InputMode)
+	if err != nil {
+		return SessionMessageResult{}, err
+	}
 	studentID, sessionID, err := s.sessionIDs(cmd.StudentID, cmd.SessionID)
 	if err != nil {
 		return SessionMessageResult{}, err
@@ -183,6 +193,9 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	if err != nil {
 		return SessionMessageResult{}, apperrors.Internal("assistant_session_load_failed", "failed to load assistant session", err)
 	}
+	if session.GradeLevel < 1 || session.GradeLevel > 11 {
+		return SessionMessageResult{}, apperrors.BadRequest("assistant_grade_unsupported", "assistant supports grades 1 through 11")
+	}
 
 	historyItems, err := s.sessions.ListMessages(ctx, studentID, sessionID, SessionHistoryLimit, nil)
 	if err != nil {
@@ -208,7 +221,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	if !inputSafety.Allowed {
 		safe := s.safeResponses.ForModeration(inputSafety)
 		analysis := tutoring.Analysis{Intent: tutoring.IntentGeneralQuestion, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", GradeBand: tutoring.GradeBand(session.GradeLevel)}
-		return s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "neutral", AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
+		return s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "neutral", AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
 	}
 
 	academic := AcademicContext{Locale: session.Locale, GradeLevel: session.GradeLevel}
@@ -250,14 +263,14 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		draft.ResponseMode = tutoring.ResponseModeSafety
 		draft.HelpLevel = "safety"
 	}
-	result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, draft, analysis, providerResponse.Provider, providerResponse.Model, safetyCategory, academic.Suggestions())
+	result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, draft, analysis, providerResponse.Provider, providerResponse.Model, safetyCategory, academic.Suggestions())
 	if err == nil {
 		s.logSessionEvent(startedAt, studentID.String(), sessionID.String(), analysis, contextFailed, "ok")
 	}
 	return result, err
 }
 
-func (s *Service) persistSessionDraft(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText string, draft tutoring.TutorResponseDraft, analysis tutoring.Analysis, provider, model, category string, suggestions []string) (SessionMessageResult, error) {
+func (s *Service) persistSessionDraft(ctx context.Context, studentID, sessionID, clientMessageID uuid.UUID, userText, inputMode string, draft tutoring.TutorResponseDraft, analysis tutoring.Analysis, provider, model, category string, suggestions []string) (SessionMessageResult, error) {
 	metadata := sessionResponseMetadata{
 		SchemaVersion: sessionResponseMetadataVersion, Intent: analysis.Intent,
 		HelpLevel: draft.HelpLevel, FollowUpQuestion: draft.FollowUpQuestion,
@@ -266,11 +279,25 @@ func (s *Service) persistSessionDraft(ctx context.Context, studentID, sessionID,
 		AnimationCue: draft.AnimationCue, Suggestions: suggestions,
 	}
 	policy, _ := json.Marshal(metadata)
-	exchange, err := s.sessions.SaveExchange(ctx, studentID, sessionID, clientMessageID, userText, SessionMessage{Content: draft.Answer, Provider: provider, Model: model, ResponseMode: string(draft.ResponseMode), TutoringPolicy: policy, SafetyCategory: category})
+	exchange, err := s.sessions.SaveExchange(ctx, studentID, sessionID, clientMessageID, userText, inputMode, SessionMessage{Content: draft.Answer, Provider: provider, Model: model, ResponseMode: string(draft.ResponseMode), TutoringPolicy: policy, SafetyCategory: category})
 	if err != nil {
 		return SessionMessageResult{}, apperrors.Internal("assistant_message_save_failed", "failed to save assistant message", err)
 	}
 	return resultFromExchange(exchange), nil
+}
+
+func (s *Service) normalizeInputMode(raw string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	if mode == "" {
+		return InputModeText, nil
+	}
+	if mode != InputModeText && mode != InputModeVoice {
+		return "", apperrors.BadRequest("assistant_input_mode_invalid", "input_mode must be text or voice")
+	}
+	if mode == InputModeVoice && !s.voiceEnabled {
+		return "", apperrors.NotFound("assistant_voice_input_disabled", "voice input is not enabled")
+	}
+	return mode, nil
 }
 
 func resultFromExchange(exchange StoredExchange) SessionMessageResult {
