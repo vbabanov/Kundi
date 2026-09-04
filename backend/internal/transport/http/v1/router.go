@@ -66,6 +66,11 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/attendance", withAuth(api.attendance))
 	mux.Handle("PUT /v1/profile/local", withAuth(api.updateLocalAppProfile))
 	mux.Handle("POST /v1/assistant/message", withAuth(api.assistantMessage))
+	mux.Handle("POST /v1/assistant/sessions", withAuth(api.createAssistantSession))
+	mux.Handle("GET /v1/assistant/sessions", withAuth(api.listAssistantSessions))
+	mux.Handle("GET /v1/assistant/sessions/{sessionID}/messages", withAuth(api.listAssistantMessages))
+	mux.Handle("POST /v1/assistant/sessions/{sessionID}/messages", withAuth(api.sendAssistantMessage))
+	mux.Handle("DELETE /v1/assistant/sessions/{sessionID}", withAuth(api.deleteAssistantSession))
 	mux.Handle("POST /v1/whatsapp/send-homework", withAuth(api.sendHomeworkDigest))
 	mux.Handle("POST /v1/whatsapp/send-photo", withAuth(api.sendHomeworkPhoto))
 	mux.Handle("GET /v1/whatsapp/jobs/{jobID}", withAuth(api.whatsappJobStatus))
@@ -397,6 +402,9 @@ func (a *API) attendance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) assistantMessage(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
 	studentID, err := studentIDFromRequest(r)
 	if err != nil {
 		httpx.JSONError(w, err)
@@ -426,6 +434,137 @@ func (a *API) assistantMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (a *API) createAssistantSession(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4*1024)
+	var req struct{}
+	if err := decodeJSONStrict(r, &req); err != nil {
+		httpx.JSONError(w, apperrors.BadRequest("invalid_json", "request body is not valid JSON"))
+		return
+	}
+	result, err := a.deps.AssistantService.CreateSession(r.Context(), studentID.String())
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, result)
+}
+
+func (a *API) listAssistantSessions(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	limit, err := assistantPageLimit(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.AssistantService.ListSessions(r.Context(), studentID.String(), limit, r.URL.Query().Get("cursor"))
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (a *API) listAssistantMessages(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	limit, err := assistantPageLimit(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.AssistantService.ListSessionMessages(r.Context(), studentID.String(), r.PathValue("sessionID"), limit, r.URL.Query().Get("cursor"))
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (a *API) sendAssistantMessage(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	var req struct {
+		ClientMessageID string `json:"client_message_id"`
+		Text            string `json:"text"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, assistantsafety.DefaultMaxRequestBodyBytes)
+	if err := decodeJSONStrict(r, &req); err != nil {
+		httpx.JSONError(w, apperrors.BadRequest("invalid_json", "request body is not valid JSON"))
+		return
+	}
+	result, err := a.deps.AssistantService.SendSessionMessage(r.Context(), assistantmodule.SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: r.PathValue("sessionID"), ClientMessageID: req.ClientMessageID, Text: req.Text,
+	})
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (a *API) deleteAssistantSession(w http.ResponseWriter, r *http.Request) {
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	if err := a.deps.AssistantService.DeleteSession(r.Context(), studentID.String(), r.PathValue("sessionID")); err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) assistantEnabled(w http.ResponseWriter) bool {
+	if a.deps.AssistantService != nil && a.deps.AssistantService.Enabled() {
+		return true
+	}
+	httpx.JSONError(w, apperrors.NotFound("assistant_disabled", "assistant is not enabled"))
+	return false
+}
+
+func assistantPageLimit(r *http.Request) (int, error) {
+	raw := strings.TrimSpace(r.URL.Query().Get("limit"))
+	if raw == "" {
+		return assistantmodule.DefaultSessionPageSize, nil
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit < 1 {
+		return 0, apperrors.BadRequest("assistant_limit_invalid", "limit must be a positive integer")
+	}
+	return limit, nil
 }
 
 func (a *API) sendHomeworkDigest(w http.ResponseWriter, r *http.Request) {

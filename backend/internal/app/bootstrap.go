@@ -90,11 +90,15 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	academicService := academic.NewService(pool, observe)
 	analyticsService := analyticsmodule.NewService(pool)
 	personaService := persona.NewService()
+	assistantEnabled := cfg.AI.AssistantEnabled
 	assistantService := assistantmodule.NewServiceWithOptions(
 		personaService,
-		resolveLLMProvider(cfg.AI.LLMProvider, cfg.AI.LLMBaseURL, cfg.AI.LLMAPIKey),
+		resolveAssistantLLMProvider(cfg.AI),
 		resolveTTSProvider(cfg.AI.TTSProvider, cfg.AI.TTSBaseURL, cfg.AI.TTSAPIKey),
 		assistantmodule.Options{
+			Enabled:           &assistantEnabled,
+			SessionRepository: assistantmodule.NewPostgresSessionRepository(pool),
+			AcademicContext:   assistantmodule.NewPostgresAcademicContextProvider(pool),
 			InputLimits: assistantsafety.Limits{
 				MaxTextRunes:           cfg.AI.AssistantMaxTextRunes,
 				MaxHistoryMessages:     cfg.AI.AssistantMaxHistoryMessages,
@@ -147,18 +151,28 @@ func (b *Bootstrap) Close() {
 	}
 }
 
-func resolveLLMProvider(providerName string, baseURL string, apiKey string) assistantllm.Provider {
-	switch strings.TrimSpace(strings.ToLower(providerName)) {
-	case "http":
-		if strings.TrimSpace(baseURL) == "" || strings.TrimSpace(apiKey) == "" {
-			return assistantllm.NewDeterministicProvider()
-		}
-		return assistantllm.NewHTTPProvider(baseURL, apiKey)
-	case "", "deterministic", "mock":
-		return assistantllm.NewDeterministicProvider()
-	default:
-		return assistantllm.NewDeterministicProvider()
+func resolveAssistantLLMProvider(cfg config.AIConfig) assistantllm.Provider {
+	primaryKey := firstConfigured(cfg.AlemPrimaryAPIKey, cfg.AlemAPIKey)
+	primary := assistantllm.NewOpenAICompatibleProvider(cfg.AlemBaseURL, primaryKey, cfg.AlemPrimaryModel, cfg.AssistantPrimaryTimeout)
+	if strings.TrimSpace(cfg.AlemFallbackModel) == "" {
+		return primary
 	}
+	fallbackKey := firstConfigured(cfg.AlemFallbackAPIKey, cfg.AlemAPIKey)
+	fallback := assistantllm.NewOpenAICompatibleProvider(cfg.AlemBaseURL, fallbackKey, cfg.AlemFallbackModel, cfg.AssistantFallbackTimeout)
+	return assistantllm.NewFallbackProviderWithPolicy(primary, fallback, assistantllm.FallbackPolicy{
+		PrimaryTimeout:  cfg.AssistantPrimaryTimeout,
+		FallbackTimeout: cfg.AssistantFallbackTimeout,
+		TotalTimeout:    cfg.AssistantLLMTimeout,
+	})
+}
+
+func firstConfigured(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func resolveTTSProvider(providerName string, baseURL string, apiKey string) assistanttts.Provider {

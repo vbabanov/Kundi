@@ -11,7 +11,10 @@ type ErrorKind string
 
 const (
 	ErrorClient        ErrorKind = "provider_client_error"
+	ErrorRateLimit     ErrorKind = "provider_rate_limit"
 	ErrorServer        ErrorKind = "provider_server_error"
+	ErrorUnavailable   ErrorKind = "provider_unavailable"
+	ErrorTimeout       ErrorKind = "provider_timeout"
 	ErrorMalformed     ErrorKind = "provider_malformed_response"
 	ErrorConfiguration ErrorKind = "provider_configuration_error"
 )
@@ -48,7 +51,9 @@ type Request struct {
 }
 
 type Response struct {
-	Text string
+	Text     string
+	Provider string
+	Model    string
 }
 
 type Provider interface {
@@ -70,6 +75,8 @@ func (p *DeterministicProvider) Generate(_ context.Context, req Request) (Respon
 		return Response{}, errors.New("forced llm failure")
 	}
 	return Response{
-		Text: "[" + req.Mode + "|" + req.PersonaTone + "|" + req.Style + "] " + prompt,
+		Text:     "[" + req.Mode + "|" + req.PersonaTone + "|" + req.Style + "] " + prompt,
+		Provider: "deterministic",
+		Model:    "deterministic",
 	}, nil
 }

@@ -49,6 +49,13 @@ type SecurityConfig struct {
 }
 
 type AIConfig struct {
+	AssistantEnabled                  bool
+	AlemBaseURL                       string
+	AlemAPIKey                        string
+	AlemPrimaryAPIKey                 string
+	AlemFallbackAPIKey                string
+	AlemPrimaryModel                  string
+	AlemFallbackModel                 string
 	WorkerConcurrency                 int
 	LLMProvider                       string
 	LLMBaseURL                        string
@@ -58,6 +65,8 @@ type AIConfig struct {
 	TTSAPIKey                         string
 	TTSTrustedHosts                   []string
 	AssistantLLMTimeout               time.Duration
+	AssistantPrimaryTimeout           time.Duration
+	AssistantFallbackTimeout          time.Duration
 	AssistantMaxTextRunes             int
 	AssistantMaxHistoryMessages       int
 	AssistantMaxHistoryMessageRunes   int
@@ -112,6 +121,13 @@ func Load() (Config, error) {
 			FieldEncryptionKey: env("FIELD_ENCRYPTION_KEY", ""),
 		},
 		AI: AIConfig{
+			AssistantEnabled:                  envBool("KUNDI_ASSISTANT_ENABLED", false),
+			AlemBaseURL:                       env("ALEM_BASE_URL", "https://llm.alem.ai/v1"),
+			AlemAPIKey:                        env("ALEM_API_KEY", ""),
+			AlemPrimaryAPIKey:                 env("ALEM_PRIMARY_API_KEY", ""),
+			AlemFallbackAPIKey:                env("ALEM_FALLBACK_API_KEY", ""),
+			AlemPrimaryModel:                  env("ALEM_PRIMARY_MODEL", ""),
+			AlemFallbackModel:                 env("ALEM_FALLBACK_MODEL", ""),
 			WorkerConcurrency:                 envInt("AI_WORKER_CONCURRENCY", 4),
 			LLMProvider:                       env("AI_LLM_PROVIDER", "deterministic"),
 			LLMBaseURL:                        env("AI_LLM_BASE_URL", ""),
@@ -121,6 +137,8 @@ func Load() (Config, error) {
 			TTSAPIKey:                         env("AI_TTS_API_KEY", ""),
 			TTSTrustedHosts:                   envList("AI_TTS_TRUSTED_HOSTS"),
 			AssistantLLMTimeout:               time.Duration(envInt("AI_ASSISTANT_LLM_TIMEOUT_SEC", 12)) * time.Second,
+			AssistantPrimaryTimeout:           time.Duration(envInt("AI_ASSISTANT_PRIMARY_TIMEOUT_SEC", 10)) * time.Second,
+			AssistantFallbackTimeout:          time.Duration(envInt("AI_ASSISTANT_FALLBACK_TIMEOUT_SEC", 8)) * time.Second,
 			AssistantMaxTextRunes:             envInt("AI_ASSISTANT_MAX_TEXT_RUNES", 4_000),
 			AssistantMaxHistoryMessages:       envInt("AI_ASSISTANT_MAX_HISTORY_MESSAGES", 20),
 			AssistantMaxHistoryMessageRunes:   envInt("AI_ASSISTANT_MAX_HISTORY_MESSAGE_RUNES", 4_000),

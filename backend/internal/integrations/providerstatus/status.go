@@ -42,6 +42,21 @@ func (s Snapshot) HasMisconfiguredProvider() bool {
 }
 
 func llmStatus(cfg config.Config) Provider {
+	if cfg.AI.AssistantEnabled {
+		if strings.TrimSpace(cfg.AI.AlemBaseURL) == "" {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_BASE_URL is required"}
+		}
+		if firstConfigured(cfg.AI.AlemPrimaryAPIKey, cfg.AI.AlemAPIKey) == "" {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_PRIMARY_API_KEY or ALEM_API_KEY is required"}
+		}
+		if strings.TrimSpace(cfg.AI.AlemPrimaryModel) == "" {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_PRIMARY_MODEL is required"}
+		}
+		if strings.TrimSpace(cfg.AI.AlemFallbackModel) != "" && firstConfigured(cfg.AI.AlemFallbackAPIKey, cfg.AI.AlemAPIKey) == "" {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_FALLBACK_API_KEY or ALEM_API_KEY is required when ALEM_FALLBACK_MODEL is configured"}
+		}
+		return Provider{Name: "llm", Mode: "alem", State: StateReady}
+	}
 	mode := strings.ToLower(strings.TrimSpace(cfg.AI.LLMProvider))
 	switch mode {
 	case "", "deterministic", "mock":
@@ -57,6 +72,15 @@ func llmStatus(cfg config.Config) Provider {
 	default:
 		return Provider{Name: "llm", Mode: mode, State: StateMisconfigured, Reason: "unsupported provider mode"}
 	}
+}
+
+func firstConfigured(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func ttsStatus(cfg config.Config) Provider {

@@ -20,6 +20,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/response_renderer"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tts"
+	"github.com/kundi/kundi/backend/internal/modules/assistant/tutoring"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
 )
@@ -27,6 +28,9 @@ import (
 const DefaultLLMTimeout = 12 * time.Second
 
 type Options struct {
+	Enabled           *bool
+	SessionRepository SessionRepository
+	AcademicContext   AcademicContextProvider
 	InputLimits       safety.Limits
 	Moderator         safety.Moderator
 	RateLimiter       ratelimit.Limiter
@@ -52,6 +56,10 @@ type Service struct {
 	audioURLs     *safety.AudioURLValidator
 	llmTimeout    time.Duration
 	logger        *slog.Logger
+	enabled       bool
+	sessions      SessionRepository
+	academic      AcademicContextProvider
+	tutoring      *tutoring.Service
 }
 
 func NewService(personaService *persona.Service, llmProvider llm.Provider, ttsProvider tts.Provider) *Service {
@@ -59,6 +67,10 @@ func NewService(personaService *persona.Service, llmProvider llm.Provider, ttsPr
 }
 
 func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Provider, ttsProvider tts.Provider, options Options) *Service {
+	enabled := true
+	if options.Enabled != nil {
+		enabled = *options.Enabled
+	}
 	if personaService == nil {
 		personaService = persona.NewService()
 	}
@@ -100,8 +112,14 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 		audioURLs:     options.AudioURLValidator,
 		llmTimeout:    options.LLMTimeout,
 		logger:        options.Logger,
+		enabled:       enabled,
+		sessions:      options.SessionRepository,
+		academic:      options.AcademicContext,
+		tutoring:      tutoring.NewService(),
 	}
 }
+
+func (s *Service) Enabled() bool { return s != nil && s.enabled }
 
 func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, error) {
 	startedAt := time.Now()
@@ -309,8 +327,14 @@ func classifyLLMFailure(err error, text string) (string, string) {
 		switch providerErr.Kind {
 		case llm.ErrorClient:
 			return "provider_4xx", "assistant_llm_provider_4xx"
+		case llm.ErrorRateLimit:
+			return "provider_429", "assistant_llm_provider_rate_limited"
 		case llm.ErrorServer:
 			return "provider_5xx", "assistant_llm_provider_5xx"
+		case llm.ErrorUnavailable:
+			return "provider_unavailable", "assistant_llm_provider_unavailable"
+		case llm.ErrorTimeout:
+			return "timeout", "assistant_llm_timeout"
 		case llm.ErrorMalformed:
 			return "malformed_response", "assistant_llm_malformed_response"
 		case llm.ErrorConfiguration:
