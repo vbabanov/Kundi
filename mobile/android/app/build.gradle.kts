@@ -11,6 +11,12 @@ val kundiHomeRealtimeAvatarEnabled =
         .map { it.equals("true", ignoreCase = true) }
         .orElse(false)
         .get()
+val kundiVoiceInputEnabled =
+    providers.gradleProperty("ENABLE_KUNDI_VOICE_INPUT")
+        .orElse(providers.environmentVariable("ENABLE_KUNDI_VOICE_INPUT"))
+        .map { it.equals("true", ignoreCase = true) }
+        .orElse(false)
+        .get()
 val kundiHomeAvatarGracePeriodMillis =
     providers.gradleProperty("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS")
         .orElse(providers.environmentVariable("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS"))
@@ -70,6 +76,23 @@ android {
             "KUNDI_HOME_AVATAR_GRACE_PERIOD_MS",
             "${kundiHomeAvatarGracePeriodMillis}L",
         )
+        buildConfigField(
+            "boolean",
+            "KUNDI_VOICE_INPUT_ENABLED",
+            kundiVoiceInputEnabled.toString(),
+        )
+        manifestPlaceholders["kundiRecordAudioPermission"] =
+            if (kundiVoiceInputEnabled) {
+                "android.permission.RECORD_AUDIO"
+            } else {
+                "android.permission.INTERNET"
+            }
+        manifestPlaceholders["kundiRecognitionServiceAction"] =
+            if (kundiVoiceInputEnabled) {
+                "android.speech.RecognitionService"
+            } else {
+                "com.kundi.kundi_mobile.DISABLED_VOICE_INPUT"
+            }
         if (kundiHomeRealtimeAvatarEnabled) {
             ndk {
                 abiFilters += "arm64-v8a"
@@ -114,9 +137,9 @@ flutter {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     if (kundiHomeRealtimeAvatarEnabled) {
         implementation("com.google.android.filament:filament-android:1.74.0")
         implementation("com.google.android.filament:gltfio-android:1.74.0")
-        testImplementation("junit:junit:4.13.2")
     }
 }
