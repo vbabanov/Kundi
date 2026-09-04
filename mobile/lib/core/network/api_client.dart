@@ -27,4 +27,8 @@ class ApiClient {
   Future<Response<dynamic>> put(String path, {Object? data, Options? options}) {
     return _dio.put(path, data: data, options: options);
   }
+
+  Future<Response<dynamic>> delete(String path, {Options? options}) {
+    return _dio.delete(path, options: options);
+  }
 }

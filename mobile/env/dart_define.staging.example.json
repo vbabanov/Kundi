@@ -1,4 +1,5 @@
 {
   "API_BASE_URL": "http://46.247.42.87:18080",
-  "ENABLE_DEBUG_SURFACES": "false"
+  "ENABLE_DEBUG_SURFACES": "false",
+  "ENABLE_KUNDI_ASSISTANT": "false"
 }

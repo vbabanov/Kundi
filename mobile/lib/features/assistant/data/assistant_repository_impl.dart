@@ -13,6 +13,140 @@ class AssistantRepositoryImpl implements AssistantRepository {
   final ApiClient _apiClient;
 
   @override
+  Future<AssistantSessionEntity> createSession({
+    required String accessToken,
+  }) async {
+    _requireToken(accessToken);
+    final response = await _apiClient.post(
+      '/v1/assistant/sessions',
+      options: _auth(accessToken),
+      data: const <String, dynamic>{},
+    );
+    if (response.statusCode != 201) {
+      throw const AppException(
+          'assistant_session_create_failed', 'Не удалось создать диалог.');
+    }
+    return _sessionFromJson(_payload(response.data));
+  }
+
+  @override
+  Future<AssistantPageResult<AssistantSessionEntity>> listSessions({
+    required String accessToken,
+    String cursor = '',
+    int limit = 20,
+  }) async {
+    _requireToken(accessToken);
+    final response = await _apiClient.get(
+      '/v1/assistant/sessions',
+      options: _auth(accessToken),
+      queryParameters: <String, dynamic>{
+        'limit': limit,
+        if (cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
+      },
+    );
+    final payload = _payload(response.data);
+    final rawItems =
+        payload['items'] is List ? payload['items'] as List : const <dynamic>[];
+    return AssistantPageResult<AssistantSessionEntity>(
+      items: rawItems
+          .whereType<Map>()
+          .map((item) => _sessionFromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false),
+      nextCursor: (payload['next_cursor'] ?? '').toString(),
+    );
+  }
+
+  @override
+  Future<AssistantPageResult<AssistantMessageEntity>> listMessages({
+    required String accessToken,
+    required String sessionId,
+    String cursor = '',
+    int limit = 20,
+  }) async {
+    _requireToken(accessToken);
+    final response = await _apiClient.get(
+      '/v1/assistant/sessions/${Uri.encodeComponent(sessionId)}/messages',
+      options: _auth(accessToken),
+      queryParameters: <String, dynamic>{
+        'limit': limit,
+        if (cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
+      },
+    );
+    final payload = _payload(response.data);
+    final rawItems =
+        payload['items'] is List ? payload['items'] as List : const <dynamic>[];
+    return AssistantPageResult<AssistantMessageEntity>(
+      items: rawItems
+          .whereType<Map>()
+          .map((item) => _messageFromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false),
+      nextCursor: (payload['next_cursor'] ?? '').toString(),
+    );
+  }
+
+  @override
+  Future<AssistantMessageResult> sendSessionMessage({
+    required String accessToken,
+    required String sessionId,
+    required String clientMessageId,
+    required String text,
+  }) async {
+    _requireToken(accessToken);
+    if (text.trim().isEmpty) {
+      throw const AppException('assistant_empty_text', 'Введите сообщение.');
+    }
+    final response = await _apiClient.post(
+      '/v1/assistant/sessions/${Uri.encodeComponent(sessionId)}/messages',
+      options: _auth(accessToken),
+      data: <String, dynamic>{
+        'client_message_id': clientMessageId,
+        'text': text.trim(),
+      },
+    );
+    final payload = _payload(response.data);
+    if (payload['user_message'] is! Map ||
+        payload['assistant_message'] is! Map) {
+      throw const AppException(
+          'assistant_invalid_payload', 'Сервер вернул неполный ответ.');
+    }
+    final suggestions = payload['suggestions'] is List
+        ? (payload['suggestions'] as List)
+            .map((value) => value.toString().trim())
+            .where((value) => value.isNotEmpty)
+            .take(3)
+            .toList(growable: false)
+        : const <String>[];
+    return AssistantMessageResult(
+      userMessage: _messageFromJson(
+          Map<String, dynamic>.from(payload['user_message'] as Map)),
+      assistantMessage: _messageFromJson(
+          Map<String, dynamic>.from(payload['assistant_message'] as Map)),
+      responseMode: (payload['response_mode'] ?? '').toString(),
+      helpLevel: (payload['help_level'] ?? '').toString(),
+      followUpQuestion: (payload['follow_up_question'] ?? '').toString(),
+      emotion: (payload['emotion'] ?? 'neutral').toString(),
+      animationCue: (payload['animation_cue'] ?? 'standing').toString(),
+      suggestions: suggestions,
+    );
+  }
+
+  @override
+  Future<void> deleteSession({
+    required String accessToken,
+    required String sessionId,
+  }) async {
+    _requireToken(accessToken);
+    final response = await _apiClient.delete(
+      '/v1/assistant/sessions/${Uri.encodeComponent(sessionId)}',
+      options: _auth(accessToken),
+    );
+    if (response.statusCode != 204) {
+      throw const AppException(
+          'assistant_session_delete_failed', 'Не удалось удалить диалог.');
+    }
+  }
+
+  @override
   Future<AssistantEntity> sendMessage({
     required String accessToken,
     required String text,
@@ -117,4 +251,55 @@ class AssistantRepositoryImpl implements AssistantRepository {
       gradeBand: (behavior['grade_band'] ?? '').toString(),
     );
   }
+
+  Options _auth(String token) => Options(
+        headers: <String, String>{'Authorization': 'Bearer ${token.trim()}'},
+      );
+
+  void _requireToken(String token) {
+    if (token.trim().isEmpty) {
+      throw const AppException(
+          'assistant_auth_required', 'Authorization token is required.');
+    }
+  }
+
+  Map<String, dynamic> _payload(dynamic raw) {
+    if (raw is! Map) {
+      throw const AppException(
+          'assistant_invalid_payload', 'Сервер вернул некорректный ответ.');
+    }
+    final root = Map<String, dynamic>.from(raw);
+    if (root['data'] is Map) {
+      return Map<String, dynamic>.from(root['data'] as Map);
+    }
+    return root;
+  }
+
+  AssistantSessionEntity _sessionFromJson(Map<String, dynamic> json) {
+    return AssistantSessionEntity(
+      id: (json['id'] ?? '').toString(),
+      locale: (json['locale'] ?? 'ru-KZ').toString(),
+      gradeLevel: int.tryParse((json['grade_level'] ?? '1').toString()) ?? 1,
+      title: (json['title'] ?? '').toString(),
+      createdAt: _date(json['created_at']),
+      updatedAt: _date(json['updated_at']),
+      lastMessageAt: _date(json['last_message_at']),
+    );
+  }
+
+  AssistantMessageEntity _messageFromJson(Map<String, dynamic> json) {
+    return AssistantMessageEntity(
+      id: (json['id'] ?? '').toString(),
+      sessionId: (json['session_id'] ?? '').toString(),
+      role: (json['role'] ?? '').toString(),
+      content: (json['content'] ?? '').toString(),
+      inputMode: (json['input_mode'] ?? 'text').toString(),
+      responseMode: (json['response_mode'] ?? '').toString(),
+      createdAt: _date(json['created_at']),
+    );
+  }
+
+  DateTime _date(dynamic raw) =>
+      DateTime.tryParse((raw ?? '').toString())?.toUtc() ??
+      DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 }

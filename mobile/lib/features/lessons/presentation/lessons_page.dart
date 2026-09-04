@@ -22,6 +22,8 @@ class LessonsPage extends ConsumerWidget {
     super.key,
     this.onHomeworkTap,
     this.onGradesTap,
+    this.onAssistantTap,
+    this.assistantEnabled = false,
     this.now,
     this.realtimeAvatarEnabled = false,
     this.realtimeAvatarPreparing = false,
@@ -33,6 +35,8 @@ class LessonsPage extends ConsumerWidget {
 
   final VoidCallback? onHomeworkTap;
   final VoidCallback? onGradesTap;
+  final VoidCallback? onAssistantTap;
+  final bool assistantEnabled;
   final DateTime? now;
   final bool realtimeAvatarEnabled;
   final bool realtimeAvatarPreparing;
@@ -48,9 +52,8 @@ class LessonsPage extends ConsumerWidget {
     final summaryState = ref.watch(summaryControllerProvider);
     final profileState = ref.watch(profileControllerProvider);
     final behaviorCoreEnabled = ref.watch(kundiBehaviorCoreEnabledProvider);
-    final behaviorState = behaviorCoreEnabled
-        ? ref.watch(kundiBehaviorControllerProvider)
-        : null;
+    final behaviorState =
+        behaviorCoreEnabled ? ref.watch(kundiBehaviorControllerProvider) : null;
     final lessons = lessonsState.valueOrNull ?? const <LessonsEntity>[];
     final summary = summaryState.valueOrNull;
     final today = _TodaySnapshot.from(
@@ -84,10 +87,12 @@ class LessonsPage extends ConsumerWidget {
         behaviorPresentation = null;
       }
     }
-    final animationCueName = behaviorPresentation?.animationCueName ?? 'neutral';
-    final animationIdentity = animationCueName == 'neutral' || behaviorState == null
-        ? 'home:greeting:initial'
-        : behaviorState.sourceEventId;
+    final animationCueName =
+        behaviorPresentation?.animationCueName ?? 'neutral';
+    final animationIdentity =
+        animationCueName == 'neutral' || behaviorState == null
+            ? 'home:greeting:initial'
+            : behaviorState.sourceEventId;
 
     return Scaffold(
       body: KundiGradientBackground(
@@ -130,8 +135,7 @@ class LessonsPage extends ConsumerWidget {
                 heroMessage: behaviorPresentation?.message ?? heroMessage,
                 semanticState:
                     behaviorPresentation?.semanticLabel ?? semanticState,
-                heroAssetPath:
-                    behaviorPresentation?.assetPath ??
+                heroAssetPath: behaviorPresentation?.assetPath ??
                     LessonsPage._heroAssetPath,
                 realtimeAvatarEnabled: realtimeAvatarEnabled,
                 realtimeAvatarPreparing: realtimeAvatarPreparing,
@@ -144,6 +148,8 @@ class LessonsPage extends ConsumerWidget {
                 gradesText: _latestGradesText(summary),
                 onHomeworkTap: onHomeworkTap,
                 onGradesTap: onGradesTap,
+                onAssistantTap: onAssistantTap,
+                assistantEnabled: assistantEnabled,
               ),
             ],
           ),
@@ -436,6 +442,8 @@ class _HeroActionStack extends StatelessWidget {
     required this.gradesText,
     required this.onHomeworkTap,
     required this.onGradesTap,
+    required this.onAssistantTap,
+    required this.assistantEnabled,
   });
 
   final String greeting;
@@ -454,6 +462,8 @@ class _HeroActionStack extends StatelessWidget {
   final String gradesText;
   final VoidCallback? onHomeworkTap;
   final VoidCallback? onGradesTap;
+  final VoidCallback? onAssistantTap;
+  final bool assistantEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -490,13 +500,16 @@ class _HeroActionStack extends StatelessWidget {
                     onTap: onGradesTap,
                   ),
                   const SizedBox(height: 10),
-                  const _InformationActionRow(
-                    key: Key('home-action-kundi'),
+                  _InformationActionRow(
+                    key: const Key('home-action-kundi'),
                     icon: Icons.chat_bubble_outline_rounded,
                     title: 'Спросите Kundi...',
-                    secondary: 'Персональный помощник появится позже',
-                    accent: Color(0xFF9E7BFF),
-                    trailingLabel: 'Скоро',
+                    secondary: assistantEnabled
+                        ? 'Объяснит тему и поможет сделать первый шаг'
+                        : 'Персональный помощник появится позже',
+                    accent: const Color(0xFF9E7BFF),
+                    trailingLabel: assistantEnabled ? '' : 'Скоро',
+                    onTap: assistantEnabled ? onAssistantTap : null,
                   ),
                 ],
               ),

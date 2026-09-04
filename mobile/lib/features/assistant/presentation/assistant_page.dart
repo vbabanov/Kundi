@@ -13,89 +13,368 @@ class AssistantPage extends ConsumerStatefulWidget {
 
 class _AssistantPageState extends ConsumerState<AssistantPage> {
   final TextEditingController _messageController = TextEditingController();
-  AssistantMode _mode = AssistantMode.tutor;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(assistantControllerProvider);
+    ref.listen(assistantControllerProvider, (previous, next) {
+      final before = previous?.valueOrNull?.messages.length ?? 0;
+      final after = next.valueOrNull?.messages.length ?? 0;
+      if (after > before) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    });
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Assistant')),
-      body: Column(
-        children: [
-          Expanded(
-            child: state.when(
-              data: (items) => ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return ListTile(
-                    title: Text(item.responseText),
-                    subtitle: Text(
-                        'Q: ${item.userText}\nmode: ${item.mode.apiValue}'),
-                  );
-                },
-              ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text(error.toString())),
-            ),
+      appBar: AppBar(
+        title: const Text('Спросите Kundi'),
+        actions: [
+          IconButton(
+            key: const Key('assistant-history-button'),
+            tooltip: 'Прошлые диалоги',
+            onPressed: state.hasValue ? _showSessions : null,
+            icon: const Icon(Icons.history_rounded),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              children: [
-                DropdownButton<AssistantMode>(
-                  value: _mode,
-                  items: const [
-                    DropdownMenuItem(
-                      value: AssistantMode.tutor,
-                      child: Text('Tutor'),
-                    ),
-                    DropdownMenuItem(
-                      value: AssistantMode.generalChat,
-                      child: Text('Chat'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _mode = value);
-                    }
-                  },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration:
-                        const InputDecoration(hintText: 'Ask assistant...'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: state.isLoading ? null : _sendMessage,
-                  child: const Text('Send'),
-                ),
-              ],
-            ),
+          PopupMenuButton<String>(
+            onSelected: _handleMenu,
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'new', child: Text('Новый диалог')),
+              PopupMenuItem(value: 'delete', child: Text('Удалить диалог')),
+            ],
           ),
         ],
+      ),
+      body: state.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _LoadError(
+          onRetry: () => ref.invalidate(assistantControllerProvider),
+        ),
+        data: (view) => Column(
+          children: [
+            Expanded(child: _messageList(view)),
+            if (view.errorMessage.isNotEmpty)
+              _TransportError(
+                message: view.errorMessage,
+                onRetry: view.retryText.isEmpty
+                    ? null
+                    : () => ref
+                        .read(assistantControllerProvider.notifier)
+                        .retryLastMessage(),
+              ),
+            _suggestions(view),
+            _composer(view),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _messageList(AssistantViewState view) {
+    final hasPending = view.pendingText.isNotEmpty;
+    if (view.messages.isEmpty && !hasPending && !view.isSending) {
+      return const _EmptyConversation();
+    }
+    final extra = (view.messageCursor.isNotEmpty ? 1 : 0) +
+        (hasPending ? 1 : 0) +
+        (view.isSending ? 1 : 0);
+    return ListView.builder(
+      key: const Key('assistant-message-list'),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      itemCount: view.messages.length + extra,
+      itemBuilder: (context, index) {
+        var offset = 0;
+        if (view.messageCursor.isNotEmpty) {
+          if (index == 0) {
+            return TextButton(
+              onPressed: () => ref
+                  .read(assistantControllerProvider.notifier)
+                  .loadOlderMessages(),
+              child: const Text('Показать предыдущие сообщения'),
+            );
+          }
+          offset = 1;
+        }
+        final messageIndex = index - offset;
+        if (messageIndex < view.messages.length) {
+          return _MessageBubble(message: view.messages[messageIndex]);
+        }
+        final tailIndex = messageIndex - view.messages.length;
+        if (hasPending && tailIndex == 0) {
+          return _PendingUserBubble(text: view.pendingText);
+        }
+        return const _ThinkingBubble();
+      },
+    );
+  }
+
+  Widget _suggestions(AssistantViewState view) {
+    if (view.suggestions.isEmpty || view.isSending) {
+      return const SizedBox.shrink();
+    }
+    return SingleChildScrollView(
+      key: const Key('assistant-suggestions'),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      child: Row(
+        children: view.suggestions.take(3).map((text) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(
+              label: Text(text),
+              onPressed: () => _messageController.text = text,
+            ),
+          );
+        }).toList(growable: false),
+      ),
+    );
+  }
+
+  Widget _composer(AssistantViewState view) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                key: const Key('assistant-text-field'),
+                controller: _messageController,
+                enabled: !view.isSending,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(
+                  hintText: 'Напишите вопрос…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              key: const Key('assistant-send-button'),
+              tooltip: 'Отправить',
+              onPressed: view.isSending ? null : _sendMessage,
+              icon: const Icon(Icons.send_rounded),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _sendMessage() {
     final message = _messageController.text.trim();
-    if (message.isEmpty) {
+    if (message.isEmpty) return;
+    _messageController.clear();
+    ref.read(assistantControllerProvider.notifier).sendMessage(message);
+  }
+
+  Future<void> _showSessions() async {
+    if (!ref.read(assistantControllerProvider).hasValue) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Consumer(
+        builder: (context, sheetRef, _) {
+          final view = sheetRef.watch(assistantControllerProvider).valueOrNull;
+          if (view == null) {
+            return const SafeArea(
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const ListTile(title: Text('Прошлые диалоги')),
+                ...view.sessions.map((session) => ListTile(
+                      selected: session.id == view.activeSession?.id,
+                      title: Text(session.title.isEmpty
+                          ? 'Новый диалог'
+                          : session.title),
+                      subtitle: Text('${session.gradeLevel} класс'),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        sheetRef
+                            .read(assistantControllerProvider.notifier)
+                            .openSession(session);
+                      },
+                    )),
+                if (view.sessionCursor.isNotEmpty)
+                  TextButton(
+                    onPressed: () => sheetRef
+                        .read(assistantControllerProvider.notifier)
+                        .loadMoreSessions(),
+                    child: const Text('Показать ещё'),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _handleMenu(String value) async {
+    if (value == 'new') {
+      await ref.read(assistantControllerProvider.notifier).createNewSession();
       return;
     }
-    ref
-        .read(assistantControllerProvider.notifier)
-        .sendMessage(text: message, mode: _mode);
-    _messageController.clear();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить диалог?'),
+        content: const Text('Историю этого диалога нельзя будет восстановить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref
+          .read(assistantControllerProvider.notifier)
+          .deleteCurrentSession();
+    }
   }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.message});
+
+  final AssistantMessageEntity message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 560),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: message.isUser
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: SelectableText(message.content),
+      ),
+    );
+  }
+}
+
+class _PendingUserBubble extends StatelessWidget {
+  const _PendingUserBubble({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(text),
+        ),
+      );
+}
+
+class _ThinkingBubble extends StatelessWidget {
+  const _ThinkingBubble();
+
+  @override
+  Widget build(BuildContext context) => const Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 10),
+              Text('Kundi думает…'),
+            ],
+          ),
+        ),
+      );
+}
+
+class _EmptyConversation extends StatelessWidget {
+  const _EmptyConversation();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Задайте вопрос — Kundi объяснит тему, даст подсказку или проверит ваш шаг.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+}
+
+class _TransportError extends StatelessWidget {
+  const _TransportError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) => MaterialBanner(
+        content: Text(message),
+        actions: [
+          if (onRetry != null)
+            TextButton(onPressed: onRetry, child: const Text('Повторить')),
+        ],
+      );
+}
+
+class _LoadError extends StatelessWidget {
+  const _LoadError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Не удалось загрузить диалог.'),
+            const SizedBox(height: 8),
+            FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+          ],
+        ),
+      );
 }

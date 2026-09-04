@@ -9,6 +9,8 @@ import '../../../shared/providers/providers.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../../grades/application/grades_controller.dart';
 import '../../grades/presentation/grades_page.dart';
+import '../../assistant/assistant_feature.dart';
+import '../../assistant/presentation/assistant_page.dart';
 import '../../homework/application/homework_controller.dart';
 import '../../homework/presentation/homework_page.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
@@ -235,6 +237,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           isDark ? Brightness.light : Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
     );
+    final assistantEnabled = ref.watch(kundiAssistantEnabledProvider);
 
     final rootPages = <Widget>[
       const HomeworkPage(),
@@ -242,6 +245,21 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         child: LessonsPage(
           onHomeworkTap: () => _showRootPage(0),
           onGradesTap: () => _showRootPage(2),
+          assistantEnabled: assistantEnabled,
+          onAssistantTap: assistantEnabled
+              ? () {
+                  if (_behaviorCoreEnabled) {
+                    ref
+                        .read(kundiBehaviorControllerProvider.notifier)
+                        .dismiss();
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AssistantPage(),
+                    ),
+                  );
+                }
+              : null,
           realtimeAvatarEnabled:
               KundiNativeAvatarFeature.enabled && _avatarRuntimeReady,
           realtimeAvatarPreparing:
