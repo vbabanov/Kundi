@@ -82,3 +82,58 @@ func TestBuildHTTPModesAreReadyWhenSecretsPresent(t *testing.T) {
 		t.Fatalf("expected no misconfigured providers")
 	}
 }
+
+func TestBuildAlemSeparateKeysAreReady(t *testing.T) {
+	cfg := config.Config{AI: config.AIConfig{
+		AssistantEnabled:   true,
+		AlemBaseURL:        "https://llm.example/v1",
+		AlemPrimaryAPIKey:  "primary-test-key",
+		AlemFallbackAPIKey: "fallback-test-key",
+		AlemPrimaryModel:   "primary-model",
+		AlemFallbackModel:  "fallback-model",
+	}}
+	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
+		t.Fatalf("expected separate Alem credentials to be ready, got %#v", snapshot.LLM)
+	}
+}
+
+func TestBuildAlemRequiresCredentialForConfiguredFallback(t *testing.T) {
+	cfg := config.Config{AI: config.AIConfig{
+		AssistantEnabled:  true,
+		AlemBaseURL:       "https://llm.example/v1",
+		AlemPrimaryAPIKey: "primary-test-key",
+		AlemPrimaryModel:  "primary-model",
+		AlemFallbackModel: "fallback-model",
+	}}
+	snapshot := Build(cfg)
+	if snapshot.LLM.State != StateMisconfigured || snapshot.LLM.Reason == "" {
+		t.Fatalf("expected missing fallback credential to be reported, got %#v", snapshot.LLM)
+	}
+}
+
+func TestBuildAlemAcceptsSeparateKeys(t *testing.T) {
+	cfg := config.Config{AI: config.AIConfig{
+		AssistantEnabled:   true,
+		AlemBaseURL:        "https://llm.example/v1",
+		AlemPrimaryAPIKey:  "primary-key",
+		AlemFallbackAPIKey: "fallback-key",
+		AlemPrimaryModel:   "primary-model",
+		AlemFallbackModel:  "fallback-model",
+	}}
+	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
+		t.Fatalf("expected separate Alem keys to be ready, got %#v", snapshot.LLM)
+	}
+}
+
+func TestBuildAlemAcceptsLegacySharedKey(t *testing.T) {
+	cfg := config.Config{AI: config.AIConfig{
+		AssistantEnabled:  true,
+		AlemBaseURL:       "https://llm.example/v1",
+		AlemAPIKey:        "shared-key",
+		AlemPrimaryModel:  "primary-model",
+		AlemFallbackModel: "fallback-model",
+	}}
+	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
+		t.Fatalf("expected legacy shared Alem key to be ready, got %#v", snapshot.LLM)
+	}
+}

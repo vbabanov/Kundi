@@ -200,6 +200,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+      'enabled Kundi row opens assistant callback without geometry change',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    var assistantTapped = false;
+    await tester.pumpWidget(
+      _testApp(
+        lessons: _sixLessons,
+        summary: _summaryWithGrades,
+        studentName: 'Артем',
+        assistantEnabled: true,
+        onAssistantTap: () => assistantTapped = true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const Key('home-action-kundi'));
+    expect(find.text('Скоро'), findsNothing);
+    expect(find.text('Объяснит тему и поможет сделать первый шаг'),
+        findsOneWidget);
+    await tester.tap(action);
+    await tester.pump();
+    expect(assistantTapped, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses results title when recent values are summative',
       (tester) async {
     await _setSurface(tester, const Size(430, 1000));
@@ -284,6 +310,8 @@ Widget _testApp({
   required String studentName,
   VoidCallback? onHomeworkTap,
   VoidCallback? onGradesTap,
+  VoidCallback? onAssistantTap,
+  bool assistantEnabled = false,
   double textScale = 1,
   bool withBottomNavigation = false,
   bool behaviorCoreEnabled = false,
@@ -293,6 +321,8 @@ Widget _testApp({
     now: DateTime(2026, 4, 5, 7, 45),
     onHomeworkTap: onHomeworkTap,
     onGradesTap: onGradesTap,
+    onAssistantTap: onAssistantTap,
+    assistantEnabled: assistantEnabled,
   );
   final home = withBottomNavigation
       ? Scaffold(
