@@ -13,6 +13,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
+        key: UniqueKey(),
         overrides: [
           assistantControllerProvider.overrideWith(
             () => _FakeAssistantController(_viewState()),
@@ -35,6 +36,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        key: UniqueKey(),
         overrides: [
           assistantControllerProvider.overrideWith(
             () => _FakeAssistantController(_viewState(
@@ -51,12 +53,51 @@ void main() {
     expect(find.text('Kundi думает…'), findsOneWidget);
     expect(find.byIcon(Icons.mic), findsNothing);
   });
+
+  testWidgets('shows retry only for retryable send failures', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        key: UniqueKey(),
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(
+              errorMessage: 'Kundi временно не смогла ответить.',
+              retryable: true,
+            )),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Kundi временно не смогла ответить.'), findsOneWidget);
+    expect(find.text('Повторить'), findsOneWidget);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        key: UniqueKey(),
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(
+              errorMessage: 'Kundi пока недоступна.',
+              retryable: false,
+            )),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Kundi пока недоступна.'), findsOneWidget);
+    expect(find.text('Повторить'), findsNothing);
+  });
 }
 
 AssistantViewState _viewState({
   bool isSending = false,
   String pendingText = '',
   String errorMessage = 'Не удалось отправить сообщение.',
+  bool retryable = true,
 }) {
   final now = DateTime.utc(2026, 9, 4);
   return AssistantViewState(
@@ -86,8 +127,8 @@ AssistantViewState _viewState({
     isSending: isSending,
     pendingText: pendingText,
     errorMessage: errorMessage,
-    retryText: errorMessage.isEmpty ? '' : 'Повтори вопрос',
-    retryClientMessageId: errorMessage.isEmpty ? '' : 'client-1',
+    retryText: errorMessage.isEmpty || !retryable ? '' : 'Повтори вопрос',
+    retryClientMessageId: errorMessage.isEmpty || !retryable ? '' : 'client-1',
   );
 }
 

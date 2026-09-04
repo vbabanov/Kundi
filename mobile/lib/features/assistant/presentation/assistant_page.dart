@@ -353,13 +353,30 @@ class _TransportError extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) => MaterialBanner(
-        content: Text(message),
-        actions: [
-          if (onRetry != null)
-            TextButton(onPressed: onRetry, child: const Text('Повторить')),
-        ],
-      );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: colors.onErrorContainer),
+              ),
+            ),
+            if (onRetry != null)
+              TextButton(
+                onPressed: onRetry,
+                child: const Text('Повторить'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _LoadError extends StatelessWidget {

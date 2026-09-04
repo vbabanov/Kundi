@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kundi_mobile/core/errors/app_exception.dart';
 import 'package:kundi_mobile/core/network/api_client.dart';
 import 'package:kundi_mobile/features/assistant/data/assistant_repository_impl.dart';
 import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
@@ -116,6 +117,12 @@ void main() {
             'emotion': 'neutral',
             'animation_cue': 'standing',
             'suggestions': ['Повторить: дроби'],
+            'session': {
+              ..._sessionJson(),
+              'title': 'Вопрос',
+              'updated_at': '2026-09-04T00:01:00Z',
+              'last_message_at': '2026-09-04T00:01:00Z',
+            },
           }
         }));
       } else if (request.method == 'DELETE' &&
@@ -147,7 +154,71 @@ void main() {
     expect(messages.items.single.content, 'Привет!');
     expect(sent.assistantMessage.content, 'Ответ');
     expect(sent.animationCue, 'standing');
+    expect(sent.session?.title, 'Вопрос');
     expect(seenPaths, contains('DELETE /v1/assistant/sessions/session-1'));
+  });
+
+  test('assistant repository keeps old backend response compatible', () async {
+    server.listen((request) async {
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(jsonEncode({
+        'data': {
+          'user_message': _messageJson('user-1', 'user', 'Вопрос'),
+          'assistant_message':
+              _messageJson('assistant-1', 'assistant', 'Ответ'),
+          'response_mode': 'answer',
+          'help_level': 'direct',
+          'emotion': 'neutral',
+          'animation_cue': 'standing',
+          'suggestions': <String>[],
+        }
+      }));
+      await request.response.close();
+    });
+    final repository = AssistantRepositoryImpl(
+      apiClient: ApiClient(baseUrl: 'http://127.0.0.1:${server.port}'),
+    );
+    final result = await repository.sendSessionMessage(
+      accessToken: 'token',
+      sessionId: 'session-1',
+      clientMessageId: 'client-1',
+      text: 'Вопрос',
+    );
+    expect(result.session, isNull);
+  });
+
+  test('assistant repository maps structured server errors safely', () async {
+    server.listen((request) async {
+      request.response.statusCode = 429;
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(jsonEncode({
+        'error': {
+          'code': 'assistant_rate_limited',
+          'message': 'internal provider details must not be surfaced',
+        }
+      }));
+      await request.response.close();
+    });
+    final repository = AssistantRepositoryImpl(
+      apiClient: ApiClient(baseUrl: 'http://127.0.0.1:${server.port}'),
+    );
+    await expectLater(
+      repository.sendSessionMessage(
+        accessToken: 'token',
+        sessionId: 'session-1',
+        clientMessageId: 'client-1',
+        text: 'Вопрос',
+      ),
+      throwsA(
+        isA<AppException>()
+            .having((error) => error.code, 'code', 'assistant_rate_limited')
+            .having(
+              (error) => error.message,
+              'safe message',
+              'Не удалось отправить сообщение.',
+            ),
+      ),
+    );
   });
 }
 

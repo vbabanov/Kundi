@@ -95,14 +95,19 @@ class AssistantRepositoryImpl implements AssistantRepository {
     if (text.trim().isEmpty) {
       throw const AppException('assistant_empty_text', 'Введите сообщение.');
     }
-    final response = await _apiClient.post(
-      '/v1/assistant/sessions/${Uri.encodeComponent(sessionId)}/messages',
-      options: _auth(accessToken),
-      data: <String, dynamic>{
-        'client_message_id': clientMessageId,
-        'text': text.trim(),
-      },
-    );
+    late final Response<dynamic> response;
+    try {
+      response = await _apiClient.post(
+        '/v1/assistant/sessions/${Uri.encodeComponent(sessionId)}/messages',
+        options: _auth(accessToken),
+        data: <String, dynamic>{
+          'client_message_id': clientMessageId,
+          'text': text.trim(),
+        },
+      );
+    } on DioException catch (error) {
+      throw _assistantAppException(error);
+    }
     final payload = _payload(response.data);
     if (payload['user_message'] is! Map ||
         payload['assistant_message'] is! Map) {
@@ -127,6 +132,10 @@ class AssistantRepositoryImpl implements AssistantRepository {
       emotion: (payload['emotion'] ?? 'neutral').toString(),
       animationCue: (payload['animation_cue'] ?? 'standing').toString(),
       suggestions: suggestions,
+      session: payload['session'] is Map
+          ? _sessionFromJson(
+              Map<String, dynamic>.from(payload['session'] as Map))
+          : null,
     );
   }
 
@@ -302,4 +311,71 @@ class AssistantRepositoryImpl implements AssistantRepository {
   DateTime _date(dynamic raw) =>
       DateTime.tryParse((raw ?? '').toString())?.toUtc() ??
       DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+  AppException _assistantAppException(DioException error) {
+    final status = error.response?.statusCode;
+    if (status == 401 || status == 403) {
+      return const AppException(
+        'unauthorized',
+        'Сессия авторизации недействительна.',
+      );
+    }
+
+    final raw = error.response?.data;
+    final root = raw is Map ? Map<String, dynamic>.from(raw) : null;
+    final errorPayload = root?['error'] is Map
+        ? Map<String, dynamic>.from(root!['error'] as Map)
+        : null;
+    final code = (errorPayload?['code'] ?? '').toString().trim();
+    if (code.isNotEmpty) {
+      final message = _isAssistantValidationCode(code)
+          ? _safeServerMessage(errorPayload?['message'])
+          : 'Не удалось отправить сообщение.';
+      return AppException(code, message);
+    }
+
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return const AppException(
+          'assistant_request_timeout',
+          'Kundi временно не смогла ответить.',
+        );
+      case DioExceptionType.connectionError:
+      case DioExceptionType.unknown:
+        return const AppException(
+          'assistant_network_error',
+          'Не удалось отправить сообщение.',
+        );
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.badResponse:
+      case DioExceptionType.cancel:
+        return const AppException(
+          'assistant_request_failed',
+          'Не удалось отправить сообщение.',
+        );
+    }
+  }
+
+  bool _isAssistantValidationCode(String code) {
+    return code == 'invalid_json' ||
+        code == 'assistant_empty_text' ||
+        code.endsWith('_invalid') ||
+        code.endsWith('_required') ||
+        code.contains('_too_long') ||
+        code.contains('_too_large');
+  }
+
+  String _safeServerMessage(dynamic raw) {
+    final normalized =
+        (raw ?? '').toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return 'Проверьте сообщение и попробуйте снова.';
+    }
+    if (normalized.length <= 180) {
+      return normalized;
+    }
+    return '${normalized.substring(0, 180)}…';
+  }
 }

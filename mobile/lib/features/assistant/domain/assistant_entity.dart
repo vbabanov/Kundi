@@ -120,6 +120,7 @@ class AssistantMessageResult {
     required this.animationCue,
     required this.suggestions,
     this.followUpQuestion = '',
+    this.session,
   });
 
   final AssistantMessageEntity userMessage;
@@ -130,4 +131,5 @@ class AssistantMessageResult {
   final String emotion;
   final String animationCue;
   final List<String> suggestions;
+  final AssistantSessionEntity? session;
 }

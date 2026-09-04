@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import '../../../shared/providers/providers.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
@@ -78,12 +79,6 @@ class AssistantViewState {
 }
 
 class AssistantController extends AsyncNotifier<AssistantViewState> {
-  static const _genericSuggestions = <String>[
-    'Объясни тему',
-    'Помоги сделать первый шаг',
-    'Проверь мой ответ',
-  ];
-
   final Uuid _uuid = const Uuid();
 
   @override
@@ -109,7 +104,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
       messages: _chronological(messages.items),
       sessionCursor: page.nextCursor,
       messageCursor: messages.nextCursor,
-      suggestions: _genericSuggestions,
+      suggestions: _genericSuggestionsForLocale(active.locale),
     );
   }
 
@@ -125,7 +120,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         activeSession: session,
         messages: const <AssistantMessageEntity>[],
         messageCursor: '',
-        suggestions: _genericSuggestions,
+        suggestions: _genericSuggestionsForLocale(session.locale),
         errorMessage: '',
         retryText: '',
         retryClientMessageId: '',
@@ -145,7 +140,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         activeSession: session,
         messages: _chronological(page.items),
         messageCursor: page.nextCursor,
-        suggestions: _genericSuggestions,
+        suggestions: _genericSuggestionsForLocale(session.locale),
         errorMessage: '',
       );
     });
@@ -209,6 +204,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
                 text: normalized,
               );
       final latest = state.valueOrNull ?? current;
+      final updatedSession = result.session;
       state = AsyncData(latest.copyWith(
         messages: _mergeMessages(
           latest.messages,
@@ -220,6 +216,12 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         suggestions: result.suggestions.isEmpty
             ? latest.suggestions
             : result.suggestions,
+        activeSession: updatedSession ?? latest.activeSession,
+        sessions: updatedSession == null
+            ? latest.sessions
+            : _mergeSessions(latest.sessions, <AssistantSessionEntity>[
+                updatedSession,
+              ]),
         isSending: false,
         pendingText: '',
         errorMessage: '',
@@ -227,12 +229,18 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         retryClientMessageId: '',
       ));
       _neutralBehavior();
-    } catch (_) {
+    } catch (error) {
       final latest = state.valueOrNull ?? current;
+      final failure = _sendFailure(error);
+      if (failure.refreshAuthorization) {
+        ref.invalidate(authControllerProvider);
+      }
       state = AsyncData(latest.copyWith(
         isSending: false,
         pendingText: '',
-        errorMessage: 'Не удалось отправить сообщение. Проверьте соединение.',
+        errorMessage: failure.message,
+        retryText: failure.canRetry ? normalized : '',
+        retryClientMessageId: failure.canRetry ? requestID : '',
       ));
       _behavior(KundiBehaviorEventType.assistantFailure, requestID);
     }
@@ -326,4 +334,79 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
       ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
     return out;
   }
+
+  static List<String> _genericSuggestionsForLocale(String locale) {
+    if (locale.trim().toLowerCase().startsWith('kk')) {
+      return const <String>[
+        'Тақырыпты түсіндір',
+        'Бірінші қадамды жасауға көмектес',
+        'Жауабымды тексер',
+      ];
+    }
+    return const <String>[
+      'Объясни тему',
+      'Помоги сделать первый шаг',
+      'Проверь мой ответ',
+    ];
+  }
+
+  static _AssistantSendFailure _sendFailure(Object error) {
+    if (error is AppException) {
+      switch (error.code) {
+        case 'assistant_rate_limited':
+        case 'assistant_provider_rate_limited':
+          return const _AssistantSendFailure(
+            message:
+                'Слишком много запросов. Немного подождите и попробуйте снова.',
+            canRetry: true,
+          );
+        case 'assistant_disabled':
+          return const _AssistantSendFailure(
+            message: 'Kundi пока недоступна.',
+          );
+        case 'assistant_provider_unavailable':
+        case 'assistant_request_timeout':
+        case 'assistant_safety_unavailable':
+          return const _AssistantSendFailure(
+            message: 'Kundi временно не смогла ответить. Попробуйте ещё раз.',
+            canRetry: true,
+          );
+        case 'unauthorized':
+        case 'assistant_auth_required':
+          return const _AssistantSendFailure(refreshAuthorization: true);
+        case 'assistant_network_error':
+          return const _AssistantSendFailure(
+            message: 'Не удалось отправить сообщение. Проверьте соединение.',
+            canRetry: true,
+          );
+      }
+      if (_isValidationCode(error.code)) {
+        return _AssistantSendFailure(message: error.message);
+      }
+    }
+    return const _AssistantSendFailure(
+      message: 'Не удалось отправить сообщение. Проверьте соединение.',
+    );
+  }
+
+  static bool _isValidationCode(String code) {
+    return code == 'invalid_json' ||
+        code == 'assistant_empty_text' ||
+        code.endsWith('_invalid') ||
+        code.endsWith('_required') ||
+        code.contains('_too_long') ||
+        code.contains('_too_large');
+  }
+}
+
+class _AssistantSendFailure {
+  const _AssistantSendFailure({
+    this.message = '',
+    this.canRetry = false,
+    this.refreshAuthorization = false,
+  });
+
+  final String message;
+  final bool canRetry;
+  final bool refreshAuthorization;
 }
