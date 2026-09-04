@@ -4,5 +4,6 @@ import 'package:kundi_mobile/features/assistant/assistant_feature.dart';
 void main() {
   test('assistant feature flag defaults to false', () {
     expect(kundiAssistantEnabledByDefault, isFalse);
+    expect(kundiVoiceInputEnabledByDefault, isFalse);
   });
 }

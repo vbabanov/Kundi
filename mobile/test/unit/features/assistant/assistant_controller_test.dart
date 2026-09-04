@@ -171,11 +171,16 @@ void main() {
     final container = await _container(repository);
     addTearDown(container.dispose);
     final controller = container.read(assistantControllerProvider.notifier);
-    await controller.sendMessage('Вопрос');
+    await controller.sendMessage(
+      'Вопрос',
+      inputMode: AssistantInputMode.voice,
+    );
     final originalID = repository.lastClientMessageId;
+    expect(repository.lastInputMode, AssistantInputMode.voice);
     repository.error = null;
     await controller.retryLastMessage();
     expect(repository.sentClientMessageIds, <String>[originalID, originalID]);
+    expect(repository.lastInputMode, AssistantInputMode.voice);
   });
 }
 
@@ -220,6 +225,7 @@ class _FakeAssistantRepository implements AssistantRepository {
   Object? error;
   int listSessionCalls = 0;
   String lastClientMessageId = '';
+  AssistantInputMode lastInputMode = AssistantInputMode.text;
   final List<String> sentClientMessageIds = <String>[];
 
   @override
@@ -257,8 +263,10 @@ class _FakeAssistantRepository implements AssistantRepository {
     required String sessionId,
     required String clientMessageId,
     required String text,
+    AssistantInputMode inputMode = AssistantInputMode.text,
   }) async {
     lastClientMessageId = clientMessageId;
+    lastInputMode = inputMode;
     sentClientMessageIds.add(clientMessageId);
     if (error != null) throw error!;
     return result!;

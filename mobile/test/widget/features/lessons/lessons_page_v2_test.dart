@@ -226,6 +226,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('avatar long press is distinct from tap on static fallback',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    var taps = 0;
+    var starts = 0;
+    var ends = 0;
+    var pointerDowns = 0;
+    var pointerUps = 0;
+    await tester.pumpWidget(
+      _testApp(
+        lessons: _sixLessons,
+        summary: _summaryWithGrades,
+        studentName: 'Артем',
+        assistantEnabled: true,
+        onAssistantTap: () => taps++,
+        onAssistantPointerDown: (_) => pointerDowns++,
+        onAssistantPointerUp: (_) => pointerUps++,
+        onAssistantLongPressStart: (_) => starts++,
+        onAssistantLongPressEnd: (_) => ends++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final avatar = find.byKey(const Key('kundi-home-avatar-gesture'));
+    final gesture = await tester.startGesture(tester.getCenter(avatar));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.up();
+    await tester.pump();
+
+    expect(starts, 1);
+    expect(ends, 1);
+    expect(pointerDowns, 1);
+    expect(pointerUps, 1);
+    expect(taps, 0);
+    expect(find.byKey(KundiHomeHero.heroKey), findsOneWidget);
+  });
+
+  testWidgets(
+      'cancelled pointer then one long press are two pointer sequences but one accepted hold',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    var taps = 0;
+    var pointerDowns = 0;
+    var pointerUps = 0;
+    var pointerCancels = 0;
+    var starts = 0;
+    var ends = 0;
+    await tester.pumpWidget(
+      _testApp(
+        lessons: _sixLessons,
+        summary: _summaryWithGrades,
+        studentName: 'Артем',
+        assistantEnabled: true,
+        onAssistantTap: () => taps++,
+        onAssistantPointerDown: (_) => pointerDowns++,
+        onAssistantPointerUp: (_) => pointerUps++,
+        onAssistantPointerCancel: (_) => pointerCancels++,
+        onAssistantLongPressStart: (_) => starts++,
+        onAssistantLongPressEnd: (_) => ends++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final avatar = find.byKey(const Key('kundi-home-avatar-gesture'));
+    final slipped = await tester.startGesture(tester.getCenter(avatar));
+    await tester.pump(const Duration(milliseconds: 100));
+    await slipped.cancel();
+    await tester.pump();
+
+    final accepted = await tester.startGesture(tester.getCenter(avatar));
+    await tester.pump(const Duration(milliseconds: 600));
+    await accepted.up();
+    await tester.pump();
+
+    expect(pointerDowns, 2);
+    expect(pointerCancels, 1);
+    expect(pointerUps, 1);
+    expect(starts, 1);
+    expect(ends, 1);
+    expect(taps, 0);
+  });
+
   testWidgets('uses results title when recent values are summative',
       (tester) async {
     await _setSurface(tester, const Size(430, 1000));
@@ -311,6 +393,11 @@ Widget _testApp({
   VoidCallback? onHomeworkTap,
   VoidCallback? onGradesTap,
   VoidCallback? onAssistantTap,
+  PointerDownEventListener? onAssistantPointerDown,
+  PointerUpEventListener? onAssistantPointerUp,
+  PointerCancelEventListener? onAssistantPointerCancel,
+  GestureLongPressStartCallback? onAssistantLongPressStart,
+  GestureLongPressEndCallback? onAssistantLongPressEnd,
   bool assistantEnabled = false,
   double textScale = 1,
   bool withBottomNavigation = false,
@@ -322,6 +409,11 @@ Widget _testApp({
     onHomeworkTap: onHomeworkTap,
     onGradesTap: onGradesTap,
     onAssistantTap: onAssistantTap,
+    onAssistantPointerDown: onAssistantPointerDown,
+    onAssistantPointerUp: onAssistantPointerUp,
+    onAssistantPointerCancel: onAssistantPointerCancel,
+    onAssistantLongPressStart: onAssistantLongPressStart,
+    onAssistantLongPressEnd: onAssistantLongPressEnd,
     assistantEnabled: assistantEnabled,
   );
   final home = withBottomNavigation

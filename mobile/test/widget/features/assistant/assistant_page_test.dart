@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/assistant/application/assistant_controller.dart';
+import 'package:kundi_mobile/features/assistant/assistant_feature.dart';
 import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
+import 'package:kundi_mobile/features/assistant/domain/assistant_repository.dart';
 import 'package:kundi_mobile/features/assistant/presentation/assistant_page.dart';
+import 'package:kundi_mobile/features/auth/application/auth_controller.dart';
+import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
 
 void main() {
   testWidgets(
@@ -54,6 +58,36 @@ void main() {
     expect(find.byIcon(Icons.mic), findsNothing);
   });
 
+  testWidgets('marks persisted voice messages in the shared history',
+      (tester) async {
+    final view = _viewState();
+    final now = DateTime.utc(2026, 9, 4, 12);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(view.copyWith(messages: [
+              AssistantMessageEntity(
+                id: 'voice-1',
+                sessionId: 'session-1',
+                role: 'user',
+                content: 'Объясни дроби',
+                inputMode: 'voice',
+                responseMode: '',
+                createdAt: now,
+              ),
+            ])),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+        find.byKey(const Key('assistant-voice-message-badge')), findsOneWidget);
+    expect(find.text('Голосом'), findsOneWidget);
+  });
+
   testWidgets('shows retry only for retryable send failures', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -90,6 +124,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kundi пока недоступна.'), findsOneWidget);
     expect(find.text('Повторить'), findsNothing);
+  });
+
+  testWidgets(
+      'route re-entry and rebuild retain history without duplicate requests',
+      (tester) async {
+    final counters = _AssistantLifecycleCounters();
+    final repository = _CountingAssistantRepository(counters);
+    await tester.binding.setSurfaceSize(const Size(390, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          kundiAssistantEnabledProvider.overrideWithValue(true),
+          assistantRepositoryProvider.overrideWithValue(repository),
+          authControllerProvider.overrideWith(_CountingAuthController.new),
+          assistantControllerProvider.overrideWith(() {
+            counters.assistantControllerCreateCount++;
+            return _CountingAssistantController(counters);
+          }),
+        ],
+        child: MaterialApp(home: _AssistantRouteHost(counters: counters)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('open-assistant')));
+    await tester.pumpAndSettle();
+    expect(find.text('Сохранённое сообщение'), findsOneWidget);
+    expect(counters.assistantPageOpenCount, 1);
+    expect(counters.assistantControllerCreateCount, 1);
+    expect(counters.assistantControllerBuildCount, 1);
+    expect(counters.listSessionsRequestCount, 1);
+    expect(counters.listMessagesRequestCount, 1);
+    expect(counters.createSessionRequestCount, 0);
+    expect(counters.sendMessageRequestCount, 0);
+
+    await tester.binding.setSurfaceSize(const Size(400, 760));
+    await tester.pump();
+    await tester.binding.setSurfaceSize(const Size(390, 760));
+    await tester.pump();
+    expect(counters.assistantControllerBuildCount, 1);
+    expect(counters.listMessagesRequestCount, 1);
+
+    await tester.tap(find.byKey(const Key('assistant-history-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Прошлые диалоги'), findsOneWidget);
+    expect(counters.listMessagesRequestCount, 1);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(counters.assistantControllerDisposeCount, 0);
+    await tester.tap(find.byKey(const Key('open-assistant')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сохранённое сообщение'), findsOneWidget);
+    expect(counters.assistantPageOpenCount, 2);
+    expect(counters.assistantControllerCreateCount, 1);
+    expect(counters.assistantControllerBuildCount, 1);
+    expect(counters.assistantControllerDisposeCount, 0);
+    expect(counters.listSessionsRequestCount, 1);
+    expect(counters.listMessagesRequestCount, 1);
+    expect(counters.explicitRefreshCount, 0);
+    expect(counters.createSessionRequestCount, 0);
+    expect(counters.sendMessageRequestCount, 0);
   });
 }
 
@@ -141,4 +242,153 @@ class _FakeAssistantController extends AssistantController {
 
   @override
   Future<void> retryLastMessage() async {}
+}
+
+class _AssistantLifecycleCounters {
+  int assistantControllerCreateCount = 0;
+  int assistantControllerBuildCount = 0;
+  int assistantControllerDisposeCount = 0;
+  int assistantPageOpenCount = 0;
+  int listSessionsRequestCount = 0;
+  int listMessagesRequestCount = 0;
+  int createSessionRequestCount = 0;
+  int sendMessageRequestCount = 0;
+  int explicitRefreshCount = 0;
+}
+
+class _CountingAssistantController extends AssistantController {
+  _CountingAssistantController(this.counters);
+
+  final _AssistantLifecycleCounters counters;
+
+  @override
+  Future<AssistantViewState> build() {
+    counters.assistantControllerBuildCount++;
+    ref.onDispose(() => counters.assistantControllerDisposeCount++);
+    return super.build();
+  }
+}
+
+class _CountingAuthController extends AuthController {
+  @override
+  Future<AuthSession?> build() async => AuthSession(
+        studentId: 'student',
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        expiresAt: DateTime.utc(2030),
+      );
+}
+
+class _AssistantRouteHost extends ConsumerWidget {
+  const _AssistantRouteHost({required this.counters});
+
+  final _AssistantLifecycleCounters counters;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authReady = ref.watch(authControllerProvider).hasValue;
+    return Scaffold(
+      body: Center(
+        child: ElevatedButton(
+          key: const Key('open-assistant'),
+          onPressed: authReady
+              ? () {
+                  counters.assistantPageOpenCount++;
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AssistantPage(),
+                    ),
+                  );
+                }
+              : null,
+          child: const Text('Открыть Kundi'),
+        ),
+      ),
+    );
+  }
+}
+
+class _CountingAssistantRepository implements AssistantRepository {
+  _CountingAssistantRepository(this.counters);
+
+  final _AssistantLifecycleCounters counters;
+
+  AssistantSessionEntity get _session => AssistantSessionEntity(
+        id: 'session-1',
+        locale: 'ru-KZ',
+        gradeLevel: 7,
+        title: 'Сохранённый диалог',
+        createdAt: DateTime.utc(2026, 9, 4),
+        updatedAt: DateTime.utc(2026, 9, 4),
+        lastMessageAt: DateTime.utc(2026, 9, 4),
+      );
+
+  @override
+  Future<AssistantSessionEntity> createSession({
+    required String accessToken,
+  }) async {
+    counters.createSessionRequestCount++;
+    return _session;
+  }
+
+  @override
+  Future<void> deleteSession({
+    required String accessToken,
+    required String sessionId,
+  }) async {}
+
+  @override
+  Future<AssistantPageResult<AssistantMessageEntity>> listMessages({
+    required String accessToken,
+    required String sessionId,
+    String cursor = '',
+    int limit = 20,
+  }) async {
+    counters.listMessagesRequestCount++;
+    return AssistantPageResult<AssistantMessageEntity>(
+      items: [
+        AssistantMessageEntity(
+          id: 'message-1',
+          sessionId: sessionId,
+          role: 'assistant',
+          content: 'Сохранённое сообщение',
+          inputMode: 'text',
+          responseMode: 'explanation',
+          createdAt: DateTime.utc(2026, 9, 4),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<AssistantPageResult<AssistantSessionEntity>> listSessions({
+    required String accessToken,
+    String cursor = '',
+    int limit = 20,
+  }) async {
+    counters.listSessionsRequestCount++;
+    return AssistantPageResult<AssistantSessionEntity>(items: [_session]);
+  }
+
+  @override
+  Future<AssistantEntity> sendMessage({
+    required String accessToken,
+    required String text,
+    required AssistantMode mode,
+    required int gradeLevel,
+    List<AssistantChatRecord> history = const <AssistantChatRecord>[],
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<AssistantMessageResult> sendSessionMessage({
+    required String accessToken,
+    required String sessionId,
+    required String clientMessageId,
+    required String text,
+    AssistantInputMode inputMode = AssistantInputMode.text,
+  }) async {
+    counters.sendMessageRequestCount++;
+    throw UnimplementedError();
+  }
 }
