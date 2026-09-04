@@ -34,3 +34,42 @@ func TestAcademicContextBoundsAndMatchesHomework(t *testing.T) {
 		t.Fatal("too many suggestions")
 	}
 }
+
+func TestAcademicContextSuggestionsFollowSessionLocale(t *testing.T) {
+	tests := []struct {
+		name   string
+		locale string
+		weak   string
+		recent string
+		want   []string
+	}{
+		{"russian Kazakhstan", "ru-KZ", "Дроби", "Проценты", []string{"Разобраться с темой: Дроби", "Повторить: Проценты"}},
+		{"kazakh Kazakhstan", "kk-KZ", "Бөлшектер", "Пайыздар", []string{"Тақырыпты түсіну: Бөлшектер", "Қайталау: Пайыздар"}},
+	}
+	for _, item := range tests {
+		t.Run(item.name, func(t *testing.T) {
+			got := (AcademicContext{Locale: item.locale, WeakTopics: []string{item.weak}, RecentTopics: []string{item.recent}}).Suggestions()
+			if len(got) != len(item.want) {
+				t.Fatalf("unexpected suggestions: %#v", got)
+			}
+			for i := range item.want {
+				if got[i] != item.want[i] {
+					t.Fatalf("suggestion %d: got %q want %q", i, got[i], item.want[i])
+				}
+			}
+		})
+	}
+
+	kkGeneric := (AcademicContext{Locale: "kk"}).Suggestions()
+	if len(kkGeneric) != 3 || kkGeneric[0] != "Тақырыпты түсіндір" || kkGeneric[2] != "Жауабымды тексер" {
+		t.Fatalf("unexpected Kazakh generic suggestions: %#v", kkGeneric)
+	}
+}
+
+func TestAcademicContextOptionsUseDocumentedDefaults(t *testing.T) {
+	got := (AcademicContextOptions{}).withDefaults()
+	want := DefaultAcademicContextOptions()
+	if got != want {
+		t.Fatalf("unexpected context defaults: got %#v want %#v", got, want)
+	}
+}

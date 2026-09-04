@@ -11,12 +11,49 @@ import (
 )
 
 const (
-	MaxContextTopics       = 6
-	MaxContextHomeworks    = 5
-	MaxContextWeakTopics   = 3
-	MaxContextRecentGrades = 12
-	MaxContextRunes        = 4_000
+	MaxContextTopics                  = 6
+	MaxContextHomeworks               = 5
+	MaxContextWeakTopics              = 3
+	MaxContextRecentGrades            = 12
+	MaxContextRunes                   = 4_000
+	DefaultHomeworkRecentOverdueDays  = 21
+	DefaultHomeworkUpcomingDays       = 30
+	DefaultHomeworkWithoutDueDateDays = 21
+	DefaultAcademicResultRecencyDays  = 120
 )
+
+type AcademicContextOptions struct {
+	HomeworkRecentOverdueDays  int
+	HomeworkUpcomingDays       int
+	HomeworkWithoutDueDateDays int
+	AcademicResultRecencyDays  int
+}
+
+func DefaultAcademicContextOptions() AcademicContextOptions {
+	return AcademicContextOptions{
+		HomeworkRecentOverdueDays:  DefaultHomeworkRecentOverdueDays,
+		HomeworkUpcomingDays:       DefaultHomeworkUpcomingDays,
+		HomeworkWithoutDueDateDays: DefaultHomeworkWithoutDueDateDays,
+		AcademicResultRecencyDays:  DefaultAcademicResultRecencyDays,
+	}
+}
+
+func (o AcademicContextOptions) withDefaults() AcademicContextOptions {
+	defaults := DefaultAcademicContextOptions()
+	if o.HomeworkRecentOverdueDays <= 0 {
+		o.HomeworkRecentOverdueDays = defaults.HomeworkRecentOverdueDays
+	}
+	if o.HomeworkUpcomingDays <= 0 {
+		o.HomeworkUpcomingDays = defaults.HomeworkUpcomingDays
+	}
+	if o.HomeworkWithoutDueDateDays <= 0 {
+		o.HomeworkWithoutDueDateDays = defaults.HomeworkWithoutDueDateDays
+	}
+	if o.AcademicResultRecencyDays <= 0 {
+		o.AcademicResultRecencyDays = defaults.AcademicResultRecencyDays
+	}
+	return o
+}
 
 type ContextHomework struct {
 	Subject     string
@@ -45,10 +82,17 @@ func (EmptyAcademicContextProvider) Build(context.Context, uuid.UUID) (AcademicC
 	return AcademicContext{}, nil
 }
 
-type PostgresAcademicContextProvider struct{ pool *pgxpool.Pool }
+type PostgresAcademicContextProvider struct {
+	pool    *pgxpool.Pool
+	options AcademicContextOptions
+}
 
 func NewPostgresAcademicContextProvider(pool *pgxpool.Pool) *PostgresAcademicContextProvider {
-	return &PostgresAcademicContextProvider{pool: pool}
+	return NewPostgresAcademicContextProviderWithOptions(pool, DefaultAcademicContextOptions())
+}
+
+func NewPostgresAcademicContextProviderWithOptions(pool *pgxpool.Pool, options AcademicContextOptions) *PostgresAcademicContextProvider {
+	return &PostgresAcademicContextProvider{pool: pool, options: options.withDefaults()}
 }
 
 func (p *PostgresAcademicContextProvider) Build(ctx context.Context, studentID uuid.UUID) (AcademicContext, error) {
@@ -91,8 +135,25 @@ func (p *PostgresAcademicContextProvider) Build(ctx context.Context, studentID u
 		WHERE h.student_id = $1
 		  AND COALESCE(hc.status, 'pending') NOT IN ('completed', 'submitted', 'reviewed')
 		  AND trim(h.description) <> ''
-		ORDER BY h.due_at ASC NULLS LAST, h.updated_at DESC LIMIT $2
-	`, studentID, MaxContextHomeworks)
+		  AND (
+		    (h.due_at IS NOT NULL
+		      AND h.due_at::date >= CURRENT_DATE - $2::integer
+		      AND h.due_at::date <= CURRENT_DATE + $3::integer)
+		    OR (h.due_at IS NULL
+		      AND h.updated_at >= NOW() - ($4::integer * INTERVAL '1 day'))
+		  )
+		ORDER BY
+		  CASE
+		    WHEN h.due_at::date = CURRENT_DATE THEN 0
+		    WHEN h.due_at::date > CURRENT_DATE THEN 1
+		    WHEN h.due_at::date < CURRENT_DATE THEN 2
+		    ELSE 3
+		  END,
+		  CASE WHEN h.due_at::date > CURRENT_DATE THEN h.due_at END ASC,
+		  CASE WHEN h.due_at::date < CURRENT_DATE THEN h.due_at END DESC,
+		  h.updated_at DESC
+		LIMIT $5
+	`, studentID, p.options.HomeworkRecentOverdueDays, p.options.HomeworkUpcomingDays, p.options.HomeworkWithoutDueDateDays, MaxContextHomeworks)
 	if err != nil {
 		return AcademicContext{}, err
 	}
@@ -114,8 +175,9 @@ func (p *PostgresAcademicContextProvider) Build(ctx context.Context, studentID u
 		SELECT subject_name, value_text, resolved_mood
 		FROM academic_results
 		WHERE student_id = $1
-		ORDER BY recorded_on DESC, updated_at DESC LIMIT $2
-	`, studentID, MaxContextRecentGrades)
+		  AND recorded_on >= CURRENT_DATE - $2::integer
+		ORDER BY recorded_on DESC, updated_at DESC LIMIT $3
+	`, studentID, p.options.AcademicResultRecencyDays, MaxContextRecentGrades)
 	if err != nil {
 		return AcademicContext{}, err
 	}
@@ -145,10 +207,11 @@ func (p *PostgresAcademicContextProvider) Build(ctx context.Context, studentID u
 		JOIN lesson_topics lt ON lt.lesson_id = ar.lesson_id
 		WHERE ar.student_id = $1
 		  AND (lower(ar.resolved_mood) LIKE '%negative%' OR lower(ar.resolved_mood) LIKE '%bad%' OR lower(ar.resolved_mood) LIKE '%poor%')
+		  AND ar.recorded_on >= CURRENT_DATE - $2::integer
 		  AND trim(lt.title) <> ''
 		GROUP BY trim(lt.title) HAVING COUNT(*) >= 2
-		ORDER BY COUNT(*) DESC, trim(lt.title) LIMIT $2
-	`, studentID, MaxContextWeakTopics)
+		ORDER BY COUNT(*) DESC, trim(lt.title) LIMIT $3
+	`, studentID, p.options.AcademicResultRecencyDays, MaxContextWeakTopics)
 	if err != nil {
 		return AcademicContext{}, err
 	}
@@ -218,21 +281,30 @@ func (c AcademicContext) MatchesActiveHomework(question string) bool {
 }
 
 func (c AcademicContext) Suggestions() []string {
+	locale := strings.ToLower(strings.TrimSpace(c.Locale))
+	weakPrefix := "Разобраться с темой: "
+	recentPrefix := "Повторить: "
+	generic := []string{"Объясни тему", "Помоги сделать первый шаг", "Проверь мой ответ"}
+	if strings.HasPrefix(locale, "kk") {
+		weakPrefix = "Тақырыпты түсіну: "
+		recentPrefix = "Қайталау: "
+		generic = []string{"Тақырыпты түсіндір", "Бірінші қадамды жасауға көмектес", "Жауабымды тексер"}
+	}
 	out := make([]string, 0, 3)
 	for _, topic := range c.WeakTopics {
-		out = append(out, "Разобраться с темой: "+topic)
+		out = append(out, weakPrefix+topic)
 		if len(out) == 3 {
 			return out
 		}
 	}
 	for _, topic := range c.RecentTopics {
-		out = append(out, "Повторить: "+topic)
+		out = append(out, recentPrefix+topic)
 		if len(out) == 3 {
 			return out
 		}
 	}
 	if len(out) == 0 {
-		return []string{"Объясни тему", "Помоги сделать первый шаг", "Проверь мой ответ"}
+		return generic
 	}
 	return out
 }

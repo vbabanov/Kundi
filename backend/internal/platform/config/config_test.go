@@ -18,6 +18,10 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	t.Setenv("AI_ASSISTANT_PRIMARY_TIMEOUT_SEC", "")
 	t.Setenv("AI_ASSISTANT_FALLBACK_TIMEOUT_SEC", "")
 	t.Setenv("AI_ASSISTANT_LLM_TIMEOUT_SEC", "")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_OVERDUE_DAYS", "")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_UPCOMING_DAYS", "")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_UNDATED_DAYS", "")
+	t.Setenv("AI_ASSISTANT_ACADEMIC_RESULT_DAYS", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -35,6 +39,9 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	if cfg.AI.AssistantPrimaryTimeout != 10*time.Second || cfg.AI.AssistantFallbackTimeout != 8*time.Second || cfg.AI.AssistantLLMTimeout != 12*time.Second {
 		t.Fatalf("unexpected canary timeout policy: primary=%s fallback=%s total=%s", cfg.AI.AssistantPrimaryTimeout, cfg.AI.AssistantFallbackTimeout, cfg.AI.AssistantLLMTimeout)
 	}
+	if cfg.AI.AssistantHomeworkOverdueDays != 21 || cfg.AI.AssistantHomeworkUpcomingDays != 30 || cfg.AI.AssistantHomeworkUndatedDays != 21 || cfg.AI.AssistantAcademicResultDays != 120 {
+		t.Fatalf("unexpected academic context windows: %#v", cfg.AI)
+	}
 }
 
 func TestAssistantReadsNamedAlemSettings(t *testing.T) {
@@ -50,6 +57,10 @@ func TestAssistantReadsNamedAlemSettings(t *testing.T) {
 	t.Setenv("AI_ASSISTANT_PRIMARY_TIMEOUT_SEC", "9")
 	t.Setenv("AI_ASSISTANT_FALLBACK_TIMEOUT_SEC", "7")
 	t.Setenv("AI_ASSISTANT_LLM_TIMEOUT_SEC", "11")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_OVERDUE_DAYS", "14")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_UPCOMING_DAYS", "20")
+	t.Setenv("AI_ASSISTANT_HOMEWORK_UNDATED_DAYS", "10")
+	t.Setenv("AI_ASSISTANT_ACADEMIC_RESULT_DAYS", "90")
 
 	cfg, err := Load()
 	if err != nil {
@@ -63,5 +74,8 @@ func TestAssistantReadsNamedAlemSettings(t *testing.T) {
 	}
 	if cfg.AI.AssistantPrimaryTimeout != 9*time.Second || cfg.AI.AssistantFallbackTimeout != 7*time.Second || cfg.AI.AssistantLLMTimeout != 11*time.Second {
 		t.Fatal("named assistant timeout settings were not loaded")
+	}
+	if cfg.AI.AssistantHomeworkOverdueDays != 14 || cfg.AI.AssistantHomeworkUpcomingDays != 20 || cfg.AI.AssistantHomeworkUndatedDays != 10 || cfg.AI.AssistantAcademicResultDays != 90 {
+		t.Fatal("named academic context windows were not loaded")
 	}
 }

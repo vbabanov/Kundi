@@ -98,7 +98,12 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		assistantmodule.Options{
 			Enabled:           &assistantEnabled,
 			SessionRepository: assistantmodule.NewPostgresSessionRepository(pool),
-			AcademicContext:   assistantmodule.NewPostgresAcademicContextProvider(pool),
+			AcademicContext: assistantmodule.NewPostgresAcademicContextProviderWithOptions(pool, assistantmodule.AcademicContextOptions{
+				HomeworkRecentOverdueDays:  cfg.AI.AssistantHomeworkOverdueDays,
+				HomeworkUpcomingDays:       cfg.AI.AssistantHomeworkUpcomingDays,
+				HomeworkWithoutDueDateDays: cfg.AI.AssistantHomeworkUndatedDays,
+				AcademicResultRecencyDays:  cfg.AI.AssistantAcademicResultDays,
+			}),
 			InputLimits: assistantsafety.Limits{
 				MaxTextRunes:           cfg.AI.AssistantMaxTextRunes,
 				MaxHistoryMessages:     cfg.AI.AssistantMaxHistoryMessages,

@@ -74,6 +74,10 @@ type AIConfig struct {
 	AssistantRateLimit                int
 	AssistantRateWindow               time.Duration
 	AssistantRateLimiterMaxIdentities int
+	AssistantHomeworkOverdueDays      int
+	AssistantHomeworkUpcomingDays     int
+	AssistantHomeworkUndatedDays      int
+	AssistantAcademicResultDays       int
 }
 
 type WhatsAppConfig struct {
@@ -146,6 +150,10 @@ func Load() (Config, error) {
 			AssistantRateLimit:                envInt("AI_ASSISTANT_RATE_LIMIT", 20),
 			AssistantRateWindow:               time.Duration(envInt("AI_ASSISTANT_RATE_WINDOW_SEC", 60)) * time.Second,
 			AssistantRateLimiterMaxIdentities: envInt("AI_ASSISTANT_RATE_MAX_IDENTITIES", 10_000),
+			AssistantHomeworkOverdueDays:      envInt("AI_ASSISTANT_HOMEWORK_OVERDUE_DAYS", 21),
+			AssistantHomeworkUpcomingDays:     envInt("AI_ASSISTANT_HOMEWORK_UPCOMING_DAYS", 30),
+			AssistantHomeworkUndatedDays:      envInt("AI_ASSISTANT_HOMEWORK_UNDATED_DAYS", 21),
+			AssistantAcademicResultDays:       envInt("AI_ASSISTANT_ACADEMIC_RESULT_DAYS", 120),
 		},
 		WhatsApp: WhatsAppConfig{
 			WorkerConcurrency: envInt("WHATSAPP_WORKER_CONCURRENCY", 2),

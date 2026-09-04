@@ -35,7 +35,7 @@ Local synthetic probes on 2026-09-04 verified the configured IDs `gemma4` (prima
 - `DELETE /v1/assistant/sessions/{session_id}`
 - `POST /v1/assistant/message` remains as the legacy compatibility adapter.
 
-All session operations require student authentication, enforce ownership, and use bounded cursor pages. Message writes require a UUID `client_message_id`; reusing it returns the already stored exchange. The session title is derived deterministically from the first user message, without an LLM call.
+All session operations require student authentication, enforce ownership, and use bounded cursor pages. Message writes require a UUID `client_message_id`; reusing it returns the already stored exchange together with the same versioned, compact response metadata. The send response also includes the updated session snapshot so clients can apply its title and ordering without another request. Older stored `{}` metadata and older responses without the session field remain valid. The session title is derived deterministically from the first user message, without an LLM call.
 
 ## Stored and excluded data
 
@@ -45,7 +45,9 @@ Users can delete a session and its messages through the API/mobile UI; the datab
 
 ## Academic context limits
 
-The server builds context only from authenticated canonical records, capped at six recent topics, five unfinished homework items, three repeated weak topics, twelve recent results, and 4,000 rendered characters. A single poor result never creates a weak-topic signal; the implementation requires at least two negative canonical mood records tied to the same lesson topic. If context loading fails, the request continues with the authenticated session grade/locale and a sanitized diagnostic.
+The server builds context only from authenticated canonical records, capped at six recent topics, five unfinished homework items, three repeated weak topics, twelve recent results, and 4,000 rendered characters. Unfinished homework includes overdue work from at most the previous 21 days, upcoming work through the next 30 days, and undated records updated within 21 days. Recent results and repeated weak-topic signals use a 120-day window. These defaults are named runtime settings (`AI_ASSISTANT_HOMEWORK_OVERDUE_DAYS`, `AI_ASSISTANT_HOMEWORK_UPCOMING_DAYS`, `AI_ASSISTANT_HOMEWORK_UNDATED_DAYS`, and `AI_ASSISTANT_ACADEMIC_RESULT_DAYS`). A single poor result never creates a weak-topic signal; the implementation requires at least two recent negative canonical mood records tied to the same lesson topic. If context loading fails, the request continues with the authenticated session grade/locale and a sanitized diagnostic. Suggestion chips follow the session locale for Russian and Kazakh.
+
+Explicit requests for a complete or submission-ready answer are guarded even when canonical homework matching fails. Active homework remains an additional signal for inspecting otherwise legitimate help output; factual questions, concept explanations, and checks of the student's own attempt remain allowed.
 
 The current canonical schema has no future assessment schedule. Consequently Phase 1 does not claim upcoming SOR/SOCH dates; adding them requires a real canonical source and schema first.
 
