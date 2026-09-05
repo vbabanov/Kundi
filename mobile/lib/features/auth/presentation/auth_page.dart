@@ -6,101 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/kundi_tokens.dart';
 import '../application/auth_controller.dart';
+import '../domain/auth_session.dart';
 
-class AuthPage extends ConsumerStatefulWidget {
+class AuthPage extends ConsumerWidget {
   const AuthPage({super.key});
 
   @override
-  ConsumerState<AuthPage> createState() => _AuthPageState();
-}
-
-class _AuthPageState extends ConsumerState<AuthPage> {
-  final _loginController = TextEditingController();
-  final _passwordController = TextEditingController();
-  String _source = 'kundelik';
-  bool _prefilled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    Future<void>.microtask(_prefillSavedCredentials);
-  }
-
-  Future<void> _prefillSavedCredentials() async {
-    if (_prefilled) {
-      return;
-    }
-    _prefilled = true;
-    final saved =
-        await ref.read(authControllerProvider.notifier).loadSavedCredentials();
-    if (!mounted) {
-      return;
-    }
-    final savedSource = (saved['source'] ?? '').trim();
-    final savedLogin = (saved['login'] ?? '').trim();
-    final savedPassword = (saved['password'] ?? '').trim();
-    setState(() {
-      if (savedSource.isNotEmpty) {
-        _source = savedSource;
-      }
-      if (savedLogin.isNotEmpty) {
-        _loginController.text = savedLogin;
-      }
-      if (savedPassword.isNotEmpty) {
-        _passwordController.text = savedPassword;
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _loginController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
-
-    ref.listen(authControllerProvider, (previous, next) {
-      next.whenOrNull(
-        data: (session) {
-          if (session != null && mounted) {
-            _logPostLoginStage(
-              stage: 'login_success_ui',
-              outcome: 'success',
-              details: {
-                'source': _source,
-                'login': _redactLogin(_loginController.text.trim()),
-              },
-            );
-            Navigator.of(context, rootNavigator: true).maybePop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login successful')),
-            );
-            _logPostLoginStage(
-              stage: 'route_transition_result',
-              outcome: 'handled_by_root_auth_state',
-              details: {'target': 'app_home_router'},
-            );
-          }
-        },
-        error: (error, stackTrace) {
-          _logPostLoginStage(
-            stage: 'final_post_login_error',
-            outcome: 'ui_error',
-            details: {'error': _sanitizeError(error.toString())},
-          );
-          if (mounted) {
-            Navigator.of(context, rootNavigator: true).maybePop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(error.toString())),
-            );
-          }
-        },
-      );
-    });
 
     return Scaffold(
       body: LayoutBuilder(
@@ -195,7 +108,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   width: cardWidth,
                   child: _AuthSelectionCard(
                     isLoading: authState.isLoading,
-                    onSelectSource: _showSourceLoginSheet,
+                    onSelectSource: (source) =>
+                        _showSourceLoginSheet(context, source),
                   ),
                 ),
               ],
@@ -206,115 +120,227 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     );
   }
 
-  Future<void> _showSourceLoginSheet(String source) async {
-    setState(() {
-      _source = source;
-    });
-
-    final theme = Theme.of(context);
-    await showModalBottomSheet<void>(
+  Future<void> _showSourceLoginSheet(BuildContext context, String source) {
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final authState = ref.watch(authControllerProvider);
-            final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(14, 0, 14, bottomInset + 14),
-              child: _SheetGlass(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        _ProviderMark(source: source, compact: false),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Вход через ${_sourceLabel(source)}',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Логин и пароль от электронного дневника',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.62),
-                                  height: 1.25,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _SheetField(
-                      controller: _loginController,
-                      label: 'Логин',
-                      icon: Icons.person_outline_rounded,
-                      textInputAction: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 10),
-                    _SheetField(
-                      controller: _passwordController,
-                      label: 'Пароль',
-                      icon: Icons.lock_outline_rounded,
-                      obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) {
-                        if (!authState.isLoading) {
-                          _submitLogin();
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 50,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: KundiPalette.deepIndigo,
-                          textStyle: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        onPressed: authState.isLoading ? null : _submitLogin,
-                        child: authState.isLoading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Продолжить'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+      builder: (_) => _SourceLoginSheet(source: source),
+    );
+  }
+}
+
+class _SourceLoginSheet extends ConsumerStatefulWidget {
+  const _SourceLoginSheet({required this.source});
+
+  final String source;
+
+  @override
+  ConsumerState<_SourceLoginSheet> createState() => _SourceLoginSheetState();
+}
+
+class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController();
+  late final ProviderSubscription<AsyncValue<AuthSession?>> _authSubscription;
+  bool _loginPending = false;
+  bool _completionHandled = false;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = ref.listenManual(authControllerProvider, _handleAuth);
+    _prefillSavedCredentials();
+  }
+
+  Future<void> _prefillSavedCredentials() async {
+    try {
+      final saved = await ref
+          .read(authControllerProvider.notifier)
+          .loadSavedCredentials();
+      if (!mounted ||
+          _completionHandled ||
+          ModalRoute.of(context)?.isActive != true) {
+        return;
+      }
+      // A delayed storage read must not replace input already entered by hand.
+      if (_loginController.text.isEmpty) {
+        _loginController.text = (saved['login'] ?? '').trim();
+      }
+      if (_passwordController.text.isEmpty) {
+        _passwordController.text = (saved['password'] ?? '').trim();
+      }
+    } on Exception {
+      // Saved credentials are optional; manual login remains available.
+      if (mounted) {
+        _logPostLoginStage(
+            stage: 'saved_credentials_prefill', outcome: 'unavailable');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.close();
+    _loginController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _handleAuth(
+      AsyncValue<AuthSession?>? previous, AsyncValue<AuthSession?> next) {
+    if (!mounted || _completionHandled || next.isLoading) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    if (next.hasError) {
+      if (!_loginPending) return;
+      setState(() {
+        _loginPending = false;
+        _errorMessage = 'Не удалось войти. Попробуйте ещё раз.';
+      });
+      _logPostLoginStage(stage: 'final_post_login_error', outcome: 'ui_error');
+      return;
+    }
+    if (next.valueOrNull == null) return;
+    _completionHandled = true;
+    _loginPending = false;
+    _logPostLoginStage(
+      stage: 'login_success_ui',
+      outcome: 'success',
+      details: {
+        'source': widget.source,
+        'login': _redactLogin(_loginController.text.trim()),
       },
+    );
+    final navigator = route.navigator!;
+    final messenger = ScaffoldMessenger.of(context);
+    // Close this sheet only, even if another route was placed above it.
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
+    messenger.showSnackBar(const SnackBar(content: Text('Login successful')));
+    _logPostLoginStage(
+      stage: 'route_transition_result',
+      outcome: 'handled_by_root_auth_state',
+      details: {'target': 'app_home_router'},
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final source = widget.source;
+    final isLoading =
+        _loginPending || ref.watch(authControllerProvider).isLoading;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 0, 14, bottomInset + 14),
+      child: _SheetGlass(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                _ProviderMark(source: source, compact: false),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Вход через ${_sourceLabel(source)}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Логин и пароль от электронного дневника',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SheetField(
+              controller: _loginController,
+              label: 'Логин',
+              icon: Icons.person_outline_rounded,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 10),
+            _SheetField(
+              controller: _passwordController,
+              label: 'Пароль',
+              icon: Icons.lock_outline_rounded,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!isLoading) {
+                  _submitLogin();
+                }
+              },
+            ),
+            if (_errorMessage.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(_errorMessage,
+                  style:
+                      theme.textTheme.bodySmall?.copyWith(color: Colors.white)),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 50,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: KundiPalette.deepIndigo,
+                  textStyle: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onPressed: isLoading ? null : _submitLogin,
+                child: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Продолжить'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   void _submitLogin() {
+    if (_completionHandled ||
+        _loginPending ||
+        ref.read(authControllerProvider).isLoading) {
+      return;
+    }
+    setState(() {
+      _loginPending = true;
+      _errorMessage = '';
+    });
     ref.read(authControllerProvider.notifier).login(
-          source: _source,
+          source: widget.source,
           login: _loginController.text.trim(),
           password: _passwordController.text,
         );
@@ -351,14 +377,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       return '${normalized[0]}***';
     }
     return '${normalized.substring(0, 2)}***';
-  }
-
-  String _sanitizeError(String message) {
-    final normalized = message.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.length <= 180) {
-      return normalized;
-    }
-    return '${normalized.substring(0, 180)}...';
   }
 }
 
