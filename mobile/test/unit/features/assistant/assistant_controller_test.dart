@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/core/errors/app_exception.dart';
 import 'package:kundi_mobile/features/assistant/application/assistant_controller.dart';
+import 'package:kundi_mobile/features/assistant/application/kundi_tts_coordinator.dart';
+import 'kundi_tts_coordinator_test.dart' as speech_test;
 import 'package:kundi_mobile/features/assistant/assistant_feature.dart';
 import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
 import 'package:kundi_mobile/features/assistant/domain/assistant_repository.dart';
@@ -9,6 +11,46 @@ import 'package:kundi_mobile/features/auth/application/auth_controller.dart';
 import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+      'only foreground voice send triggers TTS; history and failure preserve text',
+      () async {
+    final wire = speech_test.FakeTts();
+    final reply = speech_test.result();
+    final tts = KundiTtsCoordinator(
+        enabled: true,
+        transport: wire,
+        authorize: (message) async => speech_test.authorization(message));
+    final repository = _FakeAssistantRepository(sessions: [
+      _session(
+          id: 's',
+          locale: 'ru-RU',
+          title: '',
+          lastMessageAt: DateTime.utc(2026))
+    ], result: reply);
+    final container = ProviderContainer(overrides: [
+      kundiAssistantEnabledProvider.overrideWithValue(true),
+      kundiVoiceInputEnabledProvider.overrideWithValue(true),
+      kundiTtsEnabledProvider.overrideWithValue(true),
+      kundiTtsCoordinatorProvider.overrideWith((ref) => tts),
+      assistantRepositoryProvider.overrideWithValue(repository),
+      authControllerProvider.overrideWith(_FakeAuthController.new),
+    ]);
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.future);
+    await container.read(assistantControllerProvider.future);
+    final controller = container.read(assistantControllerProvider.notifier);
+    expect(wire.texts, isEmpty);
+    await controller.sendMessage('typed');
+    expect(wire.texts, isEmpty);
+    await controller.sendMessage('voice', inputMode: AssistantInputMode.voice);
+    await Future<void>.delayed(Duration.zero);
+    expect(wire.texts, [reply.assistantMessage.content]);
+    await tts.cancel();
+    await controller.openSession(repository.sessions.first);
+    expect(wire.texts.length, 1);
+    expect(repository.sentClientMessageIds.length, 2);
+  });
   test('send applies returned session snapshot and sorts sessions', () async {
     final old = _session(
       id: 'active',
@@ -182,6 +224,114 @@ void main() {
     expect(repository.sentClientMessageIds, <String>[originalID, originalID]);
     expect(repository.lastInputMode, AssistantInputMode.voice);
   });
+
+  test('revalidation failure preserves stale messages and active session',
+      () async {
+    final session = _session(
+      id: 'active',
+      locale: 'kk-KZ',
+      title: 'Бөлшектер',
+      lastMessageAt: DateTime.utc(2026, 9, 5),
+    );
+    final oldMessage = _message(
+      'old-message',
+      'assistant',
+      DateTime.utc(2026, 9, 5, 10),
+    );
+    final repository = _FakeAssistantRepository(
+      sessions: <AssistantSessionEntity>[session],
+      result: _result(),
+      messages: <AssistantMessageEntity>[oldMessage],
+    );
+    final container = await _container(repository);
+    addTearDown(container.dispose);
+    repository.messageError =
+        const AppException('assistant_network_error', 'raw');
+
+    await container
+        .read(assistantControllerProvider.notifier)
+        .refreshActiveSession();
+    final state = container.read(assistantControllerProvider).requireValue;
+
+    expect(state.messages, <AssistantMessageEntity>[oldMessage]);
+    expect(state.activeSession?.id, 'active');
+    expect(state.isRefreshing, isFalse);
+    expect(state.refreshErrorMessage, 'Не удалось обновить историю');
+    expect(repository.listMessageCalls, 2);
+  });
+
+  test('history retry replaces stale data and clears transient error',
+      () async {
+    final session = _session(
+      id: 'active',
+      locale: 'ru-KZ',
+      title: 'Диалог',
+      lastMessageAt: DateTime.utc(2026, 9, 5),
+    );
+    final oldMessage = _message(
+      'old-message',
+      'assistant',
+      DateTime.utc(2026, 9, 5, 10),
+    );
+    final newMessage = _message(
+      'new-message',
+      'assistant',
+      DateTime.utc(2026, 9, 5, 11),
+    );
+    final repository = _FakeAssistantRepository(
+      sessions: <AssistantSessionEntity>[session],
+      result: _result(),
+      messages: <AssistantMessageEntity>[oldMessage],
+    );
+    final container = await _container(repository);
+    addTearDown(container.dispose);
+    final controller = container.read(assistantControllerProvider.notifier);
+    repository.messageError =
+        const AppException('assistant_network_error', 'raw');
+    await controller.refreshActiveSession();
+    repository
+      ..messageError = null
+      ..messages = <AssistantMessageEntity>[oldMessage, newMessage, newMessage];
+
+    await controller.retryHistoryRefresh();
+    final state = container.read(assistantControllerProvider).requireValue;
+
+    expect(state.messages.map((message) => message.id),
+        <String>['old-message', 'new-message']);
+    expect(state.activeSession?.id, 'active');
+    expect(state.refreshErrorMessage, isEmpty);
+    expect(repository.createSessionCalls, 0);
+    expect(repository.sentClientMessageIds, isEmpty);
+  });
+
+  test('initial history error remains a full AsyncError without stale state',
+      () async {
+    final repository = _FakeAssistantRepository(
+      sessions: <AssistantSessionEntity>[
+        _session(
+          id: 'active',
+          locale: 'ru-KZ',
+          title: '',
+          lastMessageAt: DateTime.utc(2026, 9, 5),
+        ),
+      ],
+      result: _result(),
+      messageError: const AppException('assistant_network_error', 'raw'),
+    );
+    final container = ProviderContainer(overrides: <Override>[
+      kundiAssistantEnabledProvider.overrideWithValue(true),
+      assistantRepositoryProvider.overrideWithValue(repository),
+      authControllerProvider.overrideWith(_FakeAuthController.new),
+    ]);
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.future);
+
+    await expectLater(
+      container.read(assistantControllerProvider.future),
+      throwsA(isA<AppException>()),
+    );
+    expect(container.read(assistantControllerProvider).hasError, isTrue);
+  });
 }
 
 Future<ProviderContainer> _container(
@@ -218,20 +368,28 @@ class _FakeAssistantRepository implements AssistantRepository {
     required this.sessions,
     this.result,
     this.error,
+    this.messages = const <AssistantMessageEntity>[],
+    this.messageError,
   });
 
   final List<AssistantSessionEntity> sessions;
   final AssistantMessageResult? result;
   Object? error;
+  List<AssistantMessageEntity> messages;
+  Object? messageError;
   int listSessionCalls = 0;
+  int listMessageCalls = 0;
+  int createSessionCalls = 0;
   String lastClientMessageId = '';
   AssistantInputMode lastInputMode = AssistantInputMode.text;
   final List<String> sentClientMessageIds = <String>[];
 
   @override
   Future<AssistantSessionEntity> createSession(
-          {required String accessToken}) async =>
-      sessions.first;
+      {required String accessToken}) async {
+    createSessionCalls++;
+    return sessions.first;
+  }
 
   @override
   Future<void> deleteSession(
@@ -243,9 +401,11 @@ class _FakeAssistantRepository implements AssistantRepository {
     required String sessionId,
     String cursor = '',
     int limit = 20,
-  }) async =>
-      const AssistantPageResult<AssistantMessageEntity>(
-          items: <AssistantMessageEntity>[]);
+  }) async {
+    listMessageCalls++;
+    if (messageError != null) throw messageError!;
+    return AssistantPageResult<AssistantMessageEntity>(items: messages);
+  }
 
   @override
   Future<AssistantPageResult<AssistantSessionEntity>> listSessions({

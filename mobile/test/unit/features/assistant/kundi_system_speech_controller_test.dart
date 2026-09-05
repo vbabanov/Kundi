@@ -7,6 +7,92 @@ import 'package:kundi_mobile/runtimes/kundi_system_speech/kundi_system_speech_co
 import 'package:kundi_mobile/runtimes/kundi_system_speech/kundi_system_speech_transport.dart';
 
 void main() {
+  test('release or cancel during TTS stop cannot start a late recognizer',
+      () async {
+    for (final cancel in [false, true]) {
+      final transport =
+          _FakeSpeechTransport(permission: KundiSpeechPermission.granted);
+      final speech = KundiSystemSpeechController(transport: transport);
+      final stoppingTts = Completer<void>();
+      final coordinator = KundiVoiceAssistantCoordinator(
+          enabled: true,
+          speech: speech,
+          interruptSpeech: () => stoppingTts.future,
+          ensureAssistantReady: () async {},
+          sendVoiceMessage: (_, __) async {},
+          behavior: (_, __) {},
+          settleBehavior: () {});
+      final starting = coordinator.beginHold('ru-RU');
+      expect(transport.startCalls, 0);
+      final ending = cancel ? coordinator.cancel() : coordinator.endHold();
+      stoppingTts.complete();
+      await ending;
+      expect(await starting, KundiVoiceStartOutcome.busy);
+      expect(transport.startCalls, 0);
+      coordinator.dispose();
+      speech.dispose();
+    }
+  });
+
+  test('new hold waits for TTS cancellation before system recognition',
+      () async {
+    final transport =
+        _FakeSpeechTransport(permission: KundiSpeechPermission.granted);
+    final speech = KundiSystemSpeechController(transport: transport);
+    final stoppingTts = Completer<void>();
+    final coordinator = KundiVoiceAssistantCoordinator(
+        enabled: true,
+        speech: speech,
+        interruptSpeech: () => stoppingTts.future,
+        ensureAssistantReady: () async {},
+        sendVoiceMessage: (_, __) async {},
+        behavior: (_, __) {},
+        settleBehavior: () {});
+    final starting = coordinator.beginHold('ru-RU');
+    expect(transport.startCalls, 0);
+    stoppingTts.complete();
+    expect(await starting, KundiVoiceStartOutcome.listening);
+    expect(transport.startCalls, 1);
+    coordinator.dispose();
+    speech.dispose();
+  });
+
+  test('terminal caches are bounded and evicted callbacks cannot send again',
+      () async {
+    final transport =
+        _FakeSpeechTransport(permission: KundiSpeechPermission.granted);
+    final speech = KundiSystemSpeechController(transport: transport);
+    var sends = 0;
+    final coordinator = KundiVoiceAssistantCoordinator(
+        enabled: true,
+        speech: speech,
+        ensureAssistantReady: () async {},
+        sendVoiceMessage: (_, __) async {
+          sends++;
+        },
+        behavior: (_, __) {},
+        settleBehavior: () {});
+    String firstId = '';
+    for (var i = 0; i < 300; i++) {
+      await coordinator.beginHold('ru-RU');
+      final id = transport.lastRequestId;
+      if (i == 0) firstId = id;
+      transport.emit('finalResult', id, text: 'Одинаковый вопрос');
+      transport.emit('finalResult', id, text: 'Одинаковый вопрос');
+      await _flush();
+      expect(speech.terminalRequestCount, lessThanOrEqualTo(128));
+      expect(coordinator.terminalRequestCount, lessThanOrEqualTo(128));
+    }
+    await coordinator.beginHold('ru-RU');
+    transport.emit('finalResult', firstId,
+        text: 'Поздний ответ после eviction');
+    await _flush();
+    expect(sends, 300);
+    coordinator.dispose();
+    speech.dispose();
+    expect(speech.terminalRequestCount, 0);
+    expect(coordinator.terminalRequestCount, 0);
+  });
   test('first permission flow never starts listening until a second hold',
       () async {
     final transport = _FakeSpeechTransport(

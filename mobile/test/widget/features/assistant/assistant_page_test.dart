@@ -126,6 +126,48 @@ void main() {
     expect(find.text('Повторить'), findsNothing);
   });
 
+  testWidgets('refresh failure banner keeps the loaded conversation visible',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(
+              errorMessage: '',
+            ).copyWith(
+              refreshErrorMessage: 'Не удалось обновить историю',
+            )),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Ұзақ мәтін'), findsOneWidget);
+    expect(find.text('Не удалось обновить историю'), findsOneWidget);
+    expect(find.text('Не удалось загрузить диалог.'), findsNothing);
+    expect(find.text('Повторить'), findsOneWidget);
+  });
+
+  testWidgets('initial load error uses the full retry state', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            _FailingAssistantController.new,
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Не удалось загрузить диалог.'), findsOneWidget);
+    expect(find.text('Повторить'), findsOneWidget);
+    expect(find.byKey(const Key('assistant-message-list')), findsNothing);
+  });
+
   testWidgets(
       'route re-entry and rebuild retain history without duplicate requests',
       (tester) async {
@@ -187,7 +229,7 @@ void main() {
     expect(counters.assistantControllerBuildCount, 1);
     expect(counters.assistantControllerDisposeCount, 0);
     expect(counters.listSessionsRequestCount, 1);
-    expect(counters.listMessagesRequestCount, 1);
+    expect(counters.listMessagesRequestCount, 2);
     expect(counters.explicitRefreshCount, 0);
     expect(counters.createSessionRequestCount, 0);
     expect(counters.sendMessageRequestCount, 0);
@@ -242,6 +284,18 @@ class _FakeAssistantController extends AssistantController {
 
   @override
   Future<void> retryLastMessage() async {}
+
+  @override
+  Future<void> revalidateOnPageOpen() async {}
+}
+
+class _FailingAssistantController extends AssistantController {
+  @override
+  Future<AssistantViewState> build() =>
+      Future<AssistantViewState>.error(StateError('offline'));
+
+  @override
+  Future<void> revalidateOnPageOpen() async {}
 }
 
 class _AssistantLifecycleCounters {

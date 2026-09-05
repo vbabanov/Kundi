@@ -47,8 +47,26 @@ void main() {
     );
 
     expect(first.target, KundiAvatarAnimationTarget.talking);
-    expect(first.talkingVariant, inInclusiveRange(1, 3));
+    expect(
+      KundiAvatarAnimationPolicy.frontalTalkingVariants,
+      const <int>{2},
+    );
+    expect(first.talkingVariant, 2);
     expect(second.talkingVariant, first.talkingVariant);
+  });
+
+  test('side-facing Talking clips are excluded from Home speech', () {
+    for (final identity in <String>['a', 'message:42', 'different-message']) {
+      expect(KundiAvatarAnimationPolicy.talkingVariant(identity), 2);
+      expect(
+        KundiAvatarAnimationPolicy.frontalTalkingVariants,
+        isNot(contains(1)),
+      );
+      expect(
+        KundiAvatarAnimationPolicy.frontalTalkingVariants,
+        isNot(contains(3)),
+      );
+    }
   });
 
   test('celebration uses Dansing', () {
