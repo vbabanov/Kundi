@@ -1,9 +1,16 @@
 package providerstatus
 
 import (
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/kundi/kundi/backend/internal/platform/config"
+)
+
+var (
+	azureSpeechRegionPattern   = regexp.MustCompile(`^[a-z0-9]+$`)
+	azureSpeechResourcePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*\.cognitiveservices\.azure\.com$`)
 )
 
 type State string
@@ -84,6 +91,10 @@ func firstConfigured(values ...string) string {
 }
 
 func ttsStatus(cfg config.Config) Provider {
+	if cfg.AI.KundiTTSEnabled {
+		return azureSpeechStatus(cfg)
+	}
+
 	mode := strings.ToLower(strings.TrimSpace(cfg.AI.TTSProvider))
 	switch mode {
 	case "", "deterministic", "mock":
@@ -99,6 +110,43 @@ func ttsStatus(cfg config.Config) Provider {
 	default:
 		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "unsupported provider mode"}
 	}
+}
+
+func azureSpeechStatus(cfg config.Config) Provider {
+	const mode = "azure-speech"
+	if !cfg.AI.AssistantEnabled {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "KUNDI_ASSISTANT_ENABLED is required when KUNDI_TTS_ENABLED=true"}
+	}
+	if !cfg.AI.VoiceInputEnabled {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "KUNDI_VOICE_INPUT_ENABLED is required when KUNDI_TTS_ENABLED=true"}
+	}
+	if strings.TrimSpace(cfg.AI.AzureSpeechKeyPrimary) == "" {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "AZURE_SPEECH_KEY_PRIMARY is required"}
+	}
+	region := strings.TrimSpace(cfg.AI.AzureSpeechRegion)
+	if region != cfg.AI.AzureSpeechRegion || !azureSpeechRegionPattern.MatchString(region) {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "AZURE_SPEECH_REGION must be a valid Azure region"}
+	}
+	if cfg.AI.AzureSpeechVoiceRU != "ru-RU-SvetlanaNeural" {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "AZURE_SPEECH_VOICE_RU must be ru-RU-SvetlanaNeural"}
+	}
+	if cfg.AI.AzureSpeechVoiceKK != "kk-KZ-AigulNeural" {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "AZURE_SPEECH_VOICE_KK must be kk-KZ-AigulNeural"}
+	}
+	if endpoint := cfg.AI.AzureSpeechEndpoint; endpoint != "" && (strings.TrimSpace(endpoint) != endpoint || !validAzureSpeechEndpoint(endpoint, region)) {
+		return Provider{Name: "tts", Mode: mode, State: StateMisconfigured, Reason: "AZURE_SPEECH_ENDPOINT must be empty or a valid Azure HTTPS endpoint"}
+	}
+	return Provider{Name: "tts", Mode: mode, State: StateReady}
+}
+
+func validAzureSpeechEndpoint(endpoint, region string) bool {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Port() != "" ||
+		u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == region+".api.cognitive.microsoft.com" || azureSpeechResourcePattern.MatchString(host)
 }
 
 func whatsAppStatus(cfg config.Config) Provider {
