@@ -170,6 +170,7 @@ func (p *FallbackProvider) Generate(ctx context.Context, req Request) (Response,
 
 	fallbackCtx, cancelFallback := context.WithTimeout(totalCtx, p.policy.FallbackTimeout)
 	response, err = p.fallback.Generate(fallbackCtx, req)
+	response.FallbackUsed = true
 	fallbackContextErr := fallbackCtx.Err()
 	cancelFallback()
 	if fallbackContextErr != nil {

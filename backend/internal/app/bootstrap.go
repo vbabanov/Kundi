@@ -132,6 +132,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 			LLMTimeout:        cfg.AI.AssistantLLMTimeout,
 			Logger:            log,
 			CanaryGate:        canaryGate,
+			Observe:           observe,
 		},
 	)
 

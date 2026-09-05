@@ -14,6 +14,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
+	"github.com/kundi/kundi/backend/internal/platform/observability"
 )
 
 const testStudentID = "8d8d8ec8-27e6-4623-a325-c2e7e9db2da2"
@@ -176,18 +177,16 @@ func TestTimeoutAndProviderFailureReturnStableFallback(t *testing.T) {
 	})
 
 	t.Run("provider failure", func(t *testing.T) {
-		var logs bytes.Buffer
 		provider := &fakeLLM{err: &llm.ProviderError{Kind: llm.ErrorServer, StatusCode: 503}}
+		metrics := &capturingMetrics{}
 		service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(),
-			Logger: slog.New(slog.NewJSONHandler(&logs, nil)),
+			Observe: observability.Hooks{Metrics: metrics},
 		})
 		response, err := service.Message(context.Background(), validCommand("Explain fractions"))
 		if err != nil || response.Text == "" || strings.Contains(response.Text, "503") || !response.Pedagogy.SafetyIntervention {
 			t.Fatalf("provider error was exposed or fallback missing: response=%#v err=%v", response, err)
 		}
-		if !strings.Contains(logs.String(), "assistant_llm_provider_5xx") || strings.Contains(logs.String(), "status 503") {
-			t.Fatalf("provider failure was not logged as a sanitized typed code: %s", logs.String())
-		}
+		assertOneAssistantOutcome(t, metrics, OutcomeProvider5xx)
 	})
 }
 
@@ -202,23 +201,35 @@ func TestModerationFailureFailsClosed(t *testing.T) {
 	}
 }
 
-func TestAssistantLogsDoNotContainRawPromptOrHistory(t *testing.T) {
+func TestAssistantMetricLogsDoNotContainPIIOrRawContent(t *testing.T) {
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	service := NewServiceWithOptions(persona.NewService(), &fakeLLM{response: llm.Response{Text: "Safe answer."}}, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(), Logger: logger})
-	command := validCommand("raw-prompt-secret-9af")
-	command.History = []ChatRecord{{Role: "user", Text: "raw-history-secret-2bc"}}
+	hooks := observability.New(observability.Config{Mode: "log"}, logger)
+	responseValue := "Safe response marker 7C1"
+	authorizationValue := "AUTHVAL_5E8"
+	tokenValue := "TOKVAL_8B2"
+	secretValue := "SECVAL_3D4"
+	service := NewServiceWithOptions(persona.NewService(), &fakeLLM{response: llm.Response{Text: responseValue, Provider: "alem", Model: "gemma4"}}, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(), Logger: logger, Observe: hooks})
+	command := validCommand("Explain fractions marker 9AF")
+	command.History = []ChatRecord{{Role: "user", Text: "Prior lesson marker 2BC " + authorizationValue + " " + tokenValue + " " + secretValue}}
 
 	if _, err := service.Message(context.Background(), command); err != nil {
 		t.Fatalf("message failed: %v", err)
 	}
 	output := logs.String()
-	if strings.Contains(output, command.Text) || strings.Contains(output, command.History[0].Text) {
-		t.Fatalf("raw assistant content leaked into logs: %s", output)
+	for _, forbiddenValue := range []string{command.Text, command.History[0].Text, command.StudentID, responseValue, authorizationValue, tokenValue, secretValue} {
+		if strings.Contains(output, forbiddenValue) {
+			t.Fatalf("raw assistant value %q leaked into logs: %s", forbiddenValue, output)
+		}
 	}
-	for _, field := range []string{"text_length", "history_length", "provider_result", "safety_category"} {
+	for _, field := range []string{"assistant_requests_total", "assistant_latency_ms", "safety_category"} {
 		if !strings.Contains(output, field) {
 			t.Fatalf("sanitized log field %q is missing: %s", field, output)
+		}
+	}
+	for _, forbiddenField := range []string{"student_id", "session_id", "account_id", "prompt", "response", "history", "transcript", "token", "authorization", "endpoint"} {
+		if strings.Contains(strings.ToLower(output), forbiddenField) {
+			t.Fatalf("forbidden telemetry field %q is present: %s", forbiddenField, output)
 		}
 	}
 }

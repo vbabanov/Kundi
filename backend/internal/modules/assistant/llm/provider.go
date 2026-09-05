@@ -51,9 +51,10 @@ type Request struct {
 }
 
 type Response struct {
-	Text     string
-	Provider string
-	Model    string
+	Text         string
+	Provider     string
+	Model        string
+	FallbackUsed bool
 }
 
 type Provider interface {

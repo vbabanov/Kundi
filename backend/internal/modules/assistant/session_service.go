@@ -74,7 +74,9 @@ type sessionResponseMetadata struct {
 	Suggestions      []string        `json:"suggestions,omitempty"`
 }
 
-func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (AssistantSession, error) {
+func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (result AssistantSession, retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	defer func() { outcome.Finish(retErr) }()
 	studentID, err := s.sessionStudentID(studentIDRaw)
 	if err != nil {
 		return AssistantSession{}, err
@@ -87,6 +89,7 @@ func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (Assis
 	if locale == "" {
 		locale = "ru-KZ"
 	}
+	outcome.SetLocale(locale)
 	if profile.GradeLevel < 1 || profile.GradeLevel > 11 {
 		return AssistantSession{}, apperrors.Internal("assistant_profile_invalid", "assistant profile is invalid", errors.New("grade level is outside supported range"))
 	}
@@ -97,7 +100,9 @@ func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (Assis
 	return item, nil
 }
 
-func (s *Service) ListSessions(ctx context.Context, studentIDRaw string, limit int, cursorRaw string) (SessionPage, error) {
+func (s *Service) ListSessions(ctx context.Context, studentIDRaw string, limit int, cursorRaw string) (result SessionPage, retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	defer func() { outcome.Finish(retErr) }()
 	studentID, err := s.sessionStudentID(studentIDRaw)
 	if err != nil {
 		return SessionPage{}, err
@@ -120,7 +125,9 @@ func (s *Service) ListSessions(ctx context.Context, studentIDRaw string, limit i
 	return page, nil
 }
 
-func (s *Service) ListSessionMessages(ctx context.Context, studentIDRaw, sessionIDRaw string, limit int, cursorRaw string) (MessagePage, error) {
+func (s *Service) ListSessionMessages(ctx context.Context, studentIDRaw, sessionIDRaw string, limit int, cursorRaw string) (result MessagePage, retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	defer func() { outcome.Finish(retErr) }()
 	studentID, sessionID, err := s.sessionIDs(studentIDRaw, sessionIDRaw)
 	if err != nil {
 		return MessagePage{}, err
@@ -146,7 +153,9 @@ func (s *Service) ListSessionMessages(ctx context.Context, studentIDRaw, session
 	return page, nil
 }
 
-func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw string) error {
+func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw string) (retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	defer func() { outcome.Finish(retErr) }()
 	studentID, sessionID, err := s.sessionIDs(studentIDRaw, sessionIDRaw)
 	if err != nil {
 		return err
@@ -161,13 +170,14 @@ func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw 
 	return nil
 }
 
-func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessageCommand) (SessionMessageResult, error) {
-	startedAt := time.Now()
-	inputMode, err := s.normalizeInputMode(cmd.InputMode)
+func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessageCommand) (result SessionMessageResult, retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, cmd.InputMode)
+	defer func() { outcome.Finish(retErr) }()
+	studentID, sessionID, err := s.sessionIDs(cmd.StudentID, cmd.SessionID)
 	if err != nil {
 		return SessionMessageResult{}, err
 	}
-	studentID, sessionID, err := s.sessionIDs(cmd.StudentID, cmd.SessionID)
+	inputMode, err := s.normalizeInputMode(cmd.InputMode)
 	if err != nil {
 		return SessionMessageResult{}, err
 	}
@@ -185,6 +195,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	}
 	if found {
 		existing.Replayed = true
+		outcome.SetResult(OutcomeSuccess, telemetryNone)
 		return resultFromExchange(existing), nil
 	}
 
@@ -198,6 +209,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	if session.GradeLevel < 1 || session.GradeLevel > 11 {
 		return SessionMessageResult{}, apperrors.BadRequest("assistant_grade_unsupported", "assistant supports grades 1 through 11")
 	}
+	outcome.SetLocale(session.Locale)
 
 	historyItems, err := s.sessions.ListMessages(ctx, studentID, sessionID, SessionHistoryLimit, nil)
 	if err != nil {
@@ -212,6 +224,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		return SessionMessageResult{}, validationAppError(err)
 	}
 	if !s.rateLimiter.Allow(studentID.String()).Allowed {
+		outcome.SetResult(OutcomeRateLimited, OutcomeRateLimited)
 		return SessionMessageResult{}, apperrors.New(http.StatusTooManyRequests, "assistant_rate_limited", s.safeResponses.ForRateLimit(safety.DetectLanguage(validated.Text)).Text, nil)
 	}
 
@@ -223,29 +236,36 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	if !inputSafety.Allowed {
 		safe := s.safeResponses.ForModeration(inputSafety)
 		analysis := tutoring.Analysis{Intent: tutoring.IntentGeneralQuestion, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", GradeBand: tutoring.GradeBand(session.GradeLevel)}
-		return s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "neutral", AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
+		outcome.SetAnalysis(analysis)
+		outcome.SetSafety(inputSafety.Category)
+		result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "neutral", AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
+		if err == nil {
+			outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
+		}
+		return result, err
 	}
 
 	academic := AcademicContext{Locale: session.Locale, GradeLevel: session.GradeLevel}
-	contextFailed := false
 	if s.academic != nil {
 		loaded, contextErr := s.academic.Build(ctx, studentID)
 		if contextErr != nil {
-			contextFailed = true
-			s.logger.Warn("assistant_academic_context_degraded", slog.String("student_id", studentID.String()), slog.String("error_code", "academic_context_load_failed"))
+			s.logger.Warn("assistant_academic_context_degraded", slog.String("error_code", "academic_context_load_failed"))
 		} else {
 			academic = loaded
 		}
 	}
 	activeHomework := academic.MatchesActiveHomework(validated.Text) || tutoring.LooksLikeHomework(validated.Text)
 	analysis := s.tutoring.Analyze(inputSafety.SanitizedText, session.GradeLevel, activeHomework)
+	outcome.SetAnalysis(analysis)
 	prompt := s.tutoring.BuildPrompt(inputSafety.SanitizedText, session.GradeLevel, analysis, academic.Render(), renderSessionHistory(history))
 
 	llmCtx, cancel := context.WithTimeout(ctx, s.llmTimeout)
 	providerResponse, providerErr := s.llm.Generate(llmCtx, llm.Request{Mode: string(ModeTutor), Prompt: prompt, PersonaTone: "supportive", Style: "age_adapted"})
 	cancel()
+	outcome.SetProvider(providerResponse.Provider, providerResponse.Model, providerResponse.FallbackUsed)
 	if providerErr != nil || strings.TrimSpace(providerResponse.Text) == "" {
-		s.logSessionEvent(startedAt, studentID.String(), sessionID.String(), analysis, contextFailed, "provider_failed")
+		result, errorKind := assistantOutcomeFromProvider(providerErr, strings.TrimSpace(providerResponse.Text) != "")
+		outcome.SetResult(result, errorKind)
 		return SessionMessageResult{}, sessionProviderError(providerErr)
 	}
 
@@ -259,15 +279,23 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		safe := s.safeResponses.ForModeration(outputSafety)
 		raw = safe.Text
 		safetyCategory = string(outputSafety.Category)
+		outcome.SetSafety(outputSafety.Category)
 	}
 	draft := s.tutoring.Finalize(raw, analysis, string(language))
 	if !outputSafety.Allowed {
 		draft.ResponseMode = tutoring.ResponseModeSafety
 		draft.HelpLevel = "safety"
 	}
-	result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, draft, analysis, providerResponse.Provider, providerResponse.Model, safetyCategory, academic.Suggestions())
+	result, err = s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, draft, analysis, providerResponse.Provider, providerResponse.Model, safetyCategory, academic.Suggestions())
 	if err == nil {
-		s.logSessionEvent(startedAt, studentID.String(), sessionID.String(), analysis, contextFailed, "ok")
+		switch {
+		case !outputSafety.Allowed:
+			outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
+		case draft.ReadyAnswerRisk || analysis.ReadyAnswerRisk:
+			outcome.SetResult(OutcomeReadyAnswerGuard, OutcomeReadyAnswerGuard)
+		default:
+			outcome.SetResult(OutcomeSuccess, telemetryNone)
+		}
 	}
 	return result, err
 }
@@ -429,8 +457,4 @@ func decodePageCursor(raw string) (*PageCursor, error) {
 		return nil, errors.New("invalid cursor")
 	}
 	return &PageCursor{At: cursor.At.UTC(), ID: id}, nil
-}
-
-func (s *Service) logSessionEvent(started time.Time, studentID, sessionID string, analysis tutoring.Analysis, contextFailed bool, result string) {
-	s.logger.Info("assistant_session_message", slog.String("student_id", studentID), slog.String("session_id", sessionID), slog.String("intent", string(analysis.Intent)), slog.String("response_mode", string(analysis.ResponseMode)), slog.Bool("academic_context_degraded", contextFailed), slog.String("result", result), slog.Int64("latency_ms", time.Since(started).Milliseconds()))
 }

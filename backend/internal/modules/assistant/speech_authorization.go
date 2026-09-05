@@ -38,8 +38,11 @@ func (r *PostgresSessionRepository) SpeechMessage(ctx context.Context, studentID
 	return m, inputMode, err
 }
 
-func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRaw, messageRaw string) (speechauth.Authorization, error) {
+func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRaw, messageRaw string) (authorization speechauth.Authorization, retErr error) {
+	outcome := newSpeechOutcome(s.observe.Metrics)
+	defer func() { outcome.Finish(retErr) }()
 	if !s.Enabled() || !s.voiceEnabled || s.speechBroker == nil || !s.speechBroker.Enabled() {
+		outcome.SetResult("disabled")
 		return speechauth.Authorization{}, apperrors.NotFound("assistant_tts_disabled", "speech is not enabled")
 	}
 	student, session, err := s.sessionIDs(studentRaw, sessionRaw)
@@ -60,6 +63,7 @@ func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRa
 	if err != nil {
 		return speechauth.Authorization{}, apperrors.New(503, "speech_message_unavailable", "message unavailable", nil)
 	}
+	outcome.SetLocale(stored.Locale)
 	repo, ok := s.sessions.(SpeechMessageRepository)
 	if !ok {
 		return speechauth.Authorization{}, apperrors.New(503, "speech_message_unavailable", "message unavailable", nil)
@@ -75,5 +79,9 @@ func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRa
 		return speechauth.Authorization{}, apperrors.BadRequest("speech_content_invalid", "message cannot be synthesized")
 	}
 	hash := sha256.Sum256([]byte(m.Content))
-	return s.speechBroker.Authorize(ctx, student.String(), message.String(), stored.Locale, hex.EncodeToString(hash[:]))
+	authorization, err = s.speechBroker.Authorize(ctx, student.String(), message.String(), stored.Locale, hex.EncodeToString(hash[:]))
+	if err == nil {
+		outcome.SetResult("success")
+	}
+	return authorization, err
 }

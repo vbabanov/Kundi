@@ -63,9 +63,12 @@ func TestFallbackProviderOnlyFallsBackForAvailabilityFailures(t *testing.T) {
 			provider := NewFallbackProviderWithPolicy(&scriptedProvider{err: item.primaryError}, fallback, FallbackPolicy{
 				PrimaryTimeout: time.Second, FallbackTimeout: time.Second, TotalTimeout: 2 * time.Second,
 			})
-			_, _ = provider.Generate(context.Background(), Request{Prompt: "q"})
+			response, _ := provider.Generate(context.Background(), Request{Prompt: "q"})
 			if (fallback.calls == 1) != item.wantFallback {
 				t.Fatalf("fallback calls=%d", fallback.calls)
+			}
+			if response.FallbackUsed != item.wantFallback {
+				t.Fatalf("fallback telemetry marker=%v want=%v", response.FallbackUsed, item.wantFallback)
 			}
 		})
 	}
@@ -78,7 +81,7 @@ func TestFallbackProviderReturnsPrimarySuccessWithoutFallback(t *testing.T) {
 		PrimaryTimeout: time.Second, FallbackTimeout: time.Second, TotalTimeout: 2 * time.Second,
 	})
 	response, err := provider.Generate(context.Background(), Request{Prompt: "q"})
-	if err != nil || response.Text != "primary" || primary.calls != 1 || fallback.calls != 0 {
+	if err != nil || response.Text != "primary" || response.FallbackUsed || primary.calls != 1 || fallback.calls != 0 {
 		t.Fatalf("unexpected response=%#v err=%v primary=%d fallback=%d", response, err, primary.calls, fallback.calls)
 	}
 }

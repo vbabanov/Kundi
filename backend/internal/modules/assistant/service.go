@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/avatar_cues"
@@ -24,6 +23,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tutoring"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
+	"github.com/kundi/kundi/backend/internal/platform/observability"
 )
 
 const DefaultLLMTimeout = 12 * time.Second
@@ -41,6 +41,7 @@ type Options struct {
 	LLMTimeout        time.Duration
 	Logger            *slog.Logger
 	CanaryGate        *CanaryGate
+	Observe           observability.Hooks
 }
 
 type Service struct {
@@ -67,6 +68,7 @@ type Service struct {
 	academic      AcademicContextProvider
 	tutoring      *tutoring.Service
 	canaryGate    *CanaryGate
+	observe       observability.Hooks
 }
 
 type SpeechAuthorizer interface {
@@ -136,13 +138,15 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 		academic:      options.AcademicContext,
 		tutoring:      tutoring.NewService(),
 		canaryGate:    options.CanaryGate,
+		observe:       observability.Ensure(options.Observe),
 	}
 }
 
 func (s *Service) Enabled() bool { return s != nil && s.enabled }
 
-func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, error) {
-	startedAt := time.Now()
+func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Response, retErr error) {
+	outcome := newAssistantOutcome(s.observe.Metrics, "legacy")
+	defer func() { outcome.Finish(retErr) }()
 	if !s.Enabled() {
 		return Response{}, apperrors.NotFound("assistant_disabled", "assistant is not enabled")
 	}
@@ -172,13 +176,14 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 			code = validationErr.Code
 			message = validationErr.Message
 		}
-		s.logEvent(startedAt, studentID.String(), validationInput.Mode, validationInput.GradeLevel, "", validationInput.Text, validationInput.History, safety.CategoryNone, "not_called", code)
+		outcome.SetResult(OutcomeValidation, OutcomeValidation)
 		return Response{}, apperrors.BadRequest(code, message)
 	}
 
 	modeRaw := validated.Mode
 	gradeLevel := validated.GradeLevel
 	language := safety.DetectLanguage(validated.Text)
+	outcome.SetLocale(string(language))
 	personaResolved, legacyPersona := s.resolvePersona(ctx, studentID, modeRaw, gradeLevel)
 	if strings.TrimSpace(legacyPersona.ToneProfile) != "" {
 		personaResolved.Tone = strings.TrimSpace(legacyPersona.ToneProfile)
@@ -191,7 +196,7 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 		limitDecision := s.rateLimiter.Allow(studentID.String())
 		if !limitDecision.Allowed {
 			response := s.safeResponses.ForRateLimit(language)
-			s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryNone, "not_called", "assistant_rate_limited")
+			outcome.SetResult(OutcomeRateLimited, OutcomeRateLimited)
 			return Response{}, apperrors.New(http.StatusTooManyRequests, "assistant_rate_limited", response.Text, nil)
 		}
 	}
@@ -199,24 +204,28 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 	inputModeration, err := s.moderator.Moderate(ctx, validated.Text)
 	if err != nil {
 		response := s.safeResponses.ForModerationFailure(language)
-		s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryUnknownRisk, "not_called", "assistant_input_moderation_failed")
+		outcome.SetSafety(safety.CategoryUnknownRisk)
+		outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 		return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 	}
 	if !inputModeration.Allowed {
 		response := s.safeResponses.ForModeration(inputModeration)
-		s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, inputModeration.Category, "not_called", inputModeration.ReasonCode)
+		outcome.SetSafety(inputModeration.Category)
+		outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 		return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 	}
 	for _, record := range validated.History {
 		historyModeration, historyErr := s.moderator.Moderate(ctx, record.Text)
 		if historyErr != nil {
 			response := s.safeResponses.ForModerationFailure(language)
-			s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryUnknownRisk, "not_called", "assistant_history_moderation_failed")
+			outcome.SetSafety(safety.CategoryUnknownRisk)
+			outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 			return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 		}
 		if !historyModeration.Allowed {
 			response := s.safeResponses.ForModeration(historyModeration)
-			s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, historyModeration.Category, "not_called", historyModeration.ReasonCode)
+			outcome.SetSafety(historyModeration.Category)
+			outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 			return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 		}
 	}
@@ -239,12 +248,13 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 		History:     builtContext.RecentUserMessages,
 	})
 	cancel()
+	outcome.SetProvider(llmResponse.Provider, llmResponse.Model, llmResponse.FallbackUsed)
 
-	providerResult := "ok"
-	errorCode := ""
 	text := strings.TrimSpace(llmResponse.Text)
-	if llmErr != nil || text == "" {
-		providerResult, errorCode = classifyLLMFailure(llmErr, text)
+	providerFailed := llmErr != nil || text == ""
+	if providerFailed {
+		result, errorKind := assistantOutcomeFromProvider(llmErr, text != "")
+		outcome.SetResult(result, errorKind)
 		text = s.safeResponses.ForProviderFailure(language).Text
 		pedagogy.SafetyIntervention = true
 	}
@@ -252,12 +262,14 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 	outputModeration, moderationErr := s.output.Validate(ctx, text)
 	if moderationErr != nil {
 		response := s.safeResponses.ForModerationFailure(language)
-		s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryUnknownRisk, providerResult, "assistant_output_moderation_failed")
+		outcome.SetSafety(safety.CategoryUnknownRisk)
+		outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 		return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 	}
 	if !outputModeration.Allowed {
 		response := s.safeResponses.ForModeration(outputModeration)
-		s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, outputModeration.Category, providerResult, "assistant_output_blocked")
+		outcome.SetSafety(outputModeration.Category)
+		outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 		return s.safetyResponse(response.Text, modeRaw, gradeLevel, personaResolved), nil
 	}
 	text = outputModeration.SanitizedText
@@ -265,17 +277,9 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 	audioURL, ttsErr := s.tts.Render(ctx, text)
 	audioStatus := AudioStatusUnavailable
 	cues := avatar_cues.Cue{Emotion: "neutral"}
-	if ttsErr != nil {
-		if errorCode == "" {
-			errorCode = "assistant_tts_failed"
-		}
-	} else if strings.TrimSpace(audioURL) != "" {
+	if ttsErr == nil && strings.TrimSpace(audioURL) != "" {
 		validatedAudioURL, audioErr := s.audioURLs.Validate(audioURL)
-		if audioErr != nil {
-			if errorCode == "" {
-				errorCode = "assistant_audio_url_invalid"
-			}
-		} else {
+		if audioErr == nil {
 			audioURL = validatedAudioURL
 			audioStatus = AudioStatusReady
 			cues = s.avatarCues.Build(text, personaResolved)
@@ -289,7 +293,7 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 	if cues.Gesture != "" {
 		gestureTags = append(gestureTags, cues.Gesture)
 	}
-	response := Response{
+	response = Response{
 		Text:          text,
 		AudioURL:      audioURL,
 		AudioStatus:   audioStatus,
@@ -304,7 +308,9 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 		},
 		Behavior: behaviorMeta(modeRaw, gradeLevel, personaResolved),
 	}
-	s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryNone, providerResult, errorCode)
+	if !providerFailed {
+		outcome.SetResult(OutcomeSuccess, telemetryNone)
+	}
 	return response, nil
 }
 
@@ -340,58 +346,6 @@ func behaviorMeta(mode string, gradeLevel int, resolved persona_policy.Persona) 
 		PersonaTone:  resolved.Tone,
 		PersonaStyle: resolved.Style,
 	}
-}
-
-func classifyLLMFailure(err error, text string) (string, string) {
-	if err == nil && strings.TrimSpace(text) == "" {
-		return "malformed_response", "assistant_llm_malformed_response"
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return "timeout", "assistant_llm_timeout"
-	}
-	if errors.Is(err, context.Canceled) {
-		return "canceled", "assistant_llm_canceled"
-	}
-	var providerErr *llm.ProviderError
-	if errors.As(err, &providerErr) {
-		switch providerErr.Kind {
-		case llm.ErrorClient:
-			return "provider_4xx", "assistant_llm_provider_4xx"
-		case llm.ErrorRateLimit:
-			return "provider_429", "assistant_llm_provider_rate_limited"
-		case llm.ErrorServer:
-			return "provider_5xx", "assistant_llm_provider_5xx"
-		case llm.ErrorUnavailable:
-			return "provider_unavailable", "assistant_llm_provider_unavailable"
-		case llm.ErrorTimeout:
-			return "timeout", "assistant_llm_timeout"
-		case llm.ErrorMalformed:
-			return "malformed_response", "assistant_llm_malformed_response"
-		case llm.ErrorConfiguration:
-			return "misconfigured", "assistant_llm_misconfigured"
-		}
-	}
-	return "internal_error", "assistant_llm_internal_error"
-}
-
-func (s *Service) logEvent(startedAt time.Time, studentID, mode string, gradeLevel int, gradeBand, text string, history []safety.HistoryMessage, category safety.SafetyCategory, providerResult, errorCode string) {
-	historyRunes := 0
-	for _, record := range history {
-		historyRunes += utf8.RuneCountInString(record.Text)
-	}
-	s.logger.Info("assistant_request",
-		slog.String("student_id", studentID),
-		slog.String("mode", strings.TrimSpace(mode)),
-		slog.Int("grade_level", gradeLevel),
-		slog.String("grade_band", gradeBand),
-		slog.Int("text_length", utf8.RuneCountInString(text)),
-		slog.Int("history_messages", len(history)),
-		slog.Int("history_length", historyRunes),
-		slog.String("safety_category", string(category)),
-		slog.String("provider_result", providerResult),
-		slog.String("error_code", errorCode),
-		slog.Int64("latency_ms", time.Since(startedAt).Milliseconds()),
-	)
 }
 
 func toContractVisemes(items []avatar_cues.Viseme) []Viseme {
