@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -13,17 +15,17 @@ import '../assistant_feature.dart';
 import '../data/assistant_repository_impl.dart';
 import '../domain/assistant_entity.dart';
 import '../domain/assistant_repository.dart';
+import 'kundi_tts_coordinator.dart';
 
 final assistantRepositoryProvider = Provider<AssistantRepository>((ref) {
   const qaBaseUrl = String.fromEnvironment(
     'KUNDI_ASSISTANT_QA_BASE_URL',
     defaultValue: '',
   );
-  final apiClient = kDebugMode &&
-          kundiVoiceQaTelemetryEnabled &&
-          qaBaseUrl.isNotEmpty
-      ? ApiClient(baseUrl: qaBaseUrl)
-      : ref.watch(apiClientProvider);
+  final apiClient =
+      kDebugMode && kundiVoiceQaTelemetryEnabled && qaBaseUrl.isNotEmpty
+          ? ApiClient(baseUrl: qaBaseUrl)
+          : ref.watch(apiClientProvider);
   return AssistantRepositoryImpl(apiClient: apiClient);
 });
 
@@ -47,6 +49,8 @@ class AssistantViewState {
     this.retryText = '',
     this.retryClientMessageId = '',
     this.retryInputMode = AssistantInputMode.text,
+    this.isRefreshing = false,
+    this.refreshErrorMessage = '',
   });
 
   final List<AssistantSessionEntity> sessions;
@@ -62,6 +66,8 @@ class AssistantViewState {
   final String retryText;
   final String retryClientMessageId;
   final AssistantInputMode retryInputMode;
+  final bool isRefreshing;
+  final String refreshErrorMessage;
 
   AssistantViewState copyWith({
     List<AssistantSessionEntity>? sessions,
@@ -78,6 +84,8 @@ class AssistantViewState {
     String? retryText,
     String? retryClientMessageId,
     AssistantInputMode? retryInputMode,
+    bool? isRefreshing,
+    String? refreshErrorMessage,
   }) {
     return AssistantViewState(
       sessions: sessions ?? this.sessions,
@@ -94,12 +102,16 @@ class AssistantViewState {
       retryText: retryText ?? this.retryText,
       retryClientMessageId: retryClientMessageId ?? this.retryClientMessageId,
       retryInputMode: retryInputMode ?? this.retryInputMode,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      refreshErrorMessage: refreshErrorMessage ?? this.refreshErrorMessage,
     );
   }
 }
 
 class AssistantController extends AsyncNotifier<AssistantViewState> {
   final Uuid _uuid = const Uuid();
+  Future<void>? _historyRefresh;
+  AssistantSessionEntity? _retryRefreshSession;
 
   @override
   Future<AssistantViewState> build() async {
@@ -121,7 +133,10 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     return AssistantViewState(
       sessions: sessions,
       activeSession: active,
-      messages: _chronological(messages.items),
+      messages: _mergeMessages(
+        const <AssistantMessageEntity>[],
+        messages.items,
+      ),
       sessionCursor: page.nextCursor,
       messageCursor: messages.nextCursor,
       suggestions: _genericSuggestionsForLocale(active.locale),
@@ -129,6 +144,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
   }
 
   Future<void> createNewSession() async {
+    await _cancelSpeech();
     final previous = state.valueOrNull ?? const AssistantViewState();
     state = const AsyncLoading<AssistantViewState>();
     state = await AsyncValue.guard(() async {
@@ -149,21 +165,64 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
   }
 
   Future<void> openSession(AssistantSessionEntity session) async {
-    final previous = state.valueOrNull ?? const AssistantViewState();
-    state = const AsyncLoading<AssistantViewState>();
-    state = await AsyncValue.guard(() async {
-      final page = await ref.read(assistantRepositoryProvider).listMessages(
-            accessToken: _accessToken(),
-            sessionId: session.id,
-          );
-      return previous.copyWith(
-        activeSession: session,
-        messages: _chronological(page.items),
-        messageCursor: page.nextCursor,
-        suggestions: _genericSuggestionsForLocale(session.locale),
-        errorMessage: '',
-      );
-    });
+    await _cancelSpeech();
+    final previous = state.valueOrNull;
+    if (previous == null) return;
+    final pending = _historyRefresh;
+    if (pending != null) return pending;
+    _retryRefreshSession = session;
+    state = AsyncData(previous.copyWith(
+      isRefreshing: true,
+      refreshErrorMessage: '',
+    ));
+    final refresh = () async {
+      try {
+        final page = await ref.read(assistantRepositoryProvider).listMessages(
+              accessToken: _accessToken(),
+              sessionId: session.id,
+            );
+        final latest = state.valueOrNull ?? previous;
+        state = AsyncData(latest.copyWith(
+          activeSession: session,
+          messages: _mergeMessages(
+            const <AssistantMessageEntity>[],
+            page.items,
+          ),
+          messageCursor: page.nextCursor,
+          suggestions: _genericSuggestionsForLocale(session.locale),
+          errorMessage: '',
+          isRefreshing: false,
+          refreshErrorMessage: '',
+        ));
+        _retryRefreshSession = null;
+      } catch (_) {
+        final latest = state.valueOrNull ?? previous;
+        state = AsyncData(latest.copyWith(
+          isRefreshing: false,
+          refreshErrorMessage: 'Не удалось обновить историю',
+        ));
+      }
+    }();
+    _historyRefresh = refresh;
+    try {
+      await refresh;
+    } finally {
+      if (identical(_historyRefresh, refresh)) _historyRefresh = null;
+    }
+  }
+
+  Future<void> refreshActiveSession() async {
+    final active = state.valueOrNull?.activeSession;
+    if (active != null) await openSession(active);
+  }
+
+  Future<void> revalidateOnPageOpen() async {
+    await refreshActiveSession();
+  }
+
+  Future<void> retryHistoryRefresh() async {
+    final session = _retryRefreshSession;
+    if (session != null) await openSession(session);
   }
 
   Future<void> loadOlderMessages() async {
@@ -211,6 +270,10 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     final active = current.activeSession;
     if (active == null) return;
     final requestID = clientMessageId ?? _uuid.v4();
+    final tts = ref.read(kundiTtsEnabledProvider)
+        ? ref.read(kundiTtsCoordinatorProvider.notifier)
+        : null;
+    final speechEpoch = tts?.epoch;
     state = AsyncData(current.copyWith(
       isSending: true,
       pendingText: normalized,
@@ -258,6 +321,11 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         retryInputMode: AssistantInputMode.text,
       ));
       _neutralBehavior();
+      if (inputMode == AssistantInputMode.voice &&
+          tts != null &&
+          speechEpoch != null) {
+        unawaited(tts.speakResponse(result, expectedEpoch: speechEpoch));
+      }
     } catch (error) {
       final latest = state.valueOrNull ?? current;
       final failure = _sendFailure(error);
@@ -288,6 +356,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
   }
 
   Future<void> deleteCurrentSession() async {
+    await _cancelSpeech();
     final current = state.valueOrNull;
     final active = current?.activeSession;
     if (current == null || active == null) return;
@@ -309,6 +378,12 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     }
     state = AsyncData(current.copyWith(sessions: remaining));
     await openSession(remaining.first);
+  }
+
+  Future<void> _cancelSpeech() async {
+    if (ref.read(kundiTtsEnabledProvider)) {
+      await ref.read(kundiTtsCoordinatorProvider.notifier).cancel();
+    }
   }
 
   String _accessToken() {

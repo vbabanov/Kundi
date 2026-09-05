@@ -16,6 +16,7 @@ import '../domain/home_gamification_metrics.dart';
 import '../domain/home_greeting.dart';
 import '../domain/lessons_entity.dart';
 import 'widgets/kundi_home_hero.dart';
+import '../../assistant/application/kundi_tts_coordinator.dart';
 
 class LessonsPage extends ConsumerWidget {
   const LessonsPage({
@@ -448,7 +449,7 @@ class _InlineLoadError extends StatelessWidget {
   }
 }
 
-class _HeroActionStack extends StatelessWidget {
+class _HeroActionStack extends ConsumerWidget {
   const _HeroActionStack({
     required this.greeting,
     required this.dateLabel,
@@ -506,7 +507,10 @@ class _HeroActionStack extends StatelessWidget {
   final bool voiceListening;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ttsState = ref.watch(kundiTtsEnabledProvider)
+        ? ref.watch(kundiTtsCoordinatorProvider)
+        : const KundiTtsState();
     return Stack(
       key: const Key('home-hero-action-stack'),
       clipBehavior: Clip.none,
@@ -557,6 +561,7 @@ class _HeroActionStack extends StatelessWidget {
           ),
         ),
         KundiHomeHero(
+          ttsState: ttsState,
           title: greeting,
           dateLabel: dateLabel,
           message: heroMessage,
@@ -575,7 +580,9 @@ class _HeroActionStack extends StatelessWidget {
           onAvatarLongPressStart: onAssistantLongPressStart,
           onAvatarLongPressEnd: onAssistantLongPressEnd,
           onAvatarLongPressCancel: onAssistantLongPressCancel,
-          voiceStatusText: voiceStatusText,
+          voiceStatusText: ttsState.errorMessage.isNotEmpty
+              ? ttsState.errorMessage
+              : voiceStatusText,
           voiceListening: voiceListening,
         ),
       ],

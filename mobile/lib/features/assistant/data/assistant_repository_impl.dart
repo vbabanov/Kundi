@@ -124,6 +124,7 @@ class AssistantRepositoryImpl implements AssistantRepository {
             .toList(growable: false)
         : const <String>[];
     return AssistantMessageResult(
+      replayed: payload['replayed'] != false,
       userMessage: _messageFromJson(
           Map<String, dynamic>.from(payload['user_message'] as Map)),
       assistantMessage: _messageFromJson(

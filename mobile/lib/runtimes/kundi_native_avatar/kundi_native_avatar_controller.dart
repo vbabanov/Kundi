@@ -10,7 +10,7 @@ abstract interface class KundiNativeAvatarTransport {
 
 final class KundiNativeAvatarController {
   KundiNativeAvatarController(KundiNativeAvatarTransport transport)
-    : _transport = transport {
+      : _transport = transport {
     _subscription = _transport.events.listen(
       _onRawEvent,
       onError: _onTransportError,
@@ -41,10 +41,11 @@ final class KundiNativeAvatarController {
   Future<void> startPresentationPriming({
     required int rendererGeneration,
     required int textureId,
-  }) => _send('startPresentationPriming', <String, Object>{
-    'rendererGeneration': rendererGeneration,
-    'textureId': textureId,
-  });
+  }) =>
+      _send('startPresentationPriming', <String, Object>{
+        'rendererGeneration': rendererGeneration,
+        'textureId': textureId,
+      });
 
   Future<void> freeze() => _send('freeze');
 
@@ -54,7 +55,9 @@ final class KundiNativeAvatarController {
   Future<void> blink() => _send('blink');
 
   Future<void> setViseme(KundiNativeAvatarViseme viseme) =>
-      _send('setViseme', <String, Object>{'viseme': viseme.wireName});
+      viseme == KundiNativeAvatarViseme.neutral
+          ? resetFace()
+          : _send('setViseme', <String, Object>{'viseme': viseme.wireName});
 
   Future<void> resetFace() => _send('resetFace');
 

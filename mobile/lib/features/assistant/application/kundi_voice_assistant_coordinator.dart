@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../runtimes/kundi_system_speech/kundi_system_speech_controller.dart';
 import '../../../runtimes/kundi_system_speech/kundi_system_speech_transport.dart';
 import '../../../runtimes/kundi_system_speech/kundi_voice_qa_telemetry.dart';
+import '../../../runtimes/kundi_system_speech/terminal_request_cache.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/domain/kundi_behavior_event.dart';
 import '../assistant_feature.dart';
 import '../domain/assistant_entity.dart';
 import 'assistant_controller.dart';
+import 'kundi_tts_coordinator.dart';
 
 final kundiSystemSpeechTransportProvider =
     Provider<KundiSystemSpeechTransport>((ref) {
@@ -31,6 +33,11 @@ final kundiVoiceAssistantCoordinatorProvider = StateNotifierProvider<
   return KundiVoiceAssistantCoordinator(
     enabled: enabled,
     speech: speech,
+    interruptSpeech: () async {
+      if (ref.read(kundiTtsEnabledProvider)) {
+        await ref.read(kundiTtsCoordinatorProvider.notifier).cancel();
+      }
+    },
     ensureAssistantReady: () async {
       await ref.read(assistantControllerProvider.future);
     },
@@ -70,12 +77,14 @@ class KundiVoiceAssistantCoordinator
     required void Function(KundiBehaviorEventType type, String requestId)
         behavior,
     required void Function() settleBehavior,
+    Future<void> Function()? interruptSpeech,
   })  : _enabled = enabled,
         _speech = speech,
         _ensureAssistantReady = ensureAssistantReady,
         _sendVoiceMessage = sendVoiceMessage,
         _behavior = behavior,
         _settleBehavior = settleBehavior,
+        _interruptSpeech = interruptSpeech,
         super(speech.state) {
     KundiVoiceQaTelemetry.coordinatorCreated(_coordinatorInstanceId);
     _removeListener = _speech.addListener(_onSpeechState);
@@ -87,22 +96,30 @@ class KundiVoiceAssistantCoordinator
   final Future<void> Function(String text, String requestId) _sendVoiceMessage;
   final void Function(KundiBehaviorEventType type, String requestId) _behavior;
   final void Function() _settleBehavior;
+  final Future<void> Function()? _interruptSpeech;
   late final void Function() _removeListener;
   final String _coordinatorInstanceId =
       KundiVoiceQaTelemetry.nextId('coordinator');
-  final Set<String> _sentRequestIds = <String>{};
-  final Map<String, int> _finalResultOrdinals = <String, int>{};
+  final _terminal = TerminalRequestCache<int>();
+  String? _activeSendId;
+  int get terminalRequestCount => _terminal.length;
   int _assistantSendOrdinal = 0;
   String _lastErrorIdentity = '';
   bool _disposed = false;
   int _operationGeneration = 0;
+  int _holdGeneration = 0;
 
   Future<KundiVoiceStartOutcome> beginHold(
     String locale, {
     String gestureId = '',
     String pointerSequenceId = '',
   }) async {
-    if (!_enabled) return KundiVoiceStartOutcome.unavailable;
+    if (!_enabled || _disposed) return KundiVoiceStartOutcome.unavailable;
+    final holdGeneration = ++_holdGeneration;
+    await _interruptSpeech?.call();
+    if (_disposed || holdGeneration != _holdGeneration) {
+      return KundiVoiceStartOutcome.busy;
+    }
     final effectiveGestureId = gestureId.isEmpty
         ? KundiVoiceQaTelemetry.nextId('gesture-fallback')
         : gestureId;
@@ -136,11 +153,18 @@ class KundiVoiceAssistantCoordinator
 
   Future<void> openAppSettings() => _speech.openAppSettings();
 
-  Future<void> endHold() => _speech.stop();
+  Future<void> endHold() {
+    _holdGeneration++;
+    return _speech.stop();
+  }
 
   Future<void> cancel() async {
     _operationGeneration++;
-    await _speech.cancel();
+    _holdGeneration++;
+    // Invalidate recognition immediately, before awaiting the native TTS stop.
+    final recognitionCancelled = _speech.cancel();
+    await _interruptSpeech?.call();
+    await recognitionCancelled;
     _settleBehavior();
   }
 
@@ -162,8 +186,7 @@ class KundiVoiceAssistantCoordinator
     final requestId = recognized.requestId;
     final text = recognized.finalText.trim();
     final correlation = _speech.correlationFor(requestId);
-    final finalOrdinal = (_finalResultOrdinals[requestId] ?? 0) + 1;
-    _finalResultOrdinals[requestId] = finalOrdinal;
+    final finalOrdinal = (_terminal[requestId] ?? 0) + 1;
     if (_disposed || requestId.isEmpty || text.isEmpty) {
       KundiVoiceQaTelemetry.event(
         'finalResultSuppressed',
@@ -177,7 +200,9 @@ class KundiVoiceAssistantCoordinator
       );
       return;
     }
-    if (!_sentRequestIds.add(requestId)) {
+    if (_activeSendId != null ||
+        _terminal.contains(requestId) ||
+        requestId != _speech.state.requestId) {
       KundiVoiceQaTelemetry.event(
         'finalResultSuppressed',
         gestureId: correlation?.gestureId,
@@ -190,6 +215,7 @@ class KundiVoiceAssistantCoordinator
       );
       return;
     }
+    _activeSendId = requestId;
     KundiVoiceQaTelemetry.event(
       'finalResultAccepted',
       gestureId: correlation?.gestureId,
@@ -231,6 +257,8 @@ class KundiVoiceAssistantCoordinator
         _behavior(KundiBehaviorEventType.assistantFailure, requestId);
       }
     } finally {
+      if (!_disposed) _terminal.add(requestId, finalOrdinal);
+      if (_activeSendId == requestId) _activeSendId = null;
       if (!_disposed &&
           generation == _operationGeneration &&
           _speech.state.status != KundiSpeechRecognitionStatus.error) {
@@ -253,7 +281,10 @@ class KundiVoiceAssistantCoordinator
     if (_disposed) return;
     _disposed = true;
     _operationGeneration++;
+    _holdGeneration++;
     _removeListener();
+    _terminal.clear();
+    _activeSendId = null;
     KundiVoiceQaTelemetry.coordinatorDisposed(_coordinatorInstanceId);
     unawaited(_speech.cancel());
     super.dispose();

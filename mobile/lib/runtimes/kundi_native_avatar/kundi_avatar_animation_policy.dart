@@ -21,6 +21,12 @@ final class KundiAvatarAnimationDecision {
 
 /// Renderer-neutral mapping between product cues and the GLB animation set.
 abstract final class KundiAvatarAnimationPolicy {
+  /// GLB quaternion audit (camera at +Z) found only Talking2 keeps the Home
+  /// torso frontal: hips/chest stay within about 3 degrees of the camera.
+  /// Talking and Talking3 carry persistent positive torso/head yaw and remain
+  /// available in the asset for a future fullscreen animation pass.
+  static const Set<int> frontalTalkingVariants = <int>{2};
+
   static KundiAvatarAnimationDecision resolve({
     required String cueName,
     required String identity,
@@ -54,7 +60,8 @@ abstract final class KundiAvatarAnimationPolicy {
 
   static int talkingVariant(String identity) {
     final hash = identity.codeUnits.fold<int>(0, (sum, value) => sum + value);
-    return (hash % 3) + 1;
+    final variants = frontalTalkingVariants.toList(growable: false)..sort();
+    return variants[hash % variants.length];
   }
 }
 

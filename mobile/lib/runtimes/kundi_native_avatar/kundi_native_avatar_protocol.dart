@@ -11,6 +11,7 @@ enum KundiNativeAvatarEmotion {
 }
 
 enum KundiNativeAvatarViseme {
+  neutral('Neutral'),
   a('A'),
   i('I'),
   u('U'),
@@ -29,12 +30,13 @@ final class KundiNativeAvatarEnvelope {
   static Map<String, Object> command(
     String name, [
     Map<String, Object> payload = const {},
-  ]) => <String, Object>{
-    'version': version,
-    'kind': 'command',
-    'name': name,
-    'payload': payload,
-  };
+  ]) =>
+      <String, Object>{
+        'version': version,
+        'kind': 'command',
+        'name': name,
+        'payload': payload,
+      };
 }
 
 final class KundiNativeAvatarEvent {

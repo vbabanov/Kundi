@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../assistant/application/kundi_tts_coordinator.dart';
+import '../../../../runtimes/kundi_tts/kundi_tts_avatar_driver.dart';
 
 import '../../../../runtimes/kundi_native_avatar/kundi_first_paint_notifier.dart';
 import '../../../../runtimes/kundi_native_avatar/kundi_avatar_animation_policy.dart';
@@ -94,6 +96,7 @@ class KundiHomeHero extends StatelessWidget {
     this.onAvatarLongPressCancel,
     this.voiceStatusText = '',
     this.voiceListening = false,
+    this.ttsState = const KundiTtsState(),
     this.semanticState,
     this.realtimeAvatarEnabled = false,
     this.realtimeAvatarPreparing = false,
@@ -119,6 +122,7 @@ class KundiHomeHero extends StatelessWidget {
   final VoidCallback? onAvatarLongPressCancel;
   final String voiceStatusText;
   final bool voiceListening;
+  final KundiTtsState ttsState;
   final String? semanticState;
   final bool realtimeAvatarEnabled;
   final bool realtimeAvatarPreparing;
@@ -236,6 +240,7 @@ class KundiHomeHero extends StatelessWidget {
                           : const <BoxShadow>[],
                     ),
                     child: _KundiHomeAvatar(
+                      ttsState: ttsState,
                       assetPath: assetPath,
                       realtimeEnabled: realtimeAvatarEnabled,
                       realtimePreparing: realtimeAvatarPreparing,
@@ -283,6 +288,7 @@ class KundiHomeHero extends StatelessWidget {
 
 class _KundiHomeAvatar extends StatefulWidget {
   const _KundiHomeAvatar({
+    required this.ttsState,
     required this.assetPath,
     required this.realtimeEnabled,
     required this.realtimePreparing,
@@ -292,6 +298,7 @@ class _KundiHomeAvatar extends StatefulWidget {
     required this.animationIdentity,
   });
 
+  final KundiTtsState ttsState;
   final String assetPath;
   final bool realtimeEnabled;
   final bool realtimePreparing;
@@ -305,6 +312,7 @@ class _KundiHomeAvatar extends StatefulWidget {
 }
 
 class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
+  final _ttsDriver = KundiTtsAvatarDriver();
   static const Duration _greetingDuration = Duration(milliseconds: 2600);
 
   KundiNativeAvatarController? _controller;
@@ -346,6 +354,16 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   @override
   void didUpdateWidget(covariant _KundiHomeAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.ttsState != widget.ttsState &&
+        (oldWidget.ttsState.active || widget.ttsState.active)) {
+      _greetingTimer?.cancel();
+      if (_modelReady &&
+          _transition.handoffCompleted &&
+          widget.isVisible &&
+          _controller != null) {
+        unawaited(_ttsDriver.apply(_controller!, widget.ttsState));
+      }
+    }
     if (oldWidget.isVisible && !widget.isVisible) {
       _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
     } else if (oldWidget.animationCueName != widget.animationCueName ||
@@ -364,6 +382,7 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
 
   @override
   void dispose() {
+    _ttsDriver.invalidate();
     _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
     _greetingTimer?.cancel();
     unawaited(_events?.cancel());
@@ -442,6 +461,7 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   }
 
   void _onControllerCreated(KundiNativeAvatarController controller) {
+    _ttsDriver.invalidate();
     final previousController = _controller;
     if (previousController != null &&
         !identical(previousController, controller)) {
@@ -716,6 +736,12 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
     if (!_modelReady || !widget.isVisible || !_transition.handoffCompleted) {
       return;
     }
+    if (widget.ttsState.active) {
+      _greetingTimer?.cancel();
+      await _ttsDriver.apply(controller, widget.ttsState);
+      return;
+    }
+    _ttsDriver.invalidate();
     await controller.resetFace();
     final decision = KundiAvatarAnimationPolicy.resolve(
       cueName: widget.animationCueName,

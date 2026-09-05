@@ -121,6 +121,7 @@ class AssistantMessageResult {
     required this.suggestions,
     this.followUpQuestion = '',
     this.session,
+    this.replayed = false,
   });
 
   final AssistantMessageEntity userMessage;
@@ -132,6 +133,7 @@ class AssistantMessageResult {
   final String animationCue;
   final List<String> suggestions;
   final AssistantSessionEntity? session;
+  final bool replayed;
 }
 
 enum AssistantInputMode {

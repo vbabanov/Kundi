@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import 'kundi_system_speech_transport.dart';
 import 'kundi_voice_qa_telemetry.dart';
+import 'terminal_request_cache.dart';
 
 enum KundiSpeechRecognitionStatus {
   idle,
@@ -71,6 +72,8 @@ class KundiSystemSpeechController
         super(const KundiSpeechRecognitionState()) {
     KundiVoiceQaTelemetry.subscriptionCreated(_speechSubscriptionId);
     _events = _transport.events.listen(_handleEvent, onError: (_) {
+      if (_disposed) return;
+      _finishActive();
       state = state.copyWith(
         status: KundiSpeechRecognitionStatus.error,
         errorCode: 'unknown',
@@ -83,21 +86,32 @@ class KundiSystemSpeechController
   final String _speechSubscriptionId =
       KundiVoiceQaTelemetry.nextId('speech-subscription');
   late final StreamSubscription<KundiSystemSpeechEvent> _events;
-  final Map<String, KundiVoiceCorrelation> _correlations =
-      <String, KundiVoiceCorrelation>{};
-  final Map<String, int> _finalResultOrdinals = <String, int>{};
+  final _terminal = TerminalRequestCache<KundiVoiceCorrelation?>();
+  String? _activeRequestId;
+  KundiVoiceCorrelation? _activeCorrelation;
+  int get terminalRequestCount => _terminal.length;
   bool _disposed = false;
   bool _beginning = false;
   int _operationGeneration = 0;
 
   KundiVoiceCorrelation? correlationFor(String requestId) =>
-      _correlations[requestId];
+      requestId == _activeRequestId ? _activeCorrelation : _terminal[requestId];
+
+  void _finishActive() {
+    final id = _activeRequestId;
+    if (id != null) _terminal.add(id, _activeCorrelation);
+    _activeRequestId = null;
+    _activeCorrelation = null;
+  }
 
   Future<KundiVoiceStartOutcome> begin(
     String locale, {
     KundiVoiceCorrelation? correlation,
   }) async {
-    if (_disposed || _beginning || _isActive(state.status)) {
+    if (_disposed ||
+        _beginning ||
+        _isActive(state.status) ||
+        state.status == KundiSpeechRecognitionStatus.sending) {
       return KundiVoiceStartOutcome.busy;
     }
     _beginning = true;
@@ -130,7 +144,9 @@ class KundiSystemSpeechController
         return KundiVoiceStartOutcome.permissionExplanationRequired;
       }
       final requestId = _uuid.v4();
-      if (correlation != null) _correlations[requestId] = correlation;
+      _finishActive();
+      _activeRequestId = requestId;
+      _activeCorrelation = correlation;
       KundiVoiceQaTelemetry.event(
         'recognitionStartRequested',
         gestureId: correlation?.gestureId,
@@ -157,6 +173,7 @@ class KundiSystemSpeechController
         return KundiVoiceStartOutcome.busy;
       }
       if (!accepted) {
+        _finishActive();
         state = state.copyWith(
           status: KundiSpeechRecognitionStatus.error,
           errorCode: 'unavailable',
@@ -177,6 +194,7 @@ class KundiSystemSpeechController
       return KundiVoiceStartOutcome.listening;
     } catch (_) {
       if (_isCurrent(generation)) {
+        _finishActive();
         state = state.copyWith(
           status: KundiSpeechRecognitionStatus.error,
           errorCode: 'unavailable',
@@ -223,7 +241,7 @@ class KundiSystemSpeechController
 
   Future<void> stop() async {
     if (!_isActive(state.status)) return;
-    final correlation = _correlations[state.requestId];
+    final correlation = correlationFor(state.requestId);
     KundiVoiceQaTelemetry.event(
       'recognitionStopRequested',
       gestureId: correlation?.gestureId,
@@ -240,6 +258,7 @@ class KundiSystemSpeechController
   Future<void> cancel() async {
     if (_disposed) return;
     _operationGeneration++;
+    _finishActive();
     try {
       await _transport.cancelListening();
     } catch (_) {
@@ -254,11 +273,13 @@ class KundiSystemSpeechController
   }
 
   void settle() {
+    _finishActive();
     state = const KundiSpeechRecognitionState(
         status: KundiSpeechRecognitionStatus.ready);
   }
 
   void fail(String code) {
+    _finishActive();
     state = state.copyWith(
       status: KundiSpeechRecognitionStatus.error,
       errorCode: code,
@@ -267,9 +288,9 @@ class KundiSystemSpeechController
 
   void _handleEvent(KundiSystemSpeechEvent event) {
     if (_disposed) return;
-    if (event.requestId.isNotEmpty && event.requestId != state.requestId) {
+    if (event.requestId.isEmpty || event.requestId != _activeRequestId) {
       if (event.name == 'finalResult') {
-        final correlation = _correlations[event.requestId];
+        final correlation = correlationFor(event.requestId);
         KundiVoiceQaTelemetry.event(
           'finalResultSuppressed',
           gestureId: correlation?.gestureId,
@@ -296,9 +317,9 @@ class KundiSystemSpeechController
         state = state.copyWith(status: KundiSpeechRecognitionStatus.processing);
       case 'finalResult':
         final text = (event.payload['text'] ?? '').toString().trim();
-        final ordinal = (_finalResultOrdinals[event.requestId] ?? 0) + 1;
-        _finalResultOrdinals[event.requestId] = ordinal;
-        final correlation = _correlations[event.requestId];
+        const ordinal = 1;
+        final correlation = correlationFor(event.requestId);
+        _finishActive();
         KundiVoiceQaTelemetry.event(
           'finalResultReceived',
           gestureId: correlation?.gestureId,
@@ -317,9 +338,11 @@ class KundiSystemSpeechController
           );
         }
       case 'recognitionCancelled':
+        _finishActive();
         state = const KundiSpeechRecognitionState();
       case 'noSpeech':
       case 'recognitionError':
+        _finishActive();
         state = state.copyWith(
           status: KundiSpeechRecognitionStatus.error,
           errorCode: (event.payload['code'] ?? 'unknown').toString(),
@@ -340,6 +363,9 @@ class KundiSystemSpeechController
     if (_disposed) return;
     _disposed = true;
     _operationGeneration++;
+    _activeRequestId = null;
+    _activeCorrelation = null;
+    _terminal.clear();
     unawaited(_events.cancel());
     KundiVoiceQaTelemetry.subscriptionCancelled(_speechSubscriptionId);
     unawaited(_transport.cancelListening());

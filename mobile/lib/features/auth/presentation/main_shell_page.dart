@@ -10,7 +10,7 @@ import '../../../shared/theme/kundi_tokens.dart';
 import '../../grades/application/grades_controller.dart';
 import '../../grades/presentation/grades_page.dart';
 import '../../assistant/assistant_feature.dart';
-import '../../assistant/application/assistant_controller.dart';
+import '../../assistant/application/assistant_voice_locale_resolver.dart';
 import '../../assistant/application/kundi_voice_assistant_coordinator.dart';
 import '../../assistant/presentation/assistant_page.dart';
 import '../../homework/application/homework_controller.dart';
@@ -68,6 +68,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   int? _tapSuppressionGeneration;
   String _activePointerSequenceId = '';
   String _activeGestureId = '';
+  bool _voiceLocalePreparing = false;
 
   static const _rootLabels = <String>[
     'ДЗ',
@@ -357,20 +358,27 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
       gestureGeneration: gesture.generation,
     );
     HapticFeedback.mediumImpact();
-    final locale = ref
-            .read(assistantControllerProvider)
-            .valueOrNull
-            ?.activeSession
-            ?.locale ??
-        'ru-KZ';
+    if (mounted) setState(() => _voiceLocalePreparing = true);
+    final resolution =
+        await ref.read(assistantVoiceLocaleResolverProvider).resolve();
+    if (!mounted || !_isActiveVoiceGesture(gesture.generation)) return;
+    setState(() => _voiceLocalePreparing = false);
+    KundiVoiceQaTelemetry.event(
+      'voiceLocaleResolved',
+      gestureId: gesture.gestureId,
+      pointerSequenceId: gesture.pointerSequenceId,
+      gestureGeneration: gesture.generation,
+      sessionLocale: resolution.locale,
+      outcome: resolution.source.name,
+    );
     final outcome = await ref
         .read(kundiVoiceAssistantCoordinatorProvider.notifier)
         .beginHold(
-          locale,
+          resolution.locale,
           gestureId: gesture.gestureId,
           pointerSequenceId: gesture.pointerSequenceId,
         );
-    if (!mounted || _hasNewerVoiceGesture(gesture.generation)) return;
+    if (!mounted || !_isActiveVoiceGesture(gesture.generation)) return;
     switch (outcome) {
       case KundiVoiceStartOutcome.permissionExplanationRequired:
         _finishVoiceGesture(
@@ -412,6 +420,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   bool _hasNewerVoiceGesture(int generation) =>
       generation != _voiceGestureGeneration;
 
+  bool _isActiveVoiceGesture(int generation) =>
+      _activeVoiceGesture?.generation == generation;
+
   bool _finishVoiceGesture(
     int generation, {
     required String reason,
@@ -421,6 +432,10 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     if (gesture == null || gesture.generation != generation) return false;
 
     _activeVoiceGesture = null;
+    if (_voiceLocalePreparing) {
+      _voiceLocalePreparing = false;
+      if (mounted && reason != 'dispose') setState(() {});
+    }
     KundiVoiceQaTelemetry.event(
       'voiceGestureFinalized',
       gestureId: gesture.gestureId,
@@ -574,6 +589,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   }
 
   String _voiceStatus(KundiSpeechRecognitionState speech) {
+    if (_voiceLocalePreparing) return 'Подготавливаю Kundi…';
     return switch (speech.status) {
       KundiSpeechRecognitionStatus.listening => speech.partialText.isEmpty
           ? 'Я слушаю… Говори, пока удерживаешь Kundi'

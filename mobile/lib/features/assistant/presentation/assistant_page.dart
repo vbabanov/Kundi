@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/assistant_controller.dart';
+import '../application/kundi_tts_coordinator.dart';
 import '../domain/assistant_entity.dart';
 
 class AssistantPage extends ConsumerStatefulWidget {
@@ -16,6 +19,14 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   final ScrollController _scrollController = ScrollController();
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(
+      ref.read(assistantControllerProvider.notifier).revalidateOnPageOpen(),
+    );
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
@@ -25,6 +36,9 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(assistantControllerProvider);
+    final speechError = ref.watch(kundiTtsEnabledProvider)
+        ? ref.watch(kundiTtsCoordinatorProvider.select((s) => s.errorMessage))
+        : '';
     ref.listen(assistantControllerProvider, (previous, next) {
       final before = previous?.valueOrNull?.messages.length ?? 0;
       final after = next.valueOrNull?.messages.length ?? 0;
@@ -67,7 +81,17 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         ),
         data: (view) => Column(
           children: [
+            if (view.isRefreshing) const LinearProgressIndicator(minHeight: 2),
             Expanded(child: _messageList(view)),
+            if (view.refreshErrorMessage.isNotEmpty)
+              _TransportError(
+                message: view.refreshErrorMessage,
+                onRetry: () => ref
+                    .read(assistantControllerProvider.notifier)
+                    .retryHistoryRefresh(),
+              ),
+            if (speechError.isNotEmpty)
+              _TransportError(message: speechError, onRetry: null),
             if (view.errorMessage.isNotEmpty)
               _TransportError(
                 message: view.errorMessage,
