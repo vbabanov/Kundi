@@ -2,6 +2,7 @@ package com.kundi.kundi_mobile
 
 import com.kundi.kundi_mobile.avatar.KundiNativeAvatarHost
 import com.kundi.kundi_mobile.speech.KundiSystemSpeechHost
+import com.kundi.kundi_mobile.tts.KundiTtsHost
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
@@ -9,6 +10,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         KundiNativeAvatarHost.register(this, flutterEngine)
+        KundiTtsHost.register(this, flutterEngine)
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.register(this, flutterEngine)
         }
@@ -20,6 +22,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onPause() {
+        KundiTtsHost.onPause()
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.onPause()
         }
@@ -43,6 +46,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        KundiTtsHost.onDestroy()
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.onActivityDestroy(this)
         }

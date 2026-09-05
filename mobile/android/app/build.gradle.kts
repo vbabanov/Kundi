@@ -17,6 +17,9 @@ val kundiVoiceInputEnabled =
         .map { it.equals("true", ignoreCase = true) }
         .orElse(false)
         .get()
+val kundiTtsEnabled = providers.gradleProperty("ENABLE_KUNDI_TTS")
+    .orElse(providers.environmentVariable("ENABLE_KUNDI_TTS"))
+    .map { it.equals("true", ignoreCase = true) }.orElse(false).get()
 val kundiHomeAvatarGracePeriodMillis =
     providers.gradleProperty("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS")
         .orElse(providers.environmentVariable("KUNDI_HOME_AVATAR_GRACE_PERIOD_MS"))
@@ -41,6 +44,17 @@ val prepareKundiHomeAvatarAsset =
 
 android {
     namespace = "com.kundi.kundi_mobile"
+    sourceSets.getByName("main").java.srcDir(if (kundiTtsEnabled) "src/tts/kotlin" else "src/ttsOff/kotlin")
+    if (kundiTtsEnabled) sourceSets.getByName("test").java.srcDir("src/ttsTest/kotlin")
+    if (kundiTtsEnabled) {
+        // JAR indexes are unused on Android; preserve Netty version metadata.
+        packaging.resources.excludes += "META-INF/INDEX.LIST"
+        packaging.resources.merges += "META-INF/io.netty.versions.properties"
+        packaging.jniLibs.excludes += setOf(
+            "**/libMicrosoft.CognitiveServices.Speech.extension.kws*.so",
+            "**/libMicrosoft.CognitiveServices.Speech.extension.silk_codec.so",
+        )
+    }
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -62,7 +76,8 @@ android {
         applicationId = "com.kundi.kundi_mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // SDK 1.51.1's Azure-core/Netty use MethodHandle APIs (Android O).
+        minSdk = if (kundiTtsEnabled) maxOf(26, flutter.minSdkVersion) else flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -93,8 +108,11 @@ android {
             } else {
                 "com.kundi.kundi_mobile.DISABLED_VOICE_INPUT"
             }
-        if (kundiHomeRealtimeAvatarEnabled) {
+        // Flutter filters its own binaries; the SDK AAR also needs the requested ABI.
+        if (kundiHomeRealtimeAvatarEnabled || (kundiTtsEnabled &&
+            providers.gradleProperty("target-platform").orElse("").get() == "android-arm64")) {
             ndk {
+                abiFilters.clear()
                 abiFilters += "arm64-v8a"
             }
         }
@@ -117,6 +135,7 @@ android {
 
     buildTypes {
         release {
+            if (kundiTtsEnabled) proguardFiles("tts-proguard-rules.pro")
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
@@ -137,6 +156,9 @@ flutter {
 }
 
 dependencies {
+    if (kundiTtsEnabled) {
+        implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.1")
+    }
     testImplementation("junit:junit:4.13.2")
     if (kundiHomeRealtimeAvatarEnabled) {
         implementation("com.google.android.filament:filament-android:1.74.0")
