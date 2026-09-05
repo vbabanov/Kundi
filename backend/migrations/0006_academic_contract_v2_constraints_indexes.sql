@@ -1,7 +1,10 @@
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_academic_results_result_kind_non_blank'
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_academic_results_result_kind_non_blank'
+      AND conrelid = 'academic_results'::regclass
   ) THEN
     ALTER TABLE academic_results
       ADD CONSTRAINT chk_academic_results_result_kind_non_blank
@@ -12,7 +15,10 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_academic_results_identity_present'
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_academic_results_identity_present'
+      AND conrelid = 'academic_results'::regclass
   ) THEN
     ALTER TABLE academic_results
       ADD CONSTRAINT chk_academic_results_identity_present
@@ -27,7 +33,10 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_academic_aggregates_kind_dimensions'
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_academic_aggregates_kind_dimensions'
+      AND conrelid = 'academic_aggregates'::regclass
   ) THEN
     ALTER TABLE academic_aggregates
       ADD CONSTRAINT chk_academic_aggregates_kind_dimensions
@@ -41,7 +50,10 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_academic_result_evidence_owner'
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_academic_result_evidence_owner'
+      AND conrelid = 'academic_result_evidence'::regclass
   ) THEN
     ALTER TABLE academic_result_evidence
       ADD CONSTRAINT chk_academic_result_evidence_owner
@@ -55,7 +67,10 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_attendance_normalized_status'
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_attendance_normalized_status'
+      AND conrelid = 'attendance_events'::regclass
   ) THEN
     ALTER TABLE attendance_events
       ADD CONSTRAINT chk_attendance_normalized_status

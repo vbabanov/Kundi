@@ -106,6 +106,36 @@ func TestV2SQLConstraintsWithRealPostgresIfConfigured(t *testing.T) {
 	}
 	defer conn.Release()
 
+	constraints := []struct{ table, name string }{
+		{"academic_results", "chk_academic_results_result_kind_non_blank"},
+		{"academic_results", "chk_academic_results_identity_present"},
+		{"academic_aggregates", "chk_academic_aggregates_kind_dimensions"},
+		{"academic_result_evidence", "chk_academic_result_evidence_owner"},
+		{"attendance_events", "chk_attendance_normalized_status"},
+	}
+	assertConstraints := func(schemaName string) {
+		t.Helper()
+		for _, constraint := range constraints {
+			var exists bool
+			err := conn.QueryRow(ctx, `
+				SELECT EXISTS (
+					SELECT 1 FROM pg_constraint c
+					JOIN pg_class r ON r.oid = c.conrelid
+					JOIN pg_namespace n ON n.oid = r.relnamespace
+					WHERE n.nspname = $1 AND r.relname = $2 AND c.conname = $3
+				)
+			`, schemaName, constraint.table, constraint.name).Scan(&exists)
+			if err != nil {
+				t.Fatalf("inspect constraint %s on %s.%s: %v", constraint.name, schemaName, constraint.table, err)
+			}
+			if !exists {
+				t.Fatalf("missing constraint %s on %s.%s", constraint.name, schemaName, constraint.table)
+			}
+		}
+	}
+	// Same-named public constraints must not suppress constraints in the new schema.
+	assertConstraints("public")
+
 	if _, err := conn.Exec(ctx, fmt.Sprintf(`CREATE SCHEMA "%s"`, schema)); err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
@@ -129,6 +159,7 @@ func TestV2SQLConstraintsWithRealPostgresIfConfigured(t *testing.T) {
 			t.Fatalf("exec migration %s: %v", file, execErr)
 		}
 	}
+	assertConstraints(schema)
 
 	studentID := uuid.New()
 	_, err = conn.Exec(ctx, `INSERT INTO students(id, external_student_ref) VALUES ($1, 'ext-1')`, studentID)
