@@ -56,7 +56,7 @@ jobs:
           cache: true
 
       - name: Precache Flutter Linux test artifacts
-        run: flutter precache --linux
+        run: flutter precache --linux --universal
 
       - name: Pub get
         run: flutter pub get
