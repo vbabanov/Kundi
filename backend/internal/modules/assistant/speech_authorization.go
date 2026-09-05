@@ -39,7 +39,7 @@ func (r *PostgresSessionRepository) SpeechMessage(ctx context.Context, studentID
 }
 
 func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRaw, messageRaw string) (speechauth.Authorization, error) {
-	if !s.Enabled() || !s.voiceEnabled || !s.speechBroker.Enabled() {
+	if !s.Enabled() || !s.voiceEnabled || s.speechBroker == nil || !s.speechBroker.Enabled() {
 		return speechauth.Authorization{}, apperrors.NotFound("assistant_tts_disabled", "speech is not enabled")
 	}
 	student, session, err := s.sessionIDs(studentRaw, sessionRaw)

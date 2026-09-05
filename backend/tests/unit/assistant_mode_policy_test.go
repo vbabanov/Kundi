@@ -11,10 +11,11 @@ import (
 )
 
 func TestAssistantModeRoutingAndGradeBand(t *testing.T) {
-	svc := assistant.NewService(
+	svc := assistant.NewServiceWithOptions(
 		persona.NewService(),
 		llm.NewDeterministicProvider(),
 		tts.NewService(""),
+		assistant.Options{CanaryGate: assistant.AllowAllCanaryGate()},
 	)
 
 	tutor, err := svc.Message(context.Background(), assistant.MessageCommand{
@@ -57,10 +58,11 @@ func TestAssistantModeRoutingAndGradeBand(t *testing.T) {
 }
 
 func TestAssistantModerationRestriction(t *testing.T) {
-	svc := assistant.NewService(
+	svc := assistant.NewServiceWithOptions(
 		persona.NewService(),
 		llm.NewDeterministicProvider(),
 		tts.NewService(""),
+		assistant.Options{CanaryGate: assistant.AllowAllCanaryGate()},
 	)
 
 	response, err := svc.Message(context.Background(), assistant.MessageCommand{

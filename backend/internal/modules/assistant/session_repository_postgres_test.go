@@ -42,7 +42,7 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 	}
 	provider := &capturingSessionProvider{text: "Начни с общего знаменателя."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repository,
 		AcademicContext: staticAcademicContext{context: AcademicContext{Locale: "ru-KZ", GradeLevel: 7}},
 	})

@@ -32,7 +32,7 @@ func TestAssistantEndpointHappyPath(t *testing.T) {
 			persona.NewService(),
 			llm.NewDeterministicProvider(),
 			integrationTrustedTTS{},
-			assistantmodule.Options{AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
+			assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(), AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
 		),
 	}
 

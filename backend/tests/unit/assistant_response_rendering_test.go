@@ -16,7 +16,7 @@ func TestAssistantRenderingContracts(t *testing.T) {
 		persona.NewService(),
 		llm.NewDeterministicProvider(),
 		trustedTTS{},
-		assistant.Options{AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
+		assistant.Options{CanaryGate: assistant.AllowAllCanaryGate(), AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"})},
 	)
 
 	tutor, err := svc.Message(context.Background(), assistant.MessageCommand{
@@ -63,10 +63,11 @@ func (trustedTTS) Render(context.Context, string) (string, error) {
 }
 
 func TestAssistantTTSFailureFallbackContract(t *testing.T) {
-	svc := assistant.NewService(
+	svc := assistant.NewServiceWithOptions(
 		persona.NewService(),
 		llm.NewDeterministicProvider(),
 		failingTTS{},
+		assistant.Options{CanaryGate: assistant.AllowAllCanaryGate()},
 	)
 
 	resp, err := svc.Message(context.Background(), assistant.MessageCommand{

@@ -338,12 +338,15 @@ func (s *Service) sessionStudentID(raw string) (uuid.UUID, error) {
 	if !s.Enabled() {
 		return uuid.Nil, apperrors.NotFound("assistant_disabled", "assistant is not enabled")
 	}
-	if s.sessions == nil {
-		return uuid.Nil, apperrors.Internal("assistant_storage_unavailable", "assistant storage is unavailable", errors.New("session repository is nil"))
-	}
 	id, err := uuid.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return uuid.Nil, apperrors.Unauthorized("unauthorized", "invalid authorization context")
+	}
+	if !s.canaryGate.Allows(id) {
+		return uuid.Nil, assistantUnavailable()
+	}
+	if s.sessions == nil {
+		return uuid.Nil, apperrors.Internal("assistant_storage_unavailable", "assistant storage is unavailable", errors.New("session repository is nil"))
 	}
 	return id, nil
 }

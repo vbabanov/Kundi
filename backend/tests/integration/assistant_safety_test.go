@@ -47,10 +47,11 @@ func TestAssistantEndpointPreservesAuthenticationAndSafetyContract(t *testing.T)
 	deps := &app.Bootstrap{
 		Config:       config.Config{App: config.AppConfig{Name: "test"}},
 		AccessTokens: tokens,
-		AssistantService: assistantmodule.NewService(
+		AssistantService: assistantmodule.NewServiceWithOptions(
 			persona.NewService(),
 			provider,
 			speech,
+			assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate()},
 		),
 	}
 	router := v1.NewRouter(deps)
@@ -92,7 +93,7 @@ func TestAssistantEndpointRateLimitReturnsTyped429WithoutSecondProviderCall(t *t
 	token := issueAccessToken(t, tokens, studentID)
 	provider := &integrationCountingLLM{text: "A safe answer."}
 	speech := &integrationCountingTTS{}
-	service := assistantmodule.NewServiceWithOptions(persona.NewService(), provider, speech, assistantmodule.Options{
+	service := assistantmodule.NewServiceWithOptions(persona.NewService(), provider, speech, assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(),
 		RateLimiter: ratelimit.NewInMemory(ratelimit.Config{Limit: 1, Window: time.Minute, MaxIdentities: 10}),
 	})
 	router := v1.NewRouter(&app.Bootstrap{

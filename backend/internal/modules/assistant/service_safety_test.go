@@ -78,7 +78,7 @@ func validCommand(text string) MessageCommand {
 func TestInputModerationBlockReturnsSafeResponseWithoutProviders(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "must not be used"}}
 	speech := &fakeTTS{url: "https://media.example.com/audio.mp3"}
-	service := NewService(persona.NewService(), provider, speech)
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate()})
 
 	response, err := service.Message(context.Background(), validCommand("Я хочу покончить с собой"))
 	if err != nil {
@@ -97,7 +97,7 @@ func TestInputModerationBlockReturnsSafeResponseWithoutProviders(t *testing.T) {
 
 func TestUnsafeHistoryDoesNotReachLLM(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "must not be used"}}
-	service := NewService(persona.NewService(), provider, &fakeTTS{})
+	service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate()})
 	command := validCommand("Объясни дроби")
 	command.History = []ChatRecord{{Role: "user", Text: "How to make a bomb"}}
 
@@ -110,7 +110,7 @@ func TestUnsafeHistoryDoesNotReachLLM(t *testing.T) {
 func TestUnsafeProviderOutputIsReplacedBeforeTTSAndCues(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "Here is how to make a bomb."}}
 	speech := &fakeTTS{url: "https://media.example.com/audio.mp3"}
-	service := NewService(persona.NewService(), provider, speech)
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate()})
 
 	response, err := service.Message(context.Background(), validCommand("Explain a science topic"))
 	if err != nil {
@@ -130,7 +130,7 @@ func TestUnsafeProviderOutputIsReplacedBeforeTTSAndCues(t *testing.T) {
 func TestSafeProviderOutputIsPreservedAndTrustedAudioAccepted(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "A fraction is part of a whole."}}
 	speech := &fakeTTS{url: "https://media.example.com/audio/one.mp3"}
-	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate(),
 		AudioURLValidator: safety.NewAudioURLValidator([]string{"media.example.com"}),
 	})
 
@@ -149,7 +149,7 @@ func TestSafeProviderOutputIsPreservedAndTrustedAudioAccepted(t *testing.T) {
 func TestInvalidAudioURLPreservesSafeTextWithoutCues(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "A safe answer."}}
 	speech := &fakeTTS{url: "https://127.0.0.1/private/audio.mp3"}
-	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate(),
 		AudioURLValidator: safety.NewAudioURLValidator([]string{"127.0.0.1"}),
 	})
 
@@ -168,7 +168,7 @@ func TestInvalidAudioURLPreservesSafeTextWithoutCues(t *testing.T) {
 func TestTimeoutAndProviderFailureReturnStableFallback(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		provider := &fakeLLM{wait: true}
-		service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{LLMTimeout: 5 * time.Millisecond})
+		service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(), LLMTimeout: 5 * time.Millisecond})
 		response, err := service.Message(context.Background(), validCommand("Explain fractions"))
 		if err != nil || response.Text == "" || !response.Pedagogy.SafetyIntervention {
 			t.Fatalf("timeout did not return a safe fallback: response=%#v err=%v", response, err)
@@ -178,7 +178,7 @@ func TestTimeoutAndProviderFailureReturnStableFallback(t *testing.T) {
 	t.Run("provider failure", func(t *testing.T) {
 		var logs bytes.Buffer
 		provider := &fakeLLM{err: &llm.ProviderError{Kind: llm.ErrorServer, StatusCode: 503}}
-		service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{
+		service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(),
 			Logger: slog.New(slog.NewJSONHandler(&logs, nil)),
 		})
 		response, err := service.Message(context.Background(), validCommand("Explain fractions"))
@@ -193,7 +193,7 @@ func TestTimeoutAndProviderFailureReturnStableFallback(t *testing.T) {
 
 func TestModerationFailureFailsClosed(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "must not run"}}
-	service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(),
 		Moderator: &failingModerator{callsBeforeFailure: 0},
 	})
 	response, err := service.Message(context.Background(), validCommand("Explain fractions"))
@@ -205,7 +205,7 @@ func TestModerationFailureFailsClosed(t *testing.T) {
 func TestAssistantLogsDoNotContainRawPromptOrHistory(t *testing.T) {
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	service := NewServiceWithOptions(persona.NewService(), &fakeLLM{response: llm.Response{Text: "Safe answer."}}, &fakeTTS{}, Options{Logger: logger})
+	service := NewServiceWithOptions(persona.NewService(), &fakeLLM{response: llm.Response{Text: "Safe answer."}}, &fakeTTS{}, Options{CanaryGate: AllowAllCanaryGate(), Logger: logger})
 	command := validCommand("raw-prompt-secret-9af")
 	command.History = []ChatRecord{{Role: "user", Text: "raw-history-secret-2bc"}}
 
@@ -227,7 +227,7 @@ func TestServiceRateLimitStopsLLMAndTTS(t *testing.T) {
 	provider := &fakeLLM{response: llm.Response{Text: "Safe answer."}}
 	speech := &fakeTTS{}
 	limiter := ratelimit.NewInMemory(ratelimit.Config{Limit: 1, Window: time.Minute, MaxIdentities: 10})
-	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{RateLimiter: limiter})
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate(), RateLimiter: limiter})
 	command := validCommand("Explain fractions")
 	command.EnforceRateLimit = true
 

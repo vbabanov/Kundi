@@ -23,7 +23,7 @@ func TestAssistantSessionEndpointsCRUD(t *testing.T) {
 	sessionID := uuid.New()
 	repository := &apiSessionRepository{owner: studentID, sessionID: sessionID}
 	enabled := true
-	service := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{
+	service := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repository,
 	})
 	tokens := platformauth.NewAccessTokenService("test-secret", time.Hour)
@@ -59,7 +59,7 @@ func TestAssistantEndpointsAreDisabledWithoutFlag(t *testing.T) {
 	tokens := platformauth.NewAccessTokenService("test-secret", time.Hour)
 	token, _, _ := tokens.Issue(studentID, time.Now().UTC())
 	disabled := false
-	service := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{Enabled: &disabled, SessionRepository: &apiSessionRepository{owner: studentID, sessionID: uuid.New()}})
+	service := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(), Enabled: &disabled, SessionRepository: &apiSessionRepository{owner: studentID, sessionID: uuid.New()}})
 	router := NewRouter(&app.Bootstrap{Config: config.Config{App: config.AppConfig{Name: "test"}}, AccessTokens: tokens, AssistantService: service})
 	assertStatus(t, router, token, http.MethodGet, "/v1/assistant/sessions", "", http.StatusNotFound)
 }
@@ -70,7 +70,7 @@ func TestAssistantSessionVoiceInputContract(t *testing.T) {
 	token, _, _ := tokens.Issue(studentID, time.Now().UTC())
 	enabled, voiceDisabled := true, false
 	disabledRepo := &apiSessionRepository{owner: studentID, sessionID: sessionID}
-	disabledService := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{
+	disabledService := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(),
 		Enabled: &enabled, VoiceInputEnabled: &voiceDisabled, SessionRepository: disabledRepo,
 	})
 	disabledRouter := NewRouter(&app.Bootstrap{Config: config.Config{App: config.AppConfig{Name: "test"}}, AccessTokens: tokens, AssistantService: disabledService})
@@ -84,7 +84,7 @@ func TestAssistantSessionVoiceInputContract(t *testing.T) {
 
 	voiceEnabled := true
 	enabledRepo := &apiSessionRepository{owner: studentID, sessionID: sessionID}
-	enabledService := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{
+	enabledService := assistantmodule.NewServiceWithOptions(persona.NewService(), apiLLM{}, nil, assistantmodule.Options{CanaryGate: assistantmodule.AllowAllCanaryGate(),
 		Enabled: &enabled, VoiceInputEnabled: &voiceEnabled, SessionRepository: enabledRepo,
 	})
 	enabledRouter := NewRouter(&app.Bootstrap{Config: config.Config{App: config.AppConfig{Name: "test"}}, AccessTokens: tokens, AssistantService: enabledService})
@@ -145,33 +145,40 @@ type apiSessionRepository struct {
 	title     string
 	createdAt time.Time
 	updatedAt time.Time
+	calls     int
 }
 
 func (r *apiSessionRepository) StudentProfile(context.Context, uuid.UUID) (assistantmodule.StudentAssistantProfile, error) {
+	r.calls++
 	return assistantmodule.StudentAssistantProfile{Locale: "ru-KZ", GradeLevel: 7}, nil
 }
 func (r *apiSessionRepository) CreateSession(context.Context, uuid.UUID, string, int) (assistantmodule.AssistantSession, error) {
+	r.calls++
 	return r.session(), nil
 }
 func (r *apiSessionRepository) GetSession(_ context.Context, studentID, sessionID uuid.UUID) (assistantmodule.AssistantSession, error) {
+	r.calls++
 	if studentID != r.owner || sessionID != r.sessionID || r.deleted {
 		return assistantmodule.AssistantSession{}, assistantmodule.ErrSessionNotFound
 	}
 	return r.session(), nil
 }
 func (r *apiSessionRepository) ListSessions(_ context.Context, studentID uuid.UUID, _ int, _ *assistantmodule.PageCursor) ([]assistantmodule.AssistantSession, error) {
+	r.calls++
 	if studentID != r.owner || r.deleted {
 		return []assistantmodule.AssistantSession{}, nil
 	}
 	return []assistantmodule.AssistantSession{r.session()}, nil
 }
 func (r *apiSessionRepository) ListMessages(_ context.Context, studentID, sessionID uuid.UUID, _ int, _ *assistantmodule.PageCursor) ([]assistantmodule.SessionMessage, error) {
+	r.calls++
 	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
 		return nil, err
 	}
 	return append([]assistantmodule.SessionMessage(nil), r.messages...), nil
 }
 func (r *apiSessionRepository) DeleteSession(_ context.Context, studentID, sessionID uuid.UUID) error {
+	r.calls++
 	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
 		return err
 	}
@@ -179,6 +186,7 @@ func (r *apiSessionRepository) DeleteSession(_ context.Context, studentID, sessi
 	return nil
 }
 func (r *apiSessionRepository) FindExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID) (assistantmodule.StoredExchange, bool, error) {
+	r.calls++
 	if _, err := r.GetSession(context.Background(), studentID, sessionID); err != nil {
 		return assistantmodule.StoredExchange{}, false, err
 	}
@@ -187,6 +195,7 @@ func (r *apiSessionRepository) FindExchange(_ context.Context, studentID, sessio
 	return value, ok, nil
 }
 func (r *apiSessionRepository) SaveExchange(_ context.Context, studentID, sessionID, clientID uuid.UUID, text, inputMode string, assistant assistantmodule.SessionMessage) (assistantmodule.StoredExchange, error) {
+	r.calls++
 	if r.exchanges == nil {
 		r.exchanges = make(map[uuid.UUID]assistantmodule.StoredExchange)
 	}

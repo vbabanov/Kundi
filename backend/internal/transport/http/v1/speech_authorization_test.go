@@ -17,7 +17,7 @@ func TestSpeechAuthorizationAuthenticatedNoStoreAndOwnRateLimit(t *testing.T) {
 	student, session := uuid.New(), uuid.New()
 	repo := &apiSessionRepository{owner: student, sessionID: session}
 	enabled := true
-	service := assistant.NewServiceWithOptions(nil, nil, nil, assistant.Options{
+	service := assistant.NewServiceWithOptions(nil, nil, nil, assistant.Options{CanaryGate: assistant.AllowAllCanaryGate(),
 		Enabled: &enabled, VoiceInputEnabled: &enabled, SessionRepository: repo,
 		SpeechBroker: speechauth.New(speechauth.Config{Enabled: true}),
 	})

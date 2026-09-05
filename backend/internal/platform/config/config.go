@@ -6,6 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+)
+
+const (
+	AssistantRolloutModeAllowlist = "allowlist"
+	AssistantRolloutModeAll       = "all"
 )
 
 type Config struct {
@@ -57,6 +64,8 @@ type AIConfig struct {
 	AzureSpeechVoiceRU                string
 	AzureSpeechVoiceKK                string
 	AssistantEnabled                  bool
+	AssistantRolloutMode              string
+	AssistantCanaryStudentIDs         []uuid.UUID
 	VoiceInputEnabled                 bool
 	AlemBaseURL                       string
 	AlemAPIKey                        string
@@ -106,6 +115,11 @@ type ObservabilityConfig struct {
 }
 
 func Load() (Config, error) {
+	assistantEnabled := envBool("KUNDI_ASSISTANT_ENABLED", false)
+	rolloutMode, canaryStudentIDs, err := assistantRolloutConfig(assistantEnabled)
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
 		App: AppConfig{
 			Name:         env("APP_NAME", "kundi-backend"),
@@ -140,7 +154,9 @@ func Load() (Config, error) {
 			AzureSpeechEndpoint:               env("AZURE_SPEECH_ENDPOINT", ""),
 			AzureSpeechVoiceRU:                env("AZURE_SPEECH_VOICE_RU", "ru-RU-SvetlanaNeural"),
 			AzureSpeechVoiceKK:                env("AZURE_SPEECH_VOICE_KK", "kk-KZ-AigulNeural"),
-			AssistantEnabled:                  envBool("KUNDI_ASSISTANT_ENABLED", false),
+			AssistantEnabled:                  assistantEnabled,
+			AssistantRolloutMode:              rolloutMode,
+			AssistantCanaryStudentIDs:         canaryStudentIDs,
 			VoiceInputEnabled:                 envBool("KUNDI_VOICE_INPUT_ENABLED", false),
 			AlemBaseURL:                       env("ALEM_BASE_URL", "https://llm.alem.ai/v1"),
 			AlemAPIKey:                        env("ALEM_API_KEY", ""),
@@ -198,6 +214,41 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func assistantRolloutConfig(enabled bool) (string, []uuid.UUID, error) {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("KUNDI_ASSISTANT_ROLLOUT_MODE")))
+	if mode == "" {
+		mode = AssistantRolloutModeAllowlist
+	}
+	if mode != AssistantRolloutModeAllowlist && mode != AssistantRolloutModeAll {
+		return "", nil, fmt.Errorf("KUNDI_ASSISTANT_ROLLOUT_MODE must be allowlist or all")
+	}
+	if mode == AssistantRolloutModeAll || !enabled {
+		return mode, nil, nil
+	}
+
+	raw := strings.TrimSpace(os.Getenv("KUNDI_ASSISTANT_CANARY_STUDENT_IDS"))
+	if raw == "" {
+		return "", nil, fmt.Errorf("KUNDI_ASSISTANT_CANARY_STUDENT_IDS requires at least one UUID when Assistant allowlist rollout is enabled")
+	}
+	seen := make(map[uuid.UUID]struct{})
+	ids := make([]uuid.UUID, 0)
+	for _, item := range strings.Split(raw, ",") {
+		id, err := uuid.Parse(strings.TrimSpace(item))
+		if err != nil || id == uuid.Nil {
+			return "", nil, fmt.Errorf("KUNDI_ASSISTANT_CANARY_STUDENT_IDS must contain only valid UUIDs")
+		}
+		if _, duplicate := seen[id]; duplicate {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return "", nil, fmt.Errorf("KUNDI_ASSISTANT_CANARY_STUDENT_IDS requires at least one UUID when Assistant allowlist rollout is enabled")
+	}
+	return mode, ids, nil
 }
 
 func env(key, fallback string) string {

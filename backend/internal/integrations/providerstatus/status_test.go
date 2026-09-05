@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/kundi/kundi/backend/internal/platform/config"
 )
 
@@ -46,6 +47,7 @@ func TestAzureSpeechTTSReadiness(t *testing.T) {
 	valid := config.AIConfig{
 		KundiTTSEnabled:       true,
 		AssistantEnabled:      true,
+		AssistantRolloutMode:  config.AssistantRolloutModeAll,
 		VoiceInputEnabled:     true,
 		AzureSpeechKeyPrimary: secret,
 		AzureSpeechRegion:     "westus",
@@ -146,12 +148,13 @@ func TestBuildHTTPModesAreReadyWhenSecretsPresent(t *testing.T) {
 
 func TestBuildAlemSeparateKeysAreReady(t *testing.T) {
 	cfg := config.Config{AI: config.AIConfig{
-		AssistantEnabled:   true,
-		AlemBaseURL:        "https://llm.example/v1",
-		AlemPrimaryAPIKey:  "primary-test-key",
-		AlemFallbackAPIKey: "fallback-test-key",
-		AlemPrimaryModel:   "primary-model",
-		AlemFallbackModel:  "fallback-model",
+		AssistantEnabled:     true,
+		AssistantRolloutMode: config.AssistantRolloutModeAll,
+		AlemBaseURL:          "https://llm.example/v1",
+		AlemPrimaryAPIKey:    "primary-test-key",
+		AlemFallbackAPIKey:   "fallback-test-key",
+		AlemPrimaryModel:     "primary-model",
+		AlemFallbackModel:    "fallback-model",
 	}}
 	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
 		t.Fatalf("expected separate Alem credentials to be ready, got %#v", snapshot.LLM)
@@ -160,11 +163,12 @@ func TestBuildAlemSeparateKeysAreReady(t *testing.T) {
 
 func TestBuildAlemRequiresCredentialForConfiguredFallback(t *testing.T) {
 	cfg := config.Config{AI: config.AIConfig{
-		AssistantEnabled:  true,
-		AlemBaseURL:       "https://llm.example/v1",
-		AlemPrimaryAPIKey: "primary-test-key",
-		AlemPrimaryModel:  "primary-model",
-		AlemFallbackModel: "fallback-model",
+		AssistantEnabled:     true,
+		AssistantRolloutMode: config.AssistantRolloutModeAll,
+		AlemBaseURL:          "https://llm.example/v1",
+		AlemPrimaryAPIKey:    "primary-test-key",
+		AlemPrimaryModel:     "primary-model",
+		AlemFallbackModel:    "fallback-model",
 	}}
 	snapshot := Build(cfg)
 	if snapshot.LLM.State != StateMisconfigured || snapshot.LLM.Reason == "" {
@@ -174,12 +178,13 @@ func TestBuildAlemRequiresCredentialForConfiguredFallback(t *testing.T) {
 
 func TestBuildAlemAcceptsSeparateKeys(t *testing.T) {
 	cfg := config.Config{AI: config.AIConfig{
-		AssistantEnabled:   true,
-		AlemBaseURL:        "https://llm.example/v1",
-		AlemPrimaryAPIKey:  "primary-key",
-		AlemFallbackAPIKey: "fallback-key",
-		AlemPrimaryModel:   "primary-model",
-		AlemFallbackModel:  "fallback-model",
+		AssistantEnabled:     true,
+		AssistantRolloutMode: config.AssistantRolloutModeAll,
+		AlemBaseURL:          "https://llm.example/v1",
+		AlemPrimaryAPIKey:    "primary-key",
+		AlemFallbackAPIKey:   "fallback-key",
+		AlemPrimaryModel:     "primary-model",
+		AlemFallbackModel:    "fallback-model",
 	}}
 	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
 		t.Fatalf("expected separate Alem keys to be ready, got %#v", snapshot.LLM)
@@ -188,13 +193,52 @@ func TestBuildAlemAcceptsSeparateKeys(t *testing.T) {
 
 func TestBuildAlemAcceptsLegacySharedKey(t *testing.T) {
 	cfg := config.Config{AI: config.AIConfig{
-		AssistantEnabled:  true,
-		AlemBaseURL:       "https://llm.example/v1",
-		AlemAPIKey:        "shared-key",
-		AlemPrimaryModel:  "primary-model",
-		AlemFallbackModel: "fallback-model",
+		AssistantEnabled:     true,
+		AssistantRolloutMode: config.AssistantRolloutModeAll,
+		AlemBaseURL:          "https://llm.example/v1",
+		AlemAPIKey:           "shared-key",
+		AlemPrimaryModel:     "primary-model",
+		AlemFallbackModel:    "fallback-model",
 	}}
 	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
 		t.Fatalf("expected legacy shared Alem key to be ready, got %#v", snapshot.LLM)
+	}
+}
+
+func TestAssistantAllowlistReadinessFailsClosed(t *testing.T) {
+	base := config.Config{
+		AI: config.AIConfig{
+			AssistantEnabled:     true,
+			AssistantRolloutMode: config.AssistantRolloutModeAllowlist,
+			AlemBaseURL:          "https://llm.example/v1",
+			AlemPrimaryAPIKey:    "test-key",
+			AlemPrimaryModel:     "test-model",
+		},
+		Observability: config.ObservabilityConfig{Mode: "log"},
+	}
+	tests := []struct {
+		name   string
+		mutate func(*config.Config)
+	}{
+		{name: "empty allowlist"},
+		{name: "observability off", mutate: func(c *config.Config) {
+			c.AI.AssistantCanaryStudentIDs = []uuid.UUID{uuid.New()}
+			c.Observability.Mode = "noop"
+		}},
+		{name: "invalid rollout mode", mutate: func(c *config.Config) {
+			c.AI.AssistantRolloutMode = "percentage"
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := base
+			if test.mutate != nil {
+				test.mutate(&cfg)
+			}
+			status := llmStatus(cfg)
+			if status.State != StateMisconfigured || status.Reason == "" {
+				t.Fatalf("expected safe misconfigured status, got %#v", status)
+			}
+		})
 	}
 }

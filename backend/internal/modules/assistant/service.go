@@ -29,7 +29,7 @@ import (
 const DefaultLLMTimeout = 12 * time.Second
 
 type Options struct {
-	SpeechBroker      *speechauth.Broker
+	SpeechBroker      SpeechAuthorizer
 	Enabled           *bool
 	VoiceInputEnabled *bool
 	SessionRepository SessionRepository
@@ -40,10 +40,11 @@ type Options struct {
 	AudioURLValidator *safety.AudioURLValidator
 	LLMTimeout        time.Duration
 	Logger            *slog.Logger
+	CanaryGate        *CanaryGate
 }
 
 type Service struct {
-	speechBroker  *speechauth.Broker
+	speechBroker  SpeechAuthorizer
 	personaLegacy *persona.Service
 	context       *context_builder.Service
 	personaPolicy *persona_policy.Service
@@ -65,6 +66,13 @@ type Service struct {
 	sessions      SessionRepository
 	academic      AcademicContextProvider
 	tutoring      *tutoring.Service
+	canaryGate    *CanaryGate
+}
+
+type SpeechAuthorizer interface {
+	Enabled() bool
+	AllowRequest(studentID string) bool
+	Authorize(ctx context.Context, studentID, messageID, locale, hash string) (speechauth.Authorization, error)
 }
 
 func NewService(personaService *persona.Service, llmProvider llm.Provider, ttsProvider tts.Provider) *Service {
@@ -127,6 +135,7 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 		sessions:      options.SessionRepository,
 		academic:      options.AcademicContext,
 		tutoring:      tutoring.NewService(),
+		canaryGate:    options.CanaryGate,
 	}
 }
 
@@ -134,9 +143,15 @@ func (s *Service) Enabled() bool { return s != nil && s.enabled }
 
 func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, error) {
 	startedAt := time.Now()
+	if !s.Enabled() {
+		return Response{}, apperrors.NotFound("assistant_disabled", "assistant is not enabled")
+	}
 	studentID, err := uuid.Parse(strings.TrimSpace(cmd.StudentID))
 	if err != nil {
 		return Response{}, apperrors.BadRequest("assistant_student_id_invalid", "student id is invalid")
+	}
+	if !s.canaryGate.Allows(studentID) {
+		return Response{}, assistantUnavailable()
 	}
 
 	validationInput := safety.Input{
@@ -291,6 +306,10 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (Response, er
 	}
 	s.logEvent(startedAt, studentID.String(), modeRaw, gradeLevel, personaResolved.GradeBand, validated.Text, validated.History, safety.CategoryNone, providerResult, errorCode)
 	return response, nil
+}
+
+func assistantUnavailable() error {
+	return apperrors.NotFound("assistant_unavailable", "assistant is not available")
 }
 
 func (s *Service) resolvePersona(ctx context.Context, studentID uuid.UUID, mode string, gradeLevel int) (persona_policy.Persona, persona.Profile) {

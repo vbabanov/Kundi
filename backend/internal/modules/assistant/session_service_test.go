@@ -22,7 +22,7 @@ func TestSessionInputModePolicyAndPersistence(t *testing.T) {
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	provider := &capturingSessionProvider{text: "Начни с первого шага."}
 	enabled, voiceEnabled := true, true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, VoiceInputEnabled: &voiceEnabled, SessionRepository: repo,
 	})
 
@@ -52,7 +52,7 @@ func TestVoiceInputRequiresFlagAndRejectsInvalidMode(t *testing.T) {
 	studentID, sessionID := uuid.New(), uuid.New()
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), &capturingSessionProvider{text: "Подсказка."}, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), &capturingSessionProvider{text: "Подсказка."}, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repo,
 	})
 
@@ -72,14 +72,14 @@ func TestAssistantSessionGradeRangeIsOneThroughEleven(t *testing.T) {
 	enabled := true
 	for _, grade := range []int{1, 11} {
 		repo := newMemorySessionRepository(uuid.New(), uuid.New(), grade)
-		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{Enabled: &enabled, SessionRepository: repo})
+		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 		if _, err := service.CreateSession(context.Background(), repo.owner.String()); err != nil {
 			t.Fatalf("grade %d should be accepted: %v", grade, err)
 		}
 	}
 	for _, grade := range []int{0, 12} {
 		repo := newMemorySessionRepository(uuid.New(), uuid.New(), grade)
-		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{Enabled: &enabled, SessionRepository: repo})
+		service := NewServiceWithOptions(persona.NewService(), nil, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 		if _, err := service.CreateSession(context.Background(), repo.owner.String()); err == nil {
 			t.Fatalf("grade %d should be rejected", grade)
 		}
@@ -93,7 +93,7 @@ func TestSessionMessageUsesServerGradeAndGuardsReadyAnswerIdempotently(t *testin
 	repo := newMemorySessionRepository(studentID, sessionID, 3)
 	provider := &capturingSessionProvider{text: "Ответ: 42. Полное решение готово."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repo,
 		AcademicContext: staticAcademicContext{context: AcademicContext{
 			Locale: "ru-KZ", GradeLevel: 3,
@@ -144,7 +144,7 @@ func TestExplicitReadyAnswerWithoutAcademicMatchIsReplaced(t *testing.T) {
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	provider := &capturingSessionProvider{text: "Ответ: 42. Полное решение готово."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repo,
 		AcademicContext: staticAcademicContext{context: AcademicContext{Locale: "ru-KZ", GradeLevel: 7}},
 	})
@@ -167,7 +167,7 @@ func TestMalformedLegacyReplayDegradesWithoutCallingProvider(t *testing.T) {
 	}
 	provider := &capturingSessionProvider{text: "must not be called"}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: clientID.String(), Text: "Старый вопрос",
 	})
@@ -181,7 +181,7 @@ func TestConcurrentDuplicatePersistsOneExchange(t *testing.T) {
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	provider := &capturingSessionProvider{text: "Подсказка.", delay: 20 * time.Millisecond}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 	command := SendSessionMessageCommand{StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: clientID.String(), Text: "Объясни дроби"}
 	results := make(chan SessionMessageResult, 2)
 	errs := make(chan error, 2)
@@ -225,7 +225,7 @@ func TestFactualQuestionIsNotMisclassifiedAsHomework(t *testing.T) {
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	provider := &capturingSessionProvider{text: "Париж."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 
 	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Столица Франции?",
@@ -245,7 +245,7 @@ func TestSessionIsolationBlocksOtherStudent(t *testing.T) {
 	repo := newMemorySessionRepository(owner, sessionID, 7)
 	provider := &capturingSessionProvider{text: "Париж."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 
 	_, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: uuid.NewString(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Столица Франции?",
@@ -261,7 +261,7 @@ func TestUnsafeInputNeverReachesProviderAndOnlySafeResponseIsStored(t *testing.T
 	repo := newMemorySessionRepository(studentID, sessionID, 7)
 	provider := &capturingSessionProvider{text: "must not be called"}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{Enabled: &enabled, SessionRepository: repo})
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
 
 	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "мой пароль это 123456",
@@ -280,7 +280,7 @@ func TestAcademicContextFailureDegradesWithoutChangingServerGrade(t *testing.T) 
 	repo := newMemorySessionRepository(studentID, sessionID, 9)
 	provider := &capturingSessionProvider{text: "Париж."}
 	enabled := true
-	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(),
 		Enabled: &enabled, SessionRepository: repo,
 		AcademicContext: staticAcademicContext{err: errors.New("database unavailable")},
 	})

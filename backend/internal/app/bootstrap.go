@@ -93,6 +93,11 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	personaService := persona.NewService()
 	assistantEnabled := cfg.AI.AssistantEnabled
 	voiceInputEnabled := cfg.AI.VoiceInputEnabled
+	canaryGate, err := assistantmodule.NewCanaryGate(cfg.AI.AssistantRolloutMode, cfg.AI.AssistantCanaryStudentIDs)
+	if err != nil && assistantEnabled {
+		pool.Close()
+		return nil, err
+	}
 	assistantService := assistantmodule.NewServiceWithOptions(
 		personaService,
 		resolveAssistantLLMProvider(cfg.AI),
@@ -126,6 +131,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 			AudioURLValidator: assistantsafety.NewAudioURLValidator(trustedAudioHosts(cfg.AI.TTSBaseURL, cfg.AI.TTSTrustedHosts)),
 			LLMTimeout:        cfg.AI.AssistantLLMTimeout,
 			Logger:            log,
+			CanaryGate:        canaryGate,
 		},
 	)
 

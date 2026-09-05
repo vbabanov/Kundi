@@ -53,7 +53,7 @@ func TestSpeechAuthorizationOwnershipAndContent(t *testing.T) {
 			case "voice_off":
 				voice = false
 			}
-			service := NewServiceWithOptions(nil, nil, nil, Options{Enabled: &enabled, VoiceInputEnabled: &voice,
+			service := NewServiceWithOptions(nil, nil, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, VoiceInputEnabled: &voice,
 				SessionRepository: repo, SpeechBroker: speechauth.New(speechauth.Config{Enabled: ttsEnabled})})
 			_, err := service.SpeechAuthorization(context.Background(), student.String(), session.String(), message.String())
 			want := "assistant_message_not_found"

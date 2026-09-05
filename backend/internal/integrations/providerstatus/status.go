@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/kundi/kundi/backend/internal/platform/config"
 )
 
@@ -50,6 +51,22 @@ func (s Snapshot) HasMisconfiguredProvider() bool {
 
 func llmStatus(cfg config.Config) Provider {
 	if cfg.AI.AssistantEnabled {
+		rolloutMode := strings.ToLower(strings.TrimSpace(cfg.AI.AssistantRolloutMode))
+		if rolloutMode == "" {
+			rolloutMode = config.AssistantRolloutModeAllowlist
+		}
+		switch rolloutMode {
+		case config.AssistantRolloutModeAllowlist:
+			if !validCanaryStudentIDs(cfg.AI.AssistantCanaryStudentIDs) {
+				return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "assistant canary allowlist is required"}
+			}
+			if observabilityDisabled(cfg.Observability.Mode) {
+				return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "assistant canary observability must be enabled"}
+			}
+		case config.AssistantRolloutModeAll:
+		default:
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "assistant rollout mode is invalid"}
+		}
 		if strings.TrimSpace(cfg.AI.AlemBaseURL) == "" {
 			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_BASE_URL is required"}
 		}
@@ -78,6 +95,27 @@ func llmStatus(cfg config.Config) Provider {
 		return Provider{Name: "llm", Mode: "http", State: StateReady}
 	default:
 		return Provider{Name: "llm", Mode: mode, State: StateMisconfigured, Reason: "unsupported provider mode"}
+	}
+}
+
+func validCanaryStudentIDs(ids []uuid.UUID) bool {
+	if len(ids) == 0 {
+		return false
+	}
+	for _, id := range ids {
+		if id == uuid.Nil {
+			return false
+		}
+	}
+	return true
+}
+
+func observabilityDisabled(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "off", "none", "noop":
+		return true
+	default:
+		return false
 	}
 }
 

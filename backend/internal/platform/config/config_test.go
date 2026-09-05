@@ -3,12 +3,16 @@ package config
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
 	t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
 	t.Setenv("KUNDI_ASSISTANT_ENABLED", "")
+	t.Setenv("KUNDI_ASSISTANT_ROLLOUT_MODE", "")
+	t.Setenv("KUNDI_ASSISTANT_CANARY_STUDENT_IDS", "")
 	t.Setenv("KUNDI_VOICE_INPUT_ENABLED", "")
 	t.Setenv("KUNDI_TTS_ENABLED", "")
 	t.Setenv("ALEM_BASE_URL", "")
@@ -31,6 +35,9 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	}
 	if cfg.AI.AssistantEnabled {
 		t.Fatal("assistant must be disabled by default")
+	}
+	if cfg.AI.AssistantRolloutMode != AssistantRolloutModeAllowlist || len(cfg.AI.AssistantCanaryStudentIDs) != 0 {
+		t.Fatalf("assistant rollout must default to an empty fail-closed allowlist: %#v", cfg.AI)
 	}
 	if cfg.AI.VoiceInputEnabled {
 		t.Fatal("voice input must be disabled by default")
@@ -56,6 +63,8 @@ func TestAssistantReadsNamedAlemSettings(t *testing.T) {
 	t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
 	t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
 	t.Setenv("KUNDI_ASSISTANT_ENABLED", "true")
+	t.Setenv("KUNDI_ASSISTANT_ROLLOUT_MODE", "all")
+	t.Setenv("KUNDI_ASSISTANT_CANARY_STUDENT_IDS", "")
 	t.Setenv("KUNDI_VOICE_INPUT_ENABLED", "true")
 	t.Setenv("ALEM_BASE_URL", "https://example.invalid/v1")
 	t.Setenv("ALEM_API_KEY", "legacy-secret-value")
@@ -87,4 +96,52 @@ func TestAssistantReadsNamedAlemSettings(t *testing.T) {
 	if cfg.AI.AssistantHomeworkOverdueDays != 14 || cfg.AI.AssistantHomeworkUpcomingDays != 20 || cfg.AI.AssistantHomeworkUndatedDays != 10 || cfg.AI.AssistantAcademicResultDays != 90 {
 		t.Fatal("named academic context windows were not loaded")
 	}
+}
+
+func TestAssistantRolloutConfiguration(t *testing.T) {
+	setRequiredConfig(t)
+	first := uuid.New()
+	second := uuid.New()
+	tests := []struct {
+		name      string
+		enabled   string
+		mode      string
+		ids       string
+		wantError bool
+		wantMode  string
+		wantIDs   int
+	}{
+		{name: "disabled without allowlist", enabled: "false", wantMode: AssistantRolloutModeAllowlist},
+		{name: "enabled empty allowlist", enabled: "true", wantError: true},
+		{name: "malformed UUID", enabled: "true", ids: "not-a-uuid", wantError: true},
+		{name: "duplicates deduplicated", enabled: "true", ids: first.String() + ", " + first.String() + "," + second.String(), wantMode: AssistantRolloutModeAllowlist, wantIDs: 2},
+		{name: "explicit all", enabled: "true", mode: "all", ids: "not-used", wantMode: AssistantRolloutModeAll},
+		{name: "invalid mode", enabled: "false", mode: "percentage", wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("KUNDI_ASSISTANT_ENABLED", test.enabled)
+			t.Setenv("KUNDI_ASSISTANT_ROLLOUT_MODE", test.mode)
+			t.Setenv("KUNDI_ASSISTANT_CANARY_STUDENT_IDS", test.ids)
+			cfg, err := Load()
+			if test.wantError {
+				if err == nil {
+					t.Fatal("expected fail-closed configuration error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if cfg.AI.AssistantRolloutMode != test.wantMode || len(cfg.AI.AssistantCanaryStudentIDs) != test.wantIDs {
+				t.Fatalf("unexpected rollout mode=%q ids=%d", cfg.AI.AssistantRolloutMode, len(cfg.AI.AssistantCanaryStudentIDs))
+			}
+		})
+	}
+}
+
+func setRequiredConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
+	t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
 }
