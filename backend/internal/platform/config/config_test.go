@@ -10,6 +10,7 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
 	t.Setenv("KUNDI_ASSISTANT_ENABLED", "")
 	t.Setenv("KUNDI_VOICE_INPUT_ENABLED", "")
+	t.Setenv("KUNDI_TTS_ENABLED", "")
 	t.Setenv("ALEM_BASE_URL", "")
 	t.Setenv("ALEM_API_KEY", "")
 	t.Setenv("ALEM_PRIMARY_API_KEY", "")
@@ -33,6 +34,9 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	}
 	if cfg.AI.VoiceInputEnabled {
 		t.Fatal("voice input must be disabled by default")
+	}
+	if cfg.AI.KundiTTSEnabled {
+		t.Fatal("TTS must be disabled by default")
 	}
 	if cfg.AI.AlemBaseURL != "https://llm.alem.ai/v1" {
 		t.Fatalf("unexpected Alem base URL: %q", cfg.AI.AlemBaseURL)

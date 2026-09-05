@@ -49,6 +49,13 @@ type SecurityConfig struct {
 }
 
 type AIConfig struct {
+	KundiTTSEnabled                   bool
+	AzureSpeechKeyPrimary             string
+	AzureSpeechKeySecondary           string
+	AzureSpeechRegion                 string
+	AzureSpeechEndpoint               string
+	AzureSpeechVoiceRU                string
+	AzureSpeechVoiceKK                string
 	AssistantEnabled                  bool
 	VoiceInputEnabled                 bool
 	AlemBaseURL                       string
@@ -126,6 +133,13 @@ func Load() (Config, error) {
 			FieldEncryptionKey: env("FIELD_ENCRYPTION_KEY", ""),
 		},
 		AI: AIConfig{
+			KundiTTSEnabled:                   envBool("KUNDI_TTS_ENABLED", false),
+			AzureSpeechKeyPrimary:             env("AZURE_SPEECH_KEY_PRIMARY", ""),
+			AzureSpeechKeySecondary:           env("AZURE_SPEECH_KEY_SECONDARY", ""),
+			AzureSpeechRegion:                 env("AZURE_SPEECH_REGION", ""),
+			AzureSpeechEndpoint:               env("AZURE_SPEECH_ENDPOINT", ""),
+			AzureSpeechVoiceRU:                env("AZURE_SPEECH_VOICE_RU", "ru-RU-SvetlanaNeural"),
+			AzureSpeechVoiceKK:                env("AZURE_SPEECH_VOICE_KK", "kk-KZ-AigulNeural"),
 			AssistantEnabled:                  envBool("KUNDI_ASSISTANT_ENABLED", false),
 			VoiceInputEnabled:                 envBool("KUNDI_VOICE_INPUT_ENABLED", false),
 			AlemBaseURL:                       env("ALEM_BASE_URL", "https://llm.alem.ai/v1"),

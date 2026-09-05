@@ -127,6 +127,10 @@ func TestSessionMessageUsesServerGradeAndGuardsReadyAnswerIdempotently(t *testin
 	if err != nil {
 		t.Fatalf("idempotent send: %v", err)
 	}
+	if first.Replayed || !second.Replayed {
+		t.Fatal("replay marker is incorrect")
+	}
+	second.Replayed = false
 	if !reflect.DeepEqual(second, first) || provider.callCount() != 1 {
 		t.Fatalf("idempotency failed: equal=%v calls=%d\nfirst=%#v\nsecond=%#v", reflect.DeepEqual(second, first), provider.callCount(), first, second)
 	}

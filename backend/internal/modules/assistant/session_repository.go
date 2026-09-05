@@ -52,6 +52,7 @@ type PageCursor struct {
 }
 
 type StoredExchange struct {
+	Replayed  bool
 	User      SessionMessage
 	Assistant SessionMessage
 	Session   AssistantSession
@@ -224,6 +225,7 @@ func (r *PostgresSessionRepository) SaveExchange(ctx context.Context, studentID,
 		if !found {
 			return StoredExchange{}, errors.New("idempotent exchange is still incomplete")
 		}
+		existing.Replayed = true
 		return existing, nil
 	}
 	if err != nil {

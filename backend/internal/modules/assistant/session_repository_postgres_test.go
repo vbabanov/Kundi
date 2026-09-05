@@ -59,6 +59,10 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replay send: %v", err)
 	}
+	if first.Replayed || !replayed.Replayed {
+		t.Fatal("incorrect replay flag")
+	}
+	replayed.Replayed = false
 	if provider.callCount() != 1 || !reflect.DeepEqual(first, replayed) {
 		t.Fatalf("response replay mismatch: calls=%d equal=%v", provider.callCount(), reflect.DeepEqual(first, replayed))
 	}

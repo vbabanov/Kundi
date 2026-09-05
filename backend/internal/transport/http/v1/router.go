@@ -70,6 +70,7 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/assistant/sessions", withAuth(api.listAssistantSessions))
 	mux.Handle("GET /v1/assistant/sessions/{sessionID}/messages", withAuth(api.listAssistantMessages))
 	mux.Handle("POST /v1/assistant/sessions/{sessionID}/messages", withAuth(api.sendAssistantMessage))
+	mux.Handle("POST /v1/assistant/sessions/{sessionID}/messages/{messageID}/speech-authorization", speechNoStore(withAuth(api.speechAuthorization)))
 	mux.Handle("DELETE /v1/assistant/sessions/{sessionID}", withAuth(api.deleteAssistantSession))
 	mux.Handle("POST /v1/whatsapp/send-homework", withAuth(api.sendHomeworkDigest))
 	mux.Handle("POST /v1/whatsapp/send-photo", withAuth(api.sendHomeworkPhoto))
@@ -525,6 +526,33 @@ func (a *API) sendAssistantMessage(w http.ResponseWriter, r *http.Request) {
 	result, err := a.deps.AssistantService.SendSessionMessage(r.Context(), assistantmodule.SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: r.PathValue("sessionID"), ClientMessageID: req.ClientMessageID, Text: req.Text, InputMode: req.InputMode,
 	})
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func speechNoStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *API) speechAuthorization(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	if !a.assistantEnabled(w) {
+		return
+	}
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.AssistantService.SpeechAuthorization(r.Context(), studentID.String(), r.PathValue("sessionID"), r.PathValue("messageID"))
 	if err != nil {
 		httpx.JSONError(w, err)
 		return

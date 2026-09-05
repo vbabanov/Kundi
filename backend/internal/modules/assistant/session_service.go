@@ -47,6 +47,7 @@ const (
 )
 
 type SessionMessageResult struct {
+	Replayed         bool              `json:"replayed"`
 	UserMessage      SessionMessage    `json:"user_message"`
 	AssistantMessage SessionMessage    `json:"assistant_message"`
 	ResponseMode     string            `json:"response_mode"`
@@ -183,6 +184,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		return SessionMessageResult{}, apperrors.Internal("assistant_idempotency_lookup_failed", "failed to check assistant message", err)
 	}
 	if found {
+		existing.Replayed = true
 		return resultFromExchange(existing), nil
 	}
 
@@ -323,6 +325,7 @@ func resultFromExchange(exchange StoredExchange) SessionMessageResult {
 		session = &copy
 	}
 	return SessionMessageResult{
+		Replayed:    exchange.Replayed,
 		UserMessage: exchange.User, AssistantMessage: exchange.Assistant,
 		ResponseMode: exchange.Assistant.ResponseMode, HelpLevel: metadata.HelpLevel,
 		FollowUpQuestion: metadata.FollowUpQuestion, Emotion: metadata.Emotion,

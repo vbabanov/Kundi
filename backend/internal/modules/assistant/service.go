@@ -19,6 +19,7 @@ import (
 	"github.com/kundi/kundi/backend/internal/modules/assistant/ratelimit"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/response_renderer"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/safety"
+	"github.com/kundi/kundi/backend/internal/modules/assistant/speechauth"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tts"
 	"github.com/kundi/kundi/backend/internal/modules/assistant/tutoring"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
@@ -28,6 +29,7 @@ import (
 const DefaultLLMTimeout = 12 * time.Second
 
 type Options struct {
+	SpeechBroker      *speechauth.Broker
 	Enabled           *bool
 	VoiceInputEnabled *bool
 	SessionRepository SessionRepository
@@ -41,6 +43,7 @@ type Options struct {
 }
 
 type Service struct {
+	speechBroker  *speechauth.Broker
 	personaLegacy *persona.Service
 	context       *context_builder.Service
 	personaPolicy *persona_policy.Service
@@ -102,6 +105,7 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 		options.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	return &Service{
+		speechBroker:  options.SpeechBroker,
 		personaLegacy: personaService,
 		context:       context_builder.NewService(),
 		personaPolicy: persona_policy.NewService(),

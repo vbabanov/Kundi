@@ -13,6 +13,7 @@ import (
 	assistantllm "github.com/kundi/kundi/backend/internal/modules/assistant/llm"
 	assistantratelimit "github.com/kundi/kundi/backend/internal/modules/assistant/ratelimit"
 	assistantsafety "github.com/kundi/kundi/backend/internal/modules/assistant/safety"
+	"github.com/kundi/kundi/backend/internal/modules/assistant/speechauth"
 	assistanttts "github.com/kundi/kundi/backend/internal/modules/assistant/tts"
 	auditmodule "github.com/kundi/kundi/backend/internal/modules/audit"
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
@@ -97,6 +98,11 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		resolveAssistantLLMProvider(cfg.AI),
 		resolveTTSProvider(cfg.AI.TTSProvider, cfg.AI.TTSBaseURL, cfg.AI.TTSAPIKey),
 		assistantmodule.Options{
+			SpeechBroker: speechauth.New(speechauth.Config{
+				Enabled: cfg.AI.KundiTTSEnabled, PrimaryKey: cfg.AI.AzureSpeechKeyPrimary,
+				SecondaryKey: cfg.AI.AzureSpeechKeySecondary, Region: cfg.AI.AzureSpeechRegion,
+				Endpoint: cfg.AI.AzureSpeechEndpoint, VoiceRU: cfg.AI.AzureSpeechVoiceRU, VoiceKK: cfg.AI.AzureSpeechVoiceKK,
+			}),
 			Enabled:           &assistantEnabled,
 			VoiceInputEnabled: &voiceInputEnabled,
 			SessionRepository: assistantmodule.NewPostgresSessionRepository(pool),
