@@ -40,8 +40,20 @@ func TestWhatsAppHandlerCreatesJobAndHonorsIdempotency(t *testing.T) {
 	jobsSvc := jobs.NewService(repo)
 	whatsappSvc := whatsappmodule.NewService(jobsSvc)
 	tokens := platformauth.NewAccessTokenService("secret-key", 20*time.Minute)
-	studentID := uuid.MustParse("8d8d8ec8-27e6-4623-a325-c2e7e9db2da2")
-	token := issueAccessToken(t, tokens, studentID)
+	studentID := uuid.New()
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO students(id, external_student_ref) VALUES ($1, $2)`,
+		studentID, "whatsapp-handler-"+studentID.String(),
+	); err != nil {
+		t.Fatalf("seed student failed: %v", err)
+	}
+	defer func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		if _, err := pool.Exec(cleanupCtx, `DELETE FROM students WHERE id = $1`, studentID); err != nil {
+			t.Errorf("cleanup student failed: %v", err)
+		}
+	}()
 
 	if _, err := pool.Exec(
 		ctx,
@@ -58,6 +70,7 @@ func TestWhatsAppHandlerCreatesJobAndHonorsIdempotency(t *testing.T) {
 	); err != nil {
 		t.Fatalf("seed student_app_profiles failed: %v", err)
 	}
+	token := issueAccessToken(t, tokens, studentID)
 
 	deps := &app.Bootstrap{
 		Config:          config.Config{App: config.AppConfig{Name: "test"}},
