@@ -58,6 +58,16 @@ jobs:
       - name: Precache Flutter Linux test artifacts
         run: flutter precache --force --linux --universal
 
+      - name: Normalize Roboto test font path
+        run: |
+          task_font_dir="$FLUTTER_ROOT/bin/cache/artifacts/material_fonts"
+          task_font_path="$(find "$task_font_dir" -maxdepth 1 -type f -iname 'roboto-regular.ttf' -print -quit)"
+          test -n "$task_font_path"
+          if [ "$task_font_path" != "$task_font_dir/roboto-regular.ttf" ]; then
+            ln -sf "$(basename "$task_font_path")" "$task_font_dir/roboto-regular.ttf"
+          fi
+          test -f "$task_font_dir/roboto-regular.ttf"
+
       - name: Pub get
         run: flutter pub get
 
