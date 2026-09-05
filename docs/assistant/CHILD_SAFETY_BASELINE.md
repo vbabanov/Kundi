@@ -52,7 +52,7 @@ LLM calls have a configurable service timeout (`AI_ASSISTANT_LLM_TIMEOUT_SEC`, d
 
 ## Privacy and logging
 
-Normal Assistant logs contain only the opaque authenticated student UUID, message/history lengths, mode, grade level/band, safety category, latency, provider result, and sanitized error code. Raw prompt text, raw history, names, auth tokens, credentials, and audio URLs are not logged. The existing AI worker audit records lengths and non-content metadata only.
+Assistant telemetry contains only bounded operational dimensions: result, controlled error kind, provider/model, normalized locale, mode, fallback flag, tutoring intent, safety category, latency, and counts. Student/session/account identifiers, stable user hashes, prompts, responses, history, transcripts, tokens, authorization values, provider request IDs, endpoints, and free-form error strings are not logged or used as metric tags. The existing AI worker audit records lengths and non-content metadata only.
 
 This pass does not add conversation persistence or academic context to LLM payloads.
 

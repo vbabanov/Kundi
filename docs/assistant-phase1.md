@@ -3,10 +3,13 @@
 ## Rollout controls
 
 - Backend: `KUNDI_ASSISTANT_ENABLED=false` by default.
+- Backend cohort: `KUNDI_ASSISTANT_ROLLOUT_MODE=allowlist` by default; enabling Assistant also requires at least one valid UUID in `KUNDI_ASSISTANT_CANARY_STUDENT_IDS`.
 - Mobile: `--dart-define=ENABLE_KUNDI_ASSISTANT=false` by default.
 - Avatar rollout remains independent: `ENABLE_KUNDI_HOME_REALTIME_AVATAR` is not implied by either assistant flag.
 
 When the mobile flag is off, the Home row remains disabled and displays `Скоро`; the app does not call assistant endpoints. When the backend flag is off, assistant endpoints return the stable `assistant_disabled` response.
+
+The operational sequence and privacy contract for a one-student rollout are documented in [Assistant canary controls](assistant-canary.md). An empty allowlist never means allow-all.
 
 ## Alem configuration
 
