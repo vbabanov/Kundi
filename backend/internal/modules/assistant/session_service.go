@@ -75,7 +75,7 @@ type sessionResponseMetadata struct {
 }
 
 func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (result AssistantSession, retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationSessionCreate, InputModeText)
 	defer func() { outcome.Finish(retErr) }()
 	studentID, err := s.sessionStudentID(studentIDRaw)
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *Service) CreateSession(ctx context.Context, studentIDRaw string) (resul
 }
 
 func (s *Service) ListSessions(ctx context.Context, studentIDRaw string, limit int, cursorRaw string) (result SessionPage, retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationSessionList, InputModeText)
 	defer func() { outcome.Finish(retErr) }()
 	studentID, err := s.sessionStudentID(studentIDRaw)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *Service) ListSessions(ctx context.Context, studentIDRaw string, limit i
 }
 
 func (s *Service) ListSessionMessages(ctx context.Context, studentIDRaw, sessionIDRaw string, limit int, cursorRaw string) (result MessagePage, retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationSessionMessagesList, InputModeText)
 	defer func() { outcome.Finish(retErr) }()
 	studentID, sessionID, err := s.sessionIDs(studentIDRaw, sessionIDRaw)
 	if err != nil {
@@ -154,7 +154,7 @@ func (s *Service) ListSessionMessages(ctx context.Context, studentIDRaw, session
 }
 
 func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw string) (retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, InputModeText)
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationSessionDelete, InputModeText)
 	defer func() { outcome.Finish(retErr) }()
 	studentID, sessionID, err := s.sessionIDs(studentIDRaw, sessionIDRaw)
 	if err != nil {
@@ -171,7 +171,7 @@ func (s *Service) DeleteSession(ctx context.Context, studentIDRaw, sessionIDRaw 
 }
 
 func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessageCommand) (result SessionMessageResult, retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, cmd.InputMode)
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationSessionSend, cmd.InputMode)
 	defer func() { outcome.Finish(retErr) }()
 	studentID, sessionID, err := s.sessionIDs(cmd.StudentID, cmd.SessionID)
 	if err != nil {
@@ -260,9 +260,11 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	prompt := s.tutoring.BuildPrompt(inputSafety.SanitizedText, session.GradeLevel, analysis, academic.Render(), renderSessionHistory(history))
 
 	llmCtx, cancel := context.WithTimeout(ctx, s.llmTimeout)
+	generation := newAssistantGenerationOutcome(s.observe.Metrics, string(language), inputMode)
 	providerResponse, providerErr := s.llm.Generate(llmCtx, llm.Request{Mode: string(ModeTutor), Prompt: prompt, PersonaTone: "supportive", Style: "age_adapted"})
 	cancel()
-	outcome.SetProvider(providerResponse.Provider, providerResponse.Model, providerResponse.FallbackUsed)
+	generation.Finish(providerResponse, providerErr)
+	outcome.SetExecution(providerResponse)
 	if providerErr != nil || strings.TrimSpace(providerResponse.Text) == "" {
 		result, errorKind := assistantOutcomeFromProvider(providerErr, strings.TrimSpace(providerResponse.Text) != "")
 		outcome.SetResult(result, errorKind)
@@ -405,7 +407,7 @@ func sessionProviderError(err error) error {
 		switch providerErr.Kind {
 		case llm.ErrorRateLimit:
 			return apperrors.New(http.StatusTooManyRequests, "assistant_provider_rate_limited", "assistant provider is temporarily rate limited", nil)
-		case llm.ErrorClient, llm.ErrorMalformed:
+		case llm.ErrorClient, llm.ErrorMalformed, llm.ErrorIncomplete:
 			return apperrors.New(http.StatusBadGateway, "assistant_provider_invalid_response", "assistant provider returned an invalid response", nil)
 		}
 	}

@@ -145,7 +145,7 @@ func NewServiceWithOptions(personaService *persona.Service, llmProvider llm.Prov
 func (s *Service) Enabled() bool { return s != nil && s.enabled }
 
 func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Response, retErr error) {
-	outcome := newAssistantOutcome(s.observe.Metrics, "legacy")
+	outcome := newAssistantOutcome(s.observe.Metrics, OperationLegacyMessage, "legacy")
 	defer func() { outcome.Finish(retErr) }()
 	if !s.Enabled() {
 		return Response{}, apperrors.NotFound("assistant_disabled", "assistant is not enabled")
@@ -240,6 +240,7 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Res
 	renderedText := s.renderer.Render(modeRaw, personaResolved, builtContext)
 
 	llmCtx, cancel := context.WithTimeout(ctx, s.llmTimeout)
+	generation := newAssistantGenerationOutcome(s.observe.Metrics, string(language), "legacy")
 	llmResponse, llmErr := s.llm.Generate(llmCtx, llm.Request{
 		Mode:        modeRaw,
 		Prompt:      renderedText,
@@ -248,7 +249,8 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Res
 		History:     builtContext.RecentUserMessages,
 	})
 	cancel()
-	outcome.SetProvider(llmResponse.Provider, llmResponse.Model, llmResponse.FallbackUsed)
+	generation.Finish(llmResponse, llmErr)
+	outcome.SetExecution(llmResponse)
 
 	text := strings.TrimSpace(llmResponse.Text)
 	providerFailed := llmErr != nil || text == ""

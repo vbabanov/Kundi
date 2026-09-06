@@ -302,6 +302,31 @@ func (s staticAcademicContext) Build(context.Context, uuid.UUID) (AcademicContex
 	return s.context, s.err
 }
 
+func TestSessionIncompleteProviderContentIsNotPersisted(t *testing.T) {
+	studentID, sessionID := uuid.New(), uuid.New()
+	repository := newMemorySessionRepository(studentID, sessionID, 7)
+	provider := &fakeLLM{
+		response: llm.Response{
+			Text: "PARTIAL_PROVIDER_CONTENT_MUST_NOT_BE_SAVED", Provider: "alem", Model: "gemma4",
+			Stage: llm.StagePrimary, FinishReason: llm.FinishReasonLength,
+		},
+		err: &llm.ProviderError{Kind: llm.ErrorIncomplete},
+	}
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{
+		Enabled: &enabled, CanaryGate: AllowAllCanaryGate(), SessionRepository: repository,
+	})
+	_, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Explain fractions",
+	})
+	if !apperrors.Is(err, "assistant_provider_invalid_response") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repository.exchanges) != 0 || repository.lastAssistant.Content != "" {
+		t.Fatalf("incomplete content was persisted: exchanges=%d assistant=%#v", len(repository.exchanges), repository.lastAssistant)
+	}
+}
+
 type capturingSessionProvider struct {
 	text, prompt string
 	calls        int
@@ -317,7 +342,10 @@ func (p *capturingSessionProvider) Generate(_ context.Context, req llm.Request) 
 	if p.delay > 0 {
 		time.Sleep(p.delay)
 	}
-	return llm.Response{Text: p.text, Provider: "alem", Model: "exact-model"}, nil
+	return llm.Response{
+		Text: p.text, Provider: "alem", Model: "gemma4", Stage: llm.StagePrimary, FinishReason: llm.FinishReasonStop,
+		Attempts: []llm.Attempt{{Provider: "alem", Model: "gemma4", Stage: llm.StagePrimary, FinishReason: llm.FinishReasonStop}},
+	}, nil
 }
 
 func (p *capturingSessionProvider) callCount() int {

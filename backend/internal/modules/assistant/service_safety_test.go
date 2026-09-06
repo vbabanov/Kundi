@@ -30,7 +30,7 @@ func (f *fakeLLM) Generate(ctx context.Context, _ llm.Request) (llm.Response, er
 	f.calls++
 	if f.wait {
 		<-ctx.Done()
-		return llm.Response{}, ctx.Err()
+		return f.response, ctx.Err()
 	}
 	return f.response, f.err
 }
@@ -188,6 +188,26 @@ func TestTimeoutAndProviderFailureReturnStableFallback(t *testing.T) {
 		}
 		assertOneAssistantOutcome(t, metrics, OutcomeProvider5xx)
 	})
+}
+
+func TestIncompleteProviderContentIsNotReturnedOrSentToTTS(t *testing.T) {
+	const partial = "PARTIAL_PROVIDER_CONTENT_MUST_BE_DISCARDED"
+	provider := &fakeLLM{
+		response: llm.Response{
+			Text: partial, Provider: "alem", Model: "gemma4", Stage: llm.StagePrimary,
+			FinishReason: llm.FinishReasonLength,
+		},
+		err: &llm.ProviderError{Kind: llm.ErrorIncomplete},
+	}
+	speech := &fakeTTS{}
+	service := NewServiceWithOptions(persona.NewService(), provider, speech, Options{CanaryGate: AllowAllCanaryGate()})
+	response, err := service.Message(context.Background(), validCommand("Explain fractions"))
+	if err != nil || response.Text == "" || strings.Contains(response.Text, partial) {
+		t.Fatalf("incomplete content escaped into response: response=%#v err=%v", response, err)
+	}
+	if len(speech.texts) != 1 || strings.Contains(speech.texts[0], partial) {
+		t.Fatalf("incomplete content escaped into TTS: %#v", speech.texts)
+	}
 }
 
 func TestModerationFailureFailsClosed(t *testing.T) {
