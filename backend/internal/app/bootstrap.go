@@ -178,7 +178,7 @@ func resolveAssistantLLMProvider(cfg config.AIConfig) assistantllm.Provider {
 		return primary
 	}
 	fallbackKey := firstConfigured(cfg.AlemFallbackAPIKey, cfg.AlemAPIKey)
-	fallback := assistantllm.NewOpenAICompatibleProvider(cfg.AlemBaseURL, fallbackKey, cfg.AlemFallbackModel, cfg.AssistantFallbackTimeout)
+	fallback := assistantllm.NewOpenAICompatibleProviderForStage(cfg.AlemBaseURL, fallbackKey, cfg.AlemFallbackModel, cfg.AssistantFallbackTimeout, assistantllm.StageFallback)
 	return assistantllm.NewFallbackProviderWithPolicy(primary, fallback, assistantllm.FallbackPolicy{
 		PrimaryTimeout:  cfg.AssistantPrimaryTimeout,
 		FallbackTimeout: cfg.AssistantFallbackTimeout,

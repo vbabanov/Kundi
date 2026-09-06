@@ -15,6 +15,7 @@ import (
 
 const (
 	maxProviderResponseBytes         int64 = 1 << 20
+	maxProviderTokenCount                  = 10_000_000
 	defaultCompletionTokenBudget           = 700
 	qwenMinimumCompletionTokenBudget       = 96
 	DefaultPrimaryTimeout                  = 10 * time.Second
@@ -28,10 +29,15 @@ type OpenAICompatibleProvider struct {
 	apiKey   string
 	model    string
 	provider string
+	stage    ExecutionStage
 	client   *http.Client
 }
 
 func NewOpenAICompatibleProvider(baseURL, apiKey, model string, timeout time.Duration) *OpenAICompatibleProvider {
+	return NewOpenAICompatibleProviderForStage(baseURL, apiKey, model, timeout, StagePrimary)
+}
+
+func NewOpenAICompatibleProviderForStage(baseURL, apiKey, model string, timeout time.Duration, stage ExecutionStage) *OpenAICompatibleProvider {
 	if timeout <= 0 {
 		timeout = 12 * time.Second
 	}
@@ -40,13 +46,17 @@ func NewOpenAICompatibleProvider(baseURL, apiKey, model string, timeout time.Dur
 		apiKey:   strings.TrimSpace(apiKey),
 		model:    strings.TrimSpace(model),
 		provider: "alem",
+		stage:    normalizedStage(stage),
 		client:   &http.Client{Timeout: timeout},
 	}
 }
 
-func (p *OpenAICompatibleProvider) Generate(ctx context.Context, req Request) (Response, error) {
+func (p *OpenAICompatibleProvider) Generate(ctx context.Context, req Request) (response Response, retErr error) {
+	startedAt := time.Now()
+	response = newResponseMetadata(p.provider, p.model, p.stage)
+	defer func() { addAttempt(&response, startedAt, retErr) }()
 	if p.baseURL == "" || p.apiKey == "" || p.model == "" {
-		return Response{}, &ProviderError{Kind: ErrorConfiguration, Err: errors.New("Alem provider configuration is incomplete")}
+		return response, &ProviderError{Kind: ErrorConfiguration, Err: errors.New("Alem provider configuration is incomplete")}
 	}
 	payload := map[string]any{
 		"model": p.model,
@@ -59,25 +69,29 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, req Request) (R
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return Response{}, err
+		return response, err
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, chatCompletionsURL(p.baseURL), bytes.NewReader(body))
 	if err != nil {
-		return Response{}, err
+		return response, err
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	httpResp, err := p.client.Do(httpReq)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return Response{}, &ProviderError{Kind: ErrorTimeout, Err: context.DeadlineExceeded}
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+			cause := ctx.Err()
+			if cause == nil {
+				cause = context.DeadlineExceeded
+			}
+			return response, &ProviderError{Kind: ErrorTimeout, Err: cause}
 		}
 		var netErr net.Error
 		if errors.As(err, &netErr) {
-			return Response{}, &ProviderError{Kind: ErrorUnavailable, Err: errors.New("provider network failure")}
+			return response, &ProviderError{Kind: ErrorUnavailable, Err: errors.New("provider network failure")}
 		}
-		return Response{}, &ProviderError{Kind: ErrorUnavailable, Err: errors.New("provider request failure")}
+		return response, &ProviderError{Kind: ErrorUnavailable, Err: errors.New("provider request failure")}
 	}
 	defer httpResp.Body.Close()
 
@@ -90,28 +104,73 @@ func (p *OpenAICompatibleProvider) Generate(ctx context.Context, req Request) (R
 			kind = ErrorServer
 		}
 		_, _ = io.Copy(io.Discard, io.LimitReader(httpResp.Body, maxProviderResponseBytes))
-		return Response{}, &ProviderError{Kind: kind, StatusCode: httpResp.StatusCode}
+		return response, &ProviderError{Kind: kind, StatusCode: httpResp.StatusCode}
 	}
 
 	var decoded struct {
 		Choices []struct {
 			Message struct {
-				Content string `json:"content"`
+				Content          string          `json:"content"`
+				ReasoningContent json.RawMessage `json:"reasoning_content"`
 			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
 	}
-	decoder := json.NewDecoder(io.LimitReader(httpResp.Body, maxProviderResponseBytes))
-	if err := decoder.Decode(&decoded); err != nil {
-		return Response{}, &ProviderError{Kind: ErrorMalformed, Err: fmt.Errorf("decode provider response: %w", err)}
+	responseBody, err := io.ReadAll(io.LimitReader(httpResp.Body, maxProviderResponseBytes+1))
+	if err != nil {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: errors.New("read provider response")}
 	}
-	if len(decoded.Choices) == 0 || strings.TrimSpace(decoded.Choices[0].Message.Content) == "" {
-		return Response{}, &ProviderError{Kind: ErrorMalformed, Err: errors.New("provider response content is empty")}
+	if int64(len(responseBody)) > maxProviderResponseBytes {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: errors.New("provider response exceeds size limit")}
 	}
-	return Response{
-		Text:     strings.TrimSpace(decoded.Choices[0].Message.Content),
-		Provider: p.provider,
-		Model:    p.model,
-	}, nil
+	if err := json.Unmarshal(responseBody, &decoded); err != nil {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: fmt.Errorf("decode provider response: %w", err)}
+	}
+	response.PromptTokens = boundedTokenCount(decoded.Usage.PromptTokens)
+	response.CompletionTokens = boundedTokenCount(decoded.Usage.CompletionTokens)
+	if len(decoded.Choices) == 0 {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: errors.New("provider response choices are empty")}
+	}
+	response.FinishReason = classifyFinishReason(decoded.Choices[0].FinishReason)
+	if response.FinishReason == FinishReasonLength {
+		return response, &ProviderError{Kind: ErrorIncomplete, Err: errors.New("provider response is incomplete")}
+	}
+	if response.FinishReason != FinishReasonStop {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: errors.New("provider response finish reason is invalid")}
+	}
+	content := strings.TrimSpace(decoded.Choices[0].Message.Content)
+	if content == "" {
+		return response, &ProviderError{Kind: ErrorMalformed, Err: errors.New("provider response content is empty")}
+	}
+	response.Text = content
+	return response, nil
+}
+
+func classifyFinishReason(raw string) FinishReason {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "stop":
+		return FinishReasonStop
+	case "length":
+		return FinishReasonLength
+	case "":
+		return FinishReasonMissing
+	default:
+		return FinishReasonOther
+	}
+}
+
+func boundedTokenCount(value int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > maxProviderTokenCount {
+		return maxProviderTokenCount
+	}
+	return value
 }
 
 func chatCompletionsURL(configured string) string {
@@ -153,30 +212,49 @@ func (p *FallbackProvider) Generate(ctx context.Context, req Request) (Response,
 
 	primaryCtx, cancelPrimary := context.WithTimeout(totalCtx, p.policy.PrimaryTimeout)
 	response, err := p.primary.Generate(primaryCtx, req)
+	response = withExecutionStage(response, StagePrimary)
 	primaryContextErr := primaryCtx.Err()
 	cancelPrimary()
 	if err == nil || !isFallbackEligible(err) {
 		if primaryContextErr != nil {
-			return Response{}, timeoutError()
+			return response, timeoutError()
 		}
 		return response, err
 	}
+	primaryResponse := response
+	primaryErrorKind := providerErrorKind(err)
 	if primaryContextErr != nil || isProviderErrorKind(err, ErrorTimeout) {
-		return Response{}, timeoutError()
+		return primaryResponse, timeoutError()
 	}
 	if totalCtx.Err() != nil {
-		return Response{}, timeoutError()
+		primaryResponse.PrimaryErrorKind = primaryErrorKind
+		return primaryResponse, timeoutError()
 	}
 
 	fallbackCtx, cancelFallback := context.WithTimeout(totalCtx, p.policy.FallbackTimeout)
-	response, err = p.fallback.Generate(fallbackCtx, req)
-	response.FallbackUsed = true
+	fallbackResponse, fallbackErr := p.fallback.Generate(fallbackCtx, req)
+	fallbackResponse = withExecutionStage(fallbackResponse, StageFallback)
+	fallbackResponse.Attempts = append(primaryResponse.Attempts, fallbackResponse.Attempts...)
+	if len(fallbackResponse.Attempts) > 2 {
+		fallbackResponse.Attempts = fallbackResponse.Attempts[:2]
+	}
+	fallbackResponse.FallbackAttempted = true
+	fallbackResponse.FallbackSucceeded = fallbackErr == nil && strings.TrimSpace(fallbackResponse.Text) != ""
+	fallbackResponse.PrimaryErrorKind = primaryErrorKind
 	fallbackContextErr := fallbackCtx.Err()
 	cancelFallback()
 	if fallbackContextErr != nil {
-		return Response{}, timeoutError()
+		return fallbackResponse, timeoutError()
 	}
-	return response, err
+	return fallbackResponse, fallbackErr
+}
+
+func withExecutionStage(response Response, stage ExecutionStage) Response {
+	response.Stage = normalizedStage(stage)
+	for i := range response.Attempts {
+		response.Attempts[i].Stage = response.Stage
+	}
+	return response
 }
 
 func isFallbackEligible(err error) bool {

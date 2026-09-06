@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type ErrorKind string
@@ -16,7 +17,26 @@ const (
 	ErrorUnavailable   ErrorKind = "provider_unavailable"
 	ErrorTimeout       ErrorKind = "provider_timeout"
 	ErrorMalformed     ErrorKind = "provider_malformed_response"
+	ErrorIncomplete    ErrorKind = "provider_incomplete_response"
 	ErrorConfiguration ErrorKind = "provider_configuration_error"
+)
+
+type ExecutionStage string
+
+const (
+	StageNone     ExecutionStage = "none"
+	StagePrimary  ExecutionStage = "primary"
+	StageFallback ExecutionStage = "fallback"
+)
+
+type FinishReason string
+
+const (
+	FinishReasonNone    FinishReason = "none"
+	FinishReasonStop    FinishReason = "stop"
+	FinishReasonLength  FinishReason = "length"
+	FinishReasonMissing FinishReason = "missing"
+	FinishReasonOther   FinishReason = "other"
 )
 
 type ProviderError struct {
@@ -51,10 +71,26 @@ type Request struct {
 }
 
 type Response struct {
-	Text         string
+	Text              string
+	Provider          string
+	Model             string
+	Stage             ExecutionStage
+	FinishReason      FinishReason
+	PromptTokens      int
+	CompletionTokens  int
+	FallbackAttempted bool
+	FallbackSucceeded bool
+	PrimaryErrorKind  ErrorKind
+	Attempts          []Attempt
+}
+
+type Attempt struct {
 	Provider     string
 	Model        string
-	FallbackUsed bool
+	Stage        ExecutionStage
+	FinishReason FinishReason
+	ErrorKind    ErrorKind
+	LatencyMS    float64
 }
 
 type Provider interface {
@@ -67,17 +103,67 @@ func NewDeterministicProvider() *DeterministicProvider {
 	return &DeterministicProvider{}
 }
 
-func (p *DeterministicProvider) Generate(_ context.Context, req Request) (Response, error) {
+func (p *DeterministicProvider) Generate(_ context.Context, req Request) (response Response, retErr error) {
+	startedAt := time.Now()
+	response = newResponseMetadata("deterministic", "deterministic", StagePrimary)
+	defer func() { addAttempt(&response, startedAt, retErr) }()
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
-		return Response{}, errors.New("empty prompt")
+		return response, errors.New("empty prompt")
 	}
 	if strings.Contains(strings.ToLower(prompt), "[llm:fail]") {
-		return Response{}, errors.New("forced llm failure")
+		return response, errors.New("forced llm failure")
 	}
+	response.Text = "[" + req.Mode + "|" + req.PersonaTone + "|" + req.Style + "] " + prompt
+	response.FinishReason = FinishReasonStop
+	return response, nil
+}
+
+func newResponseMetadata(provider, model string, stage ExecutionStage) Response {
 	return Response{
-		Text:     "[" + req.Mode + "|" + req.PersonaTone + "|" + req.Style + "] " + prompt,
-		Provider: "deterministic",
-		Model:    "deterministic",
-	}, nil
+		Provider:     strings.TrimSpace(provider),
+		Model:        strings.TrimSpace(model),
+		Stage:        normalizedStage(stage),
+		FinishReason: FinishReasonMissing,
+	}
+}
+
+func addAttempt(response *Response, startedAt time.Time, err error) {
+	if response == nil {
+		return
+	}
+	response.Attempts = append(response.Attempts, Attempt{
+		Provider:     response.Provider,
+		Model:        response.Model,
+		Stage:        normalizedStage(response.Stage),
+		FinishReason: normalizedFinishReason(response.FinishReason),
+		ErrorKind:    providerErrorKind(err),
+		LatencyMS:    float64(time.Since(startedAt).Microseconds()) / 1000,
+	})
+}
+
+func providerErrorKind(err error) ErrorKind {
+	var providerErr *ProviderError
+	if errors.As(err, &providerErr) {
+		return providerErr.Kind
+	}
+	return ""
+}
+
+func normalizedStage(stage ExecutionStage) ExecutionStage {
+	switch stage {
+	case StagePrimary, StageFallback:
+		return stage
+	default:
+		return StagePrimary
+	}
+}
+
+func normalizedFinishReason(reason FinishReason) FinishReason {
+	switch reason {
+	case FinishReasonStop, FinishReasonLength, FinishReasonMissing, FinishReasonOther:
+		return reason
+	default:
+		return FinishReasonMissing
+	}
 }

@@ -30,7 +30,7 @@ func TestResolveAssistantLLMProviderUsesSeparateKeys(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer fallback-test-key" {
 				t.Fatal("fallback request used the wrong credential")
 			}
-			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"fallback ok"}}]}`))
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"fallback ok"},"finish_reason":"stop"}]}`))
 		default:
 			t.Fatalf("unexpected model %q", request.Model)
 		}
@@ -53,23 +53,25 @@ func TestResolveAssistantLLMProviderUsesSeparateKeys(t *testing.T) {
 	}
 }
 
-func TestResolveAssistantLLMProviderKeepsLegacySharedKey(t *testing.T) {
+func TestResolveAssistantLLMProviderUsesPrimaryOnlyWhenFallbackPairIsBlank(t *testing.T) {
+	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer shared-test-key" {
-			t.Fatal("legacy shared credential was not used")
+		requests++
+		if r.Header.Get("Authorization") != "Bearer primary-test-key" {
+			t.Fatal("primary credential was not used")
 		}
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"primary ok"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"primary ok"},"finish_reason":"stop"}]}`))
 	}))
 	defer server.Close()
 
 	provider := resolveAssistantLLMProvider(config.AIConfig{
 		AlemBaseURL:             server.URL + "/v1",
-		AlemAPIKey:              "shared-test-key",
-		AlemPrimaryModel:        "primary-model",
+		AlemPrimaryAPIKey:       "primary-test-key",
+		AlemPrimaryModel:        "gemma4",
 		AssistantPrimaryTimeout: time.Second,
 	})
 	response, err := provider.Generate(context.Background(), assistantllm.Request{Prompt: "synthetic"})
-	if err != nil || response.Text != "primary ok" {
+	if err != nil || response.Text != "primary ok" || response.Model != "gemma4" || response.Stage != assistantllm.StagePrimary || requests != 1 || response.FallbackAttempted {
 		t.Fatalf("unexpected primary response=%#v err=%v", response, err)
 	}
 }
