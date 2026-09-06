@@ -27,14 +27,14 @@ jobs:
 
     steps:
       - name: Checkout release tooling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           path: tooling
           persist-credentials: false
 
       - name: Setup exact Go 1.24.0
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.24.0"
           check-latest: false
@@ -49,7 +49,7 @@ jobs:
           test "$(go env GOTOOLCHAIN)" = "local"
 
       - name: Checkout stable source A
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.SOURCE_BRANCH }}
           fetch-depth: 0
@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout stable source B
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.SOURCE_BRANCH }}
           fetch-depth: 0
@@ -157,7 +157,7 @@ jobs:
           test -z "$(git -C "$GITHUB_WORKSPACE/source-b" status --porcelain=v1 --untracked-files=all)"
 
       - name: Upload canonical backend artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kundi-backend-631126f-linux-amd64
           path: |
