@@ -161,18 +161,33 @@ func TestBuildAlemSeparateKeysAreReady(t *testing.T) {
 	}
 }
 
-func TestBuildAlemRequiresCredentialForConfiguredFallback(t *testing.T) {
-	cfg := config.Config{AI: config.AIConfig{
-		AssistantEnabled:     true,
-		AssistantRolloutMode: config.AssistantRolloutModeAll,
-		AlemBaseURL:          "https://llm.example/v1",
-		AlemPrimaryAPIKey:    "primary-test-key",
-		AlemPrimaryModel:     "primary-model",
-		AlemFallbackModel:    "fallback-model",
-	}}
-	snapshot := Build(cfg)
-	if snapshot.LLM.State != StateMisconfigured || snapshot.LLM.Reason == "" {
-		t.Fatalf("expected missing fallback credential to be reported, got %#v", snapshot.LLM)
+func TestBuildAlemFallbackPairValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		fallbackModel string
+		fallbackKey   string
+		wantState     State
+	}{
+		{name: "blank pair is primary only", wantState: StateReady},
+		{name: "model only", fallbackModel: "fallback-model", wantState: StateMisconfigured},
+		{name: "key only", fallbackKey: "fallback-key", wantState: StateMisconfigured},
+		{name: "complete pair", fallbackModel: "fallback-model", fallbackKey: "fallback-key", wantState: StateReady},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := config.Config{AI: config.AIConfig{
+				AssistantEnabled:     true,
+				AssistantRolloutMode: config.AssistantRolloutModeAll,
+				AlemBaseURL:          "https://llm.example/v1",
+				AlemPrimaryAPIKey:    "primary-test-key",
+				AlemPrimaryModel:     "gemma4",
+				AlemFallbackModel:    test.fallbackModel,
+				AlemFallbackAPIKey:   test.fallbackKey,
+			}}
+			if snapshot := Build(cfg); snapshot.LLM.State != test.wantState {
+				t.Fatalf("state=%s want=%s provider=%#v", snapshot.LLM.State, test.wantState, snapshot.LLM)
+			}
+		})
 	}
 }
 
@@ -191,17 +206,16 @@ func TestBuildAlemAcceptsSeparateKeys(t *testing.T) {
 	}
 }
 
-func TestBuildAlemAcceptsLegacySharedKey(t *testing.T) {
+func TestBuildAlemRejectsLegacySharedKeyForEnabledAssistant(t *testing.T) {
 	cfg := config.Config{AI: config.AIConfig{
 		AssistantEnabled:     true,
 		AssistantRolloutMode: config.AssistantRolloutModeAll,
 		AlemBaseURL:          "https://llm.example/v1",
 		AlemAPIKey:           "shared-key",
 		AlemPrimaryModel:     "primary-model",
-		AlemFallbackModel:    "fallback-model",
 	}}
-	if snapshot := Build(cfg); snapshot.LLM.State != StateReady {
-		t.Fatalf("expected legacy shared Alem key to be ready, got %#v", snapshot.LLM)
+	if snapshot := Build(cfg); snapshot.LLM.State != StateMisconfigured {
+		t.Fatalf("expected explicit primary Alem key to be required, got %#v", snapshot.LLM)
 	}
 }
 

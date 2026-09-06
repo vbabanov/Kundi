@@ -70,14 +70,16 @@ func llmStatus(cfg config.Config) Provider {
 		if strings.TrimSpace(cfg.AI.AlemBaseURL) == "" {
 			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_BASE_URL is required"}
 		}
-		if firstConfigured(cfg.AI.AlemPrimaryAPIKey, cfg.AI.AlemAPIKey) == "" {
-			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_PRIMARY_API_KEY or ALEM_API_KEY is required"}
+		if strings.TrimSpace(cfg.AI.AlemPrimaryAPIKey) == "" {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_PRIMARY_API_KEY is required"}
 		}
 		if strings.TrimSpace(cfg.AI.AlemPrimaryModel) == "" {
 			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_PRIMARY_MODEL is required"}
 		}
-		if strings.TrimSpace(cfg.AI.AlemFallbackModel) != "" && firstConfigured(cfg.AI.AlemFallbackAPIKey, cfg.AI.AlemAPIKey) == "" {
-			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_FALLBACK_API_KEY or ALEM_API_KEY is required when ALEM_FALLBACK_MODEL is configured"}
+		fallbackModelConfigured := strings.TrimSpace(cfg.AI.AlemFallbackModel) != ""
+		fallbackKeyConfigured := strings.TrimSpace(cfg.AI.AlemFallbackAPIKey) != ""
+		if fallbackModelConfigured != fallbackKeyConfigured {
+			return Provider{Name: "llm", Mode: "alem", State: StateMisconfigured, Reason: "ALEM_FALLBACK_MODEL and ALEM_FALLBACK_API_KEY must be configured together"}
 		}
 		return Provider{Name: "llm", Mode: "alem", State: StateReady}
 	}
@@ -117,15 +119,6 @@ func observabilityDisabled(mode string) bool {
 	default:
 		return false
 	}
-}
-
-func firstConfigured(values ...string) string {
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
 }
 
 func ttsStatus(cfg config.Config) Provider {
