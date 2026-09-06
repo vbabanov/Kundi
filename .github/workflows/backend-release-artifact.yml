@@ -1,0 +1,163 @@
+name: Backend Reproducible Release Artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_BRANCH: ui/reference-polish-pass-2
+  SOURCE_SHA: 631126f87f05e52095ae41d31eb64ceaf18b0f53
+  GOTOOLCHAIN: local
+
+jobs:
+  backend-release-artifact:
+    name: Backend reproducible release artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: tooling
+          persist-credentials: false
+
+      - name: Setup exact Go 1.24.0
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.0"
+          check-latest: false
+          cache-dependency-path: tooling/backend/go.sum
+
+      - name: Verify exact Go toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(go version | awk '{print $3}')" = "go1.24.0"
+          test "$(go env GOVERSION)" = "go1.24.0"
+          test "$(go env GOTOOLCHAIN)" = "local"
+
+      - name: Checkout stable source A
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          path: source-a
+          persist-credentials: false
+
+      - name: Checkout stable source B
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          path: source-b
+          persist-credentials: false
+
+      - name: Verify independent clean source checkouts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for source in source-a source-b; do
+            git -C "$GITHUB_WORKSPACE/$source" fetch --no-tags origin \
+              "refs/heads/$SOURCE_BRANCH:refs/remotes/origin/$SOURCE_BRANCH"
+            test "$(git -C "$GITHUB_WORKSPACE/$source" rev-parse HEAD)" = "$SOURCE_SHA"
+            test "$(git -C "$GITHUB_WORKSPACE/$source" rev-parse "origin/$SOURCE_BRANCH")" = "$SOURCE_SHA"
+            test -z "$(git -C "$GITHUB_WORKSPACE/$source" status --porcelain=v1 --untracked-files=all)"
+            test "$(git -C "$GITHUB_WORKSPACE/$source" rev-parse --git-dir)" = ".git"
+          done
+          test "$(realpath "$GITHUB_WORKSPACE/source-a")" != "$(realpath "$GITHUB_WORKSPACE/source-b")"
+
+      - name: Run backend tests
+        working-directory: tooling/backend
+        shell: bash
+        run: go test ./...
+
+      - name: Build release artifact A
+        working-directory: tooling/backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releasepack build \
+            --source-root "$GITHUB_WORKSPACE/source-a" \
+            --output-root "$RUNNER_TEMP/build-a" \
+            --gocache "$RUNNER_TEMP/gocache-a" \
+            --go "$(command -v go)" \
+            --expected-sha "$SOURCE_SHA" \
+            --source-branch "$SOURCE_BRANCH"
+
+      - name: Build release artifact B
+        working-directory: tooling/backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releasepack build \
+            --source-root "$GITHUB_WORKSPACE/source-b" \
+            --output-root "$RUNNER_TEMP/build-b" \
+            --gocache "$RUNNER_TEMP/gocache-b" \
+            --go "$(command -v go)" \
+            --expected-sha "$SOURCE_SHA" \
+            --source-branch "$SOURCE_BRANCH"
+
+      - name: Compare binary, migration, manifest, and archive hashes
+        working-directory: tooling/backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/releasepack compare \
+            --build-a "$RUNNER_TEMP/build-a" \
+            --build-b "$RUNNER_TEMP/build-b"
+
+      - name: Verify package layout and privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_root="$RUNNER_TEMP/build-a/kundi-backend-631126f"
+          expected_paths="$RUNNER_TEMP/expected-paths.txt"
+          actual_paths="$RUNNER_TEMP/actual-paths.txt"
+          cat >"$expected_paths" <<'EOF'
+          RELEASE_MANIFEST.json
+          SHA256SUMS
+          bin/api
+          bin/migrator
+          bin/worker_ai
+          bin/worker_jobs
+          bin/worker_whatsapp
+          migrations/0001_extensions.sql
+          migrations/0002_core_schema.sql
+          migrations/0003_indexes.sql
+          migrations/0004_constraints_hardening.sql
+          migrations/0005_academic_contract_v2.sql
+          migrations/0006_academic_contract_v2_constraints_indexes.sql
+          migrations/0007_lessons_place_non_negative_and_summative_identity.sql
+          migrations/0008_attendance_matching_keys.sql
+          migrations/0009_assistant_phase1_sessions.sql
+          migrations/0010_assistant_voice_input.sql
+          EOF
+          find "$package_root" -type f -printf '%P\n' | sort >"$actual_paths"
+          diff -u "$expected_paths" "$actual_paths"
+          if grep -R -a -F -q "$GITHUB_WORKSPACE" "$package_root"; then
+            echo "package contains an absolute workspace path" >&2
+            exit 1
+          fi
+          if grep -R -a -F -q "$RUNNER_TEMP" "$package_root"; then
+            echo "package contains an absolute runner path" >&2
+            exit 1
+          fi
+          test "$(find "$package_root" -type f \( -name '.env' -o -name '*.env' -o -iname '*secret*' \) -print -quit)" = ""
+          test -z "$(git -C "$GITHUB_WORKSPACE/source-a" status --porcelain=v1 --untracked-files=all)"
+          test -z "$(git -C "$GITHUB_WORKSPACE/source-b" status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload canonical backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kundi-backend-631126f-linux-amd64
+          path: |
+            ${{ runner.temp }}/build-a/kundi-backend-631126f-linux-amd64.tar.gz
+            ${{ runner.temp }}/build-a/RELEASE_MANIFEST.json
+            ${{ runner.temp }}/build-a/ARTIFACT_SHA256.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 10
