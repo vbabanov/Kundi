@@ -2,6 +2,14 @@ name: Backend Reproducible Release Artifact
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/kundi-backend-artifact
+    paths:
+      - backend/RELEASE_ARTIFACT.md
+      - backend/cmd/releasepack/**
+      - backend/internal/releaseartifact/**
+      - .github/workflows/backend-release-artifact.yml
 
 permissions:
   contents: read
