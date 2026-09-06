@@ -75,7 +75,7 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 		t.Fatalf("response metadata was not restored: %#v", first)
 	}
 	stored, found, err := repository.FindExchange(ctx, studentID, uuid.MustParse(session.ID), clientID)
-	if err != nil || !found || stored.Assistant.Provider != "alem" || stored.Assistant.Model != "exact-model" || stored.Assistant.ResponseMode != "explanation" || len(stored.Assistant.TutoringPolicy) == 0 {
+	if err != nil || !found || stored.Assistant.Provider != "alem" || stored.Assistant.Model != "gemma4" || stored.Assistant.ResponseMode != "explanation" || len(stored.Assistant.TutoringPolicy) == 0 {
 		t.Fatalf("stored exchange metadata incomplete: found=%v exchange=%#v err=%v", found, stored, err)
 	}
 
