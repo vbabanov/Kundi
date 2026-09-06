@@ -3,6 +3,7 @@ package assistant
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 )
@@ -123,5 +125,119 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 	sessions, err := repository.ListSessions(ctx, studentID, 10, nil)
 	if err != nil || len(sessions) != 2 || sessions[0].ID != secondSession.ID || sessions[0].Title != "Второй вопрос" {
 		t.Fatalf("session title/order mismatch: sessions=%#v err=%v", sessions, err)
+	}
+}
+
+func TestPostgresSessionOwnershipIntegrity(t *testing.T) {
+	dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL"))
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL is not set; skipping PostgreSQL assistant ownership test")
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect test database: %v", err)
+	}
+	defer pool.Close()
+
+	var contentValidated bool
+	if err := pool.QueryRow(ctx, `
+		SELECT convalidated
+		FROM pg_constraint
+		WHERE conname = 'chk_assistant_messages_content_length'
+		  AND conrelid = 'assistant_messages'::regclass
+	`).Scan(&contentValidated); err != nil {
+		t.Fatalf("read content constraint: %v", err)
+	}
+	if !contentValidated {
+		t.Fatal("assistant message content constraint is not validated")
+	}
+
+	studentA := uuid.New()
+	studentB := uuid.New()
+	for _, studentID := range []uuid.UUID{studentA, studentB} {
+		if _, err := pool.Exec(ctx, `INSERT INTO students(id, external_student_ref) VALUES ($1, $2)`, studentID, "assistant-owner-"+studentID.String()); err != nil {
+			t.Fatalf("insert student %s: %v", studentID, err)
+		}
+	}
+	defer func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM students WHERE id = ANY($1)`, []uuid.UUID{studentA, studentB})
+	}()
+
+	repository := NewPostgresSessionRepository(pool)
+	session, err := repository.CreateSession(ctx, studentA, "ru-KZ", 7)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	sessionID := uuid.MustParse(session.ID)
+
+	matchingMessageID := uuid.New()
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO assistant_messages(id, session_id, student_id, role, text_content, content)
+		VALUES ($1, $2, $3, 'user', 'matching', 'matching')
+	`, matchingMessageID, sessionID, studentA); err != nil {
+		t.Fatalf("insert matching ownership message: %v", err)
+	}
+
+	_, mismatchErr := pool.Exec(ctx, `
+		INSERT INTO assistant_messages(id, session_id, student_id, role, text_content, content)
+		VALUES ($1, $2, $3, 'user', 'mismatch', 'mismatch')
+	`, uuid.New(), sessionID, studentB)
+	var postgresErr *pgconn.PgError
+	if !errors.As(mismatchErr, &postgresErr) || postgresErr.Code != "23503" {
+		t.Fatalf("mismatched ownership error = %v, want SQLSTATE 23503", mismatchErr)
+	}
+
+	clientMessageID := uuid.New()
+	assistantMessage := SessionMessage{
+		Content:      "stored answer",
+		Provider:     "test",
+		Model:        "test-model",
+		ResponseMode: "explanation",
+	}
+	stored, err := repository.SaveExchange(ctx, studentA, sessionID, clientMessageID, "stored question", InputModeText, assistantMessage)
+	if err != nil {
+		t.Fatalf("save matching exchange: %v", err)
+	}
+	if stored.User.ID == "" || stored.Assistant.ID == "" {
+		t.Fatalf("saved exchange is incomplete: %#v", stored)
+	}
+
+	messages, err := repository.ListMessages(ctx, studentA, sessionID, 10, nil)
+	if err != nil {
+		t.Fatalf("list matching messages: %v", err)
+	}
+	if len(messages) != 3 {
+		t.Fatalf("matching message count = %d, want 3", len(messages))
+	}
+	if _, err := repository.ListMessages(ctx, studentA, sessionID, 2, &PageCursor{At: messages[0].CreatedAt, ID: uuid.MustParse(messages[0].ID)}); err != nil {
+		t.Fatalf("list matching messages with cursor: %v", err)
+	}
+
+	found, ok, err := repository.FindExchange(ctx, studentA, sessionID, clientMessageID)
+	if err != nil || !ok || found.User.ID != stored.User.ID || found.Assistant.ID != stored.Assistant.ID {
+		t.Fatalf("find matching exchange: found=%v exchange=%#v err=%v", ok, found, err)
+	}
+
+	if _, err := repository.GetSession(ctx, studentB, sessionID); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("wrong student GetSession error = %v, want ErrSessionNotFound", err)
+	}
+	if _, err := repository.ListMessages(ctx, studentB, sessionID, 10, nil); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("wrong student ListMessages error = %v, want ErrSessionNotFound", err)
+	}
+	if _, ok, err := repository.FindExchange(ctx, studentB, sessionID, clientMessageID); !errors.Is(err, ErrSessionNotFound) || ok {
+		t.Fatalf("wrong student FindExchange: found=%v err=%v, want no session", ok, err)
+	}
+
+	if err := repository.DeleteSession(ctx, studentA, sessionID); err != nil {
+		t.Fatalf("delete matching session: %v", err)
+	}
+	var remaining int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM assistant_messages WHERE session_id = $1`, sessionID).Scan(&remaining); err != nil {
+		t.Fatalf("count messages after session delete: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("messages after session delete = %d, want 0", remaining)
 	}
 }

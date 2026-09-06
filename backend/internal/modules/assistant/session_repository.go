@@ -138,16 +138,16 @@ func (r *PostgresSessionRepository) ListMessages(ctx context.Context, studentID,
 	if _, err := r.GetSession(ctx, studentID, sessionID); err != nil {
 		return nil, err
 	}
-	args := []any{sessionID, limit}
+	args := []any{sessionID, studentID, limit}
 	cursorSQL := ""
 	if cursor != nil {
-		cursorSQL = "AND (created_at, id) < ($3, $4)"
+		cursorSQL = "AND (created_at, id) < ($4, $5)"
 		args = append(args, cursor.At, cursor.ID)
 	}
 	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
 		SELECT id::text, session_id::text, role, content, input_mode, response_mode, created_at
-		FROM assistant_messages WHERE session_id = $1 %s
-		ORDER BY created_at DESC, id DESC LIMIT $2
+		FROM assistant_messages WHERE session_id = $1 AND student_id = $2 %s
+		ORDER BY created_at DESC, id DESC LIMIT $3
 	`, cursorSQL), args...)
 	if err != nil {
 		return nil, err
@@ -187,7 +187,8 @@ func (r *PostgresSessionRepository) FindExchange(ctx context.Context, studentID,
 		       a.provider, a.model, a.tutoring_policy_result, COALESCE(a.safety_category, ''), a.created_at
 		FROM assistant_messages u
 		JOIN assistant_messages a
-		  ON a.session_id = u.session_id AND a.role = 'assistant' AND a.client_message_id = u.client_message_id
+		  ON a.session_id = u.session_id AND a.student_id = u.student_id
+		 AND a.role = 'assistant' AND a.client_message_id = u.client_message_id
 		WHERE u.session_id = $1 AND u.student_id = $2 AND u.client_message_id = $3 AND u.role = 'user'
 	`, sessionID, studentID, clientMessageID).Scan(
 		&exchange.User.ID, &exchange.User.SessionID, &exchange.User.Role, &exchange.User.Content, &exchange.User.InputMode, &exchange.User.CreatedAt,
