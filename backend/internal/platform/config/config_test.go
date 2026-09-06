@@ -59,6 +59,17 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	}
 }
 
+func TestLoadDatabaseDoesNotRequireApplicationCredentials(t *testing.T) {
+	t.Setenv("ACCESS_TOKEN_SECRET", "")
+	t.Setenv("FIELD_ENCRYPTION_KEY", "")
+	t.Setenv("DATABASE_URL", "postgres://migration-only.invalid/kundi")
+
+	cfg := LoadDatabase()
+	if cfg.URL != "postgres://migration-only.invalid/kundi" {
+		t.Fatalf("database URL = %q", cfg.URL)
+	}
+}
+
 func TestAssistantReadsNamedAlemSettings(t *testing.T) {
 	t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
 	t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")

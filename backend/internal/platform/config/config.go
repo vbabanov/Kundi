@@ -129,9 +129,7 @@ func Load() (Config, error) {
 			ReadTimeout:  time.Duration(envInt("HTTP_READ_TIMEOUT_SEC", 15)) * time.Second,
 			WriteTimeout: time.Duration(envInt("HTTP_WRITE_TIMEOUT_SEC", 30)) * time.Second,
 		},
-		Database: DatabaseConfig{
-			URL: env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/kundi?sslmode=disable"),
-		},
+		Database: LoadDatabase(),
 		Storage: StorageConfig{
 			Provider:      env("OBJECT_STORAGE_PROVIDER", "s3"),
 			Endpoint:      env("OBJECT_STORAGE_ENDPOINT", ""),
@@ -214,6 +212,14 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// LoadDatabase returns the only configuration required by the standalone
+// migrator. Application credentials are intentionally outside this contract.
+func LoadDatabase() DatabaseConfig {
+	return DatabaseConfig{
+		URL: env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/kundi?sslmode=disable"),
+	}
 }
 
 func assistantRolloutConfig(enabled bool) (string, []uuid.UUID, error) {

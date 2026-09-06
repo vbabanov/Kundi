@@ -10,12 +10,9 @@ import (
 
 func main() {
 	ctx := context.Background()
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("load config: %v", err)
-	}
+	cfg := config.LoadDatabase()
 
-	pool, err := db.Connect(ctx, cfg.Database.URL)
+	pool, err := db.Connect(ctx, cfg.URL)
 	if err != nil {
 		log.Fatalf("connect db: %v", err)
 	}
