@@ -507,8 +507,8 @@ func migrationFiles(directory string) ([]string, error) {
 		}
 	}
 	sort.Strings(files)
-	if len(files) != 10 {
-		return nil, fmt.Errorf("require exactly 10 SQL migrations, found %d", len(files))
+	if len(files) != 11 {
+		return nil, fmt.Errorf("require exactly 11 SQL migrations, found %d", len(files))
 	}
 	for index, path := range files {
 		prefix := fmt.Sprintf("%04d_", index+1)

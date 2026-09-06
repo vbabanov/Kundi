@@ -4,34 +4,60 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/kundi-backend-artifact
+      - release/kundi-migration-hardening
+      - ui/reference-polish-pass-2
     paths:
-      - backend/RELEASE_ARTIFACT.md
-      - backend/cmd/releasepack/**
-      - backend/internal/releaseartifact/**
-      - .github/workflows/backend-release-artifact.yml
+      - "backend/**"
+      - ".github/workflows/backend-release-artifact.yml"
 
 permissions:
   contents: read
 
 env:
-  SOURCE_BRANCH: ui/reference-polish-pass-2
-  SOURCE_SHA: 631126f87f05e52095ae41d31eb64ceaf18b0f53
+  SOURCE_BRANCH: ${{ github.ref_name }}
+  SOURCE_SHA: ${{ github.sha }}
   GOTOOLCHAIN: local
 
 jobs:
   backend-release-artifact:
     name: Backend reproducible release artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kundi_ci
+          POSTGRES_PASSWORD: kundi_ci
+          POSTGRES_DB: kundi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kundi_ci -d kundi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout release tooling
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.SOURCE_SHA }}
           fetch-depth: 0
           path: tooling
           persist-credentials: false
+
+      - name: Resolve current source provenance
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF" = "refs/heads/$SOURCE_BRANCH"
+          test "$(git -C "$GITHUB_WORKSPACE/tooling" rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C "$GITHUB_WORKSPACE/tooling" rev-parse "origin/$SOURCE_BRANCH")" = "$SOURCE_SHA"
+          test -z "$(git -C "$GITHUB_WORKSPACE/tooling" status --porcelain=v1 --untracked-files=all)"
+          echo "short_sha=${SOURCE_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Setup exact Go 1.24.0
         uses: actions/setup-go@v7
@@ -48,18 +74,18 @@ jobs:
           test "$(go env GOVERSION)" = "go1.24.0"
           test "$(go env GOTOOLCHAIN)" = "local"
 
-      - name: Checkout stable source A
+      - name: Checkout current source A
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.SOURCE_BRANCH }}
+          ref: ${{ env.SOURCE_SHA }}
           fetch-depth: 0
           path: source-a
           persist-credentials: false
 
-      - name: Checkout stable source B
+      - name: Checkout current source B
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.SOURCE_BRANCH }}
+          ref: ${{ env.SOURCE_SHA }}
           fetch-depth: 0
           path: source-b
           persist-credentials: false
@@ -76,10 +102,10 @@ jobs:
           done
           test "$(realpath "$GITHUB_WORKSPACE/source-a")" != "$(realpath "$GITHUB_WORKSPACE/source-b")"
 
-      - name: Run backend tests
+      - name: Run backend tests without external services
         working-directory: tooling/backend
         shell: bash
-        run: go test ./...
+        run: go test -count=1 ./...
 
       - name: Build release artifact A
         working-directory: tooling/backend
@@ -120,7 +146,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          package_root="$RUNNER_TEMP/build-a/kundi-backend-631126f"
+          package_root="$RUNNER_TEMP/build-a/kundi-backend-${{ steps.source.outputs.short_sha }}"
           expected_paths="$RUNNER_TEMP/expected-paths.txt"
           actual_paths="$RUNNER_TEMP/actual-paths.txt"
           cat >"$expected_paths" <<'EOF'
@@ -141,6 +167,7 @@ jobs:
           migrations/0008_attendance_matching_keys.sql
           migrations/0009_assistant_phase1_sessions.sql
           migrations/0010_assistant_voice_input.sql
+          migrations/0011_assistant_session_ownership_integrity.sql
           EOF
           find "$package_root" -type f -printf '%P\n' | sort >"$actual_paths"
           diff -u "$expected_paths" "$actual_paths"
@@ -156,12 +183,61 @@ jobs:
           test -z "$(git -C "$GITHUB_WORKSPACE/source-a" status --porcelain=v1 --untracked-files=all)"
           test -z "$(git -C "$GITHUB_WORKSPACE/source-b" status --porcelain=v1 --untracked-files=all)"
 
+      - name: Rehearse canonical Linux migrator on PostgreSQL 16
+        working-directory: tooling/backend
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://kundi_ci:kundi_ci@127.0.0.1:5432/kundi_ci?sslmode=disable
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/canonical-migration-rehearsal.txt"
+          go run ./cmd/releasemigrationcheck \
+            --package-root "$RUNNER_TEMP/build-a/kundi-backend-${{ steps.source.outputs.short_sha }}" \
+            --expected-sha "$SOURCE_SHA" | tee "$report"
+          grep -F -x "migrator_vcs_revision=$SOURCE_SHA" "$report"
+          grep -F -x "migrator_vcs_modified=false" "$report"
+          grep -F -x "pre0009_migration_count=8" "$report"
+          grep -F -x "full_migration_count=11" "$report"
+          grep -F -x "second_migration_count=11" "$report"
+          grep -F -x "second_run_schema_unchanged=true" "$report"
+          grep -F -x "ownership_mismatch_sqlstate=23503" "$report"
+          grep -F -x "input_mode_invalid_sqlstate=23514" "$report"
+          grep -F -x "session_delete_cascade=true" "$report"
+          grep -F -x "canonical_migrator_runs=3" "$report"
+
+      - name: Run PostgreSQL integration suite without ownership skips
+        working-directory: tooling/backend
+        shell: bash
+        env:
+          TEST_DATABASE_URL: postgresql://kundi_ci:kundi_ci@127.0.0.1:5432/kundi_ci?sslmode=disable
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/backend-pg-tests.txt"
+          go test -count=1 -v ./... 2>&1 | tee "$report"
+          for test_name in \
+            TestPostgresSessionOwnershipIntegrity \
+            TestMigrationsFresh0001Through0011 \
+            TestMigrationsUpgrade0001Through0008To0011 \
+            TestMigration0011PreservesValidRows \
+            TestMigration0011RejectsMismatchedOwnership \
+            TestMigration0011RejectsInvalidExistingContent \
+            TestMigrationsCrossSchemaConstraintRepair; do
+            grep -F -- "--- PASS: $test_name" "$report"
+            if grep -F -- "--- SKIP: $test_name" "$report"; then
+              echo "required PostgreSQL test skipped: $test_name" >&2
+              exit 1
+            fi
+          done
+          printf 'postgres_test_passes=%s\n' "$(grep -c -F -- '--- PASS:' "$report" || true)"
+          printf 'postgres_test_skips=%s\n' "$(grep -c -F -- '--- SKIP:' "$report" || true)"
+          printf 'packages_without_tests=%s\n' "$(grep -c -F -- '[no test files]' "$report" || true)"
+
       - name: Upload canonical backend artifact
         uses: actions/upload-artifact@v7
         with:
-          name: kundi-backend-631126f-linux-amd64
+          name: kundi-backend-${{ steps.source.outputs.short_sha }}-linux-amd64
           path: |
-            ${{ runner.temp }}/build-a/kundi-backend-631126f-linux-amd64.tar.gz
+            ${{ runner.temp }}/build-a/kundi-backend-${{ steps.source.outputs.short_sha }}-linux-amd64.tar.gz
             ${{ runner.temp }}/build-a/RELEASE_MANIFEST.json
             ${{ runner.temp }}/build-a/ARTIFACT_SHA256.txt
           if-no-files-found: error

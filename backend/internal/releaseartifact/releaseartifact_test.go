@@ -32,9 +32,9 @@ func TestBuildFlagsAreExact(t *testing.T) {
 	}
 }
 
-func TestMigrationFilesRequireOrdered0001Through0010(t *testing.T) {
+func TestMigrationFilesRequireOrdered0001Through0011(t *testing.T) {
 	directory := t.TempDir()
-	for number := 1; number <= 10; number++ {
+	for number := 1; number <= 11; number++ {
 		name := filepath.Join(directory, formatMigrationName(number))
 		if err := os.WriteFile(name, []byte("SELECT 1;\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -44,10 +44,10 @@ func TestMigrationFilesRequireOrdered0001Through0010(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrationFiles() error = %v", err)
 	}
-	if len(files) != 10 || filepath.Base(files[0]) != "0001_test.sql" || filepath.Base(files[9]) != "0010_test.sql" {
+	if len(files) != 11 || filepath.Base(files[0]) != "0001_test.sql" || filepath.Base(files[10]) != "0011_test.sql" {
 		t.Fatalf("unexpected migration order: %v", files)
 	}
-	if err := os.Rename(filepath.Join(directory, "0005_test.sql"), filepath.Join(directory, "0011_test.sql")); err != nil {
+	if err := os.Rename(filepath.Join(directory, "0005_test.sql"), filepath.Join(directory, "0012_test.sql")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := migrationFiles(directory); err == nil || !strings.Contains(err.Error(), "sequence mismatch") {
