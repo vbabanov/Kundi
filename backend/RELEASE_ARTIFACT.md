@@ -68,3 +68,12 @@ that non-recursive hash is stored in `ARTIFACT_SHA256.txt`.
 Migration contents are read from the commit's Git blobs rather than the checked
 out files. This prevents `core.autocrlf` or another checkout policy from changing
 their packaged bytes across operating systems.
+
+The canonical package contains exactly eleven ordered migrations, `0001` through
+`0011`. Migration `0011` validates existing assistant message content and enforces
+that every assistant message has the same student owner as its session. It does
+not add a default for `assistant_messages.content`: the active repository writes
+both `text_content` and `content`, while an unknown direct SQL writer from before
+`0009` is not a supported runtime contract. Such a writer must be updated before
+using this schema; this is a known direct-writer compatibility limitation, not a
+rollback blocker for the verified rollback runtime.
