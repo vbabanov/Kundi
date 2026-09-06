@@ -93,6 +93,7 @@ func TestMigration0011RejectsMismatchedOwnership(t *testing.T) {
 		t.Fatalf("run migrations 0001-0010: %v", err)
 	}
 	_, _, messageID := insertPre0011Message(t, pool, true)
+	contentExistedBefore, contentValidatedBefore := contentConstraintState(t, pool)
 
 	err := RunMigrations(ctx, pool, migrationsPath(t))
 	var postgresErr *pgconn.PgError
@@ -111,17 +112,12 @@ func TestMigration0011RejectsMismatchedOwnership(t *testing.T) {
 		t.Fatalf("mismatched row count after failed 0011 = %d, want 1", rowCount)
 	}
 
-	var contentValidated bool
-	if err := pool.QueryRow(ctx, `
-		SELECT convalidated
-		FROM pg_constraint
-		WHERE conname = 'chk_assistant_messages_content_length'
-		  AND conrelid = 'assistant_messages'::regclass
-	`).Scan(&contentValidated); err != nil {
-		t.Fatalf("read pre-0011 content constraint after rollback: %v", err)
-	}
-	if contentValidated {
-		t.Fatal("failed 0011 did not roll back content constraint validation")
+	contentExistsAfter, contentValidatedAfter := contentConstraintState(t, pool)
+	if contentExistsAfter != contentExistedBefore || contentValidatedAfter != contentValidatedBefore {
+		t.Fatalf(
+			"failed 0011 changed content constraint state: before=(%v,%v) after=(%v,%v)",
+			contentExistedBefore, contentValidatedBefore, contentExistsAfter, contentValidatedAfter,
+		)
 	}
 
 	var newConstraintCount int
@@ -160,6 +156,10 @@ func TestMigration0011RejectsInvalidExistingContent(t *testing.T) {
 	`, messageID, sessionID, studentID); err != nil {
 		t.Fatalf("insert pre-0009 empty message: %v", err)
 	}
+	if err := RunMigrations(ctx, pool, migrationSubset(t, 10)); err != nil {
+		t.Fatalf("upgrade invalid-content schema through 0010: %v", err)
+	}
+	contentExistedBefore, contentValidatedBefore := contentConstraintState(t, pool)
 
 	err := RunMigrations(ctx, pool, migrationsPath(t))
 	var postgresErr *pgconn.PgError
@@ -176,17 +176,12 @@ func TestMigration0011RejectsInvalidExistingContent(t *testing.T) {
 	if content != "" {
 		t.Fatalf("invalid content was modified to %q", content)
 	}
-	var contentValidated bool
-	if err := pool.QueryRow(ctx, `
-		SELECT convalidated
-		FROM pg_constraint
-		WHERE conname = 'chk_assistant_messages_content_length'
-		  AND conrelid = 'assistant_messages'::regclass
-	`).Scan(&contentValidated); err != nil {
-		t.Fatalf("read content constraint after failed validation: %v", err)
-	}
-	if contentValidated {
-		t.Fatal("failed content validation was not rolled back")
+	contentExistsAfter, contentValidatedAfter := contentConstraintState(t, pool)
+	if contentExistsAfter != contentExistedBefore || contentValidatedAfter != contentValidatedBefore {
+		t.Fatalf(
+			"failed content validation changed constraint state: before=(%v,%v) after=(%v,%v)",
+			contentExistedBefore, contentValidatedBefore, contentExistsAfter, contentValidatedAfter,
+		)
 	}
 }
 
@@ -237,6 +232,21 @@ func migrationRecords(t *testing.T, pool *pgxpool.Pool) []migrationRecord {
 		t.Fatalf("iterate migration records: %v", err)
 	}
 	return records
+}
+
+func contentConstraintState(t *testing.T, pool *pgxpool.Pool) (bool, bool) {
+	t.Helper()
+	var exists bool
+	var validated bool
+	if err := pool.QueryRow(context.Background(), `
+		SELECT count(*) = 1, COALESCE(bool_and(convalidated), false)
+		FROM pg_constraint
+		WHERE conname = 'chk_assistant_messages_content_length'
+		  AND conrelid = 'assistant_messages'::regclass
+	`).Scan(&exists, &validated); err != nil {
+		t.Fatalf("read content constraint state: %v", err)
+	}
+	return exists, validated
 }
 
 func assertOwnershipConstraints(t *testing.T, pool *pgxpool.Pool) {
