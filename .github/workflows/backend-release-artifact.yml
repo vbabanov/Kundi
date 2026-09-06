@@ -51,7 +51,7 @@ jobs:
       - name: Checkout stable source A
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.SOURCE_SHA }}
+          ref: ${{ env.SOURCE_BRANCH }}
           fetch-depth: 0
           path: source-a
           persist-credentials: false
@@ -59,7 +59,7 @@ jobs:
       - name: Checkout stable source B
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.SOURCE_SHA }}
+          ref: ${{ env.SOURCE_BRANCH }}
           fetch-depth: 0
           path: source-b
           persist-credentials: false
@@ -69,8 +69,6 @@ jobs:
         run: |
           set -euo pipefail
           for source in source-a source-b; do
-            git -C "$GITHUB_WORKSPACE/$source" fetch --no-tags origin \
-              "refs/heads/$SOURCE_BRANCH:refs/remotes/origin/$SOURCE_BRANCH"
             test "$(git -C "$GITHUB_WORKSPACE/$source" rev-parse HEAD)" = "$SOURCE_SHA"
             test "$(git -C "$GITHUB_WORKSPACE/$source" rev-parse "origin/$SOURCE_BRANCH")" = "$SOURCE_SHA"
             test -z "$(git -C "$GITHUB_WORKSPACE/$source" status --porcelain=v1 --untracked-files=all)"
