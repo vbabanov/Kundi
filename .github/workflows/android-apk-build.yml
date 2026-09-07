@@ -266,7 +266,7 @@ jobs:
         run: flutter pub get
 
       - name: Verify release signing policy
-        run: ./android/gradlew -p android :app:verifyReleaseSigningPolicy
+        run: bash android/gradlew -p android :app:verifyReleaseSigningPolicy
 
       - name: Build unsigned release AAB
         run: |
@@ -278,7 +278,7 @@ jobs:
       - name: Verify artifact is not signed with a configured identity
         run: |
           test -f build/app/outputs/bundle/release/app-release.aab
-          ! ./android/gradlew -p android :app:verifyProductionSigningConfiguration
+          ! bash android/gradlew -p android :app:verifyProductionSigningConfiguration
 
       - name: Upload explicitly unsigned AAB
         uses: actions/upload-artifact@v4
