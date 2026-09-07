@@ -105,7 +105,7 @@ void main() {
     );
   });
 
-  testWidgets('pending eligibility builds a non-empty loading layer',
+  testWidgets('pending eligibility hides WebP behind an opaque loading layer',
       (tester) async {
     final loadingImage = await _testImage(Colors.purple);
     final fallbackImage = await _testImage(Colors.blue);
@@ -130,7 +130,7 @@ void main() {
 
     expect(
         find.byKey(KundiHomeAvatarPlacement.loadingAssetKey), findsOneWidget);
-    expect(find.byType(RawImage), findsOneWidget);
+    expect(find.byType(RawImage), findsNothing);
     expect(find.byKey(KundiHomeHero.assetKey), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
