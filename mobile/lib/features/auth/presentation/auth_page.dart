@@ -25,6 +25,7 @@ class AuthPage extends ConsumerWidget {
           final mascotWidth = math.min(width * 0.94, 446.0);
           final bubbleWidth = math.min(width * 0.34, 148.0);
           final cardWidth = math.min(width - 28, 430.0);
+          final safeTop = MediaQuery.paddingOf(context).top;
 
           return DecoratedBox(
             decoration: const BoxDecoration(
@@ -78,7 +79,7 @@ class AuthPage extends ConsumerWidget {
                 const Positioned.fill(child: _BackgroundOrbitRings()),
                 const Positioned.fill(child: _SkyAccentLayer()),
                 Positioned(
-                  top: 34,
+                  top: math.max(34, safeTop + 10),
                   left: 0,
                   right: 0,
                   child: _LogoBlock(scale: logoScale),

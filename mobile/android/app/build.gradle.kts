@@ -240,6 +240,7 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.core:core-ktx:1.18.0")
     if (kundiTtsEnabled) {
         implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.1")
     }
