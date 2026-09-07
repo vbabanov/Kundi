@@ -25,6 +25,7 @@ $expectedDefines = [ordered]@{
     API_BASE_URL = 'https://api.kundi.lucartmax.kz'
     ENABLE_DEBUG_SURFACES = 'false'
     ENABLE_KUNDI_ASSISTANT = 'true'
+    ENABLE_KUNDI_HOME_REALTIME_AVATAR = 'true'
     ENABLE_KUNDI_VOICE_INPUT = 'false'
     ENABLE_KUNDI_TTS = 'false'
     KUNDI_CRASH_REPORTING_ENABLED = 'false'
@@ -49,7 +50,7 @@ $environmentValues = [ordered]@{
     KUNDI_INTERNAL_ANDROID_KEYSTORE_PASSWORD = $storePassword
     KUNDI_INTERNAL_ANDROID_KEY_ALIAS = 'kundi-internal-distribution'
     KUNDI_INTERNAL_ANDROID_KEY_PASSWORD = $keyPassword
-    ENABLE_KUNDI_HOME_REALTIME_AVATAR = 'false'
+    ENABLE_KUNDI_HOME_REALTIME_AVATAR = 'true'
     ENABLE_KUNDI_VOICE_INPUT = 'false'
     ENABLE_KUNDI_TTS = 'false'
 }
