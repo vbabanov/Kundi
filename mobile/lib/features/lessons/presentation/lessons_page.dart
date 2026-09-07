@@ -108,7 +108,7 @@ class LessonsPage extends ConsumerWidget {
         behaviorPresentation?.animationCueName ?? 'neutral';
     final animationIdentity =
         animationCueName == 'neutral' || behaviorState == null
-            ? 'home:greeting:initial'
+            ? 'home:standing:initial'
             : behaviorState.sourceEventId;
 
     return Scaffold(

@@ -329,8 +329,8 @@ class _KundiListeningGlow extends StatelessWidget {
                   gradient: RadialGradient(
                     stops: <double>[0, 0.58, 1],
                     colors: <Color>[
-                      Color(0x4058D8FF),
-                      Color(0x2058D8FF),
+                      Color(0x6658D8FF),
+                      Color(0x3358D8FF),
                       Color(0x0058D8FF),
                     ],
                   ),
@@ -346,7 +346,6 @@ class _KundiListeningGlow extends StatelessWidget {
 
 class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   final _ttsDriver = KundiTtsAvatarDriver();
-  static const Duration _greetingDuration = Duration(milliseconds: 2600);
 
   KundiNativeAvatarController? _controller;
   StreamSubscription<KundiNativeAvatarEvent>? _events;
@@ -361,8 +360,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
       KundiHomeAvatarLifecycleTelemetry(
     recordDiagnostic: KundiHomeAvatarDiagnostics.instance.record,
   );
-  Timer? _greetingTimer;
-  String? _playedGreetingIdentity;
 
   @override
   void initState() {
@@ -389,19 +386,12 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.ttsState != widget.ttsState &&
         (oldWidget.ttsState.active || widget.ttsState.active)) {
-      _greetingTimer?.cancel();
       if (_modelReady &&
           _transition.handoffCompleted &&
           widget.isVisible &&
           _controller != null) {
         unawaited(_ttsDriver.apply(_controller!, widget.ttsState));
       }
-    }
-    if (oldWidget.isVisible && !widget.isVisible) {
-      _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
-    } else if (oldWidget.animationCueName != widget.animationCueName ||
-        oldWidget.animationIdentity != widget.animationIdentity) {
-      _completeActiveGreeting(KundiGreetingCompletionReason.interrupted);
     }
     if (oldWidget.isVisible != widget.isVisible) {
       unawaited(_controller?.setVisible(widget.isVisible));
@@ -416,8 +406,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   @override
   void dispose() {
     _ttsDriver.invalidate();
-    _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
-    _greetingTimer?.cancel();
     unawaited(_events?.cancel());
     unawaited(_controller?.dispose());
     _revealGate.dispose();
@@ -611,7 +599,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
         }
       case 'rendererDisposed':
         if (mounted) {
-          _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
           setState(() {
             _modelReady = false;
             _transition.markRendererDisposed();
@@ -624,7 +611,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
 
   void _beginRendererSession({bool force = false}) {
     if (force) {
-      _completeActiveGreeting(KundiGreetingCompletionReason.cancelled);
       final previousGeneration = _activeRendererGeneration;
       if (previousGeneration != null) {
         _lifecycleTelemetry.suppressGeneration(previousGeneration);
@@ -773,7 +759,6 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
       return;
     }
     if (widget.ttsState.active) {
-      _greetingTimer?.cancel();
       await _ttsDriver.apply(controller, widget.ttsState);
       return;
     }
@@ -798,69 +783,8 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
         await controller.playTalking(decision.talkingVariant!);
       case KundiAvatarAnimationTarget.standing:
         await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
-        if (widget.animationIdentity.startsWith('home:greeting:') &&
-            _playedGreetingIdentity != widget.animationIdentity) {
-          _playedGreetingIdentity = widget.animationIdentity;
-          final variant = KundiAvatarAnimationPolicy.talkingVariant(
-            widget.animationIdentity,
-          );
-          final generation = _activeRendererGeneration;
-          if (generation != null) {
-            _lifecycleTelemetry.startGreeting(
-              generation: generation,
-              textureId: _renderSurfaceId,
-              identity: widget.animationIdentity,
-              animationName: 'Talking$variant',
-              durationMs: _greetingDuration.inMilliseconds,
-            );
-          }
-          await controller.playTalking(variant);
-          _greetingTimer?.cancel();
-          _greetingTimer = Timer(_greetingDuration, () {
-            if (mounted &&
-                widget.isVisible &&
-                widget.animationCueName == 'neutral' &&
-                _playedGreetingIdentity == widget.animationIdentity) {
-              final activeGeneration = _activeRendererGeneration;
-              if (activeGeneration != null) {
-                _lifecycleTelemetry.completeGreeting(
-                  generation: activeGeneration,
-                  textureId: _renderSurfaceId,
-                  identity: widget.animationIdentity,
-                  reason: KundiGreetingCompletionReason.finished,
-                );
-              }
-              unawaited(_transitionGreetingToRest(controller));
-            }
-          });
-        } else {
-          await controller.settleRestPose();
-        }
+        await controller.settleRestPose();
     }
-  }
-
-  Future<void> _transitionGreetingToRest(
-    KundiNativeAvatarController controller,
-  ) async {
-    if (!mounted ||
-        !widget.isVisible ||
-        widget.animationCueName != 'neutral' ||
-        _playedGreetingIdentity != widget.animationIdentity) {
-      return;
-    }
-    await controller.settleRestPose();
-  }
-
-  void _completeActiveGreeting(KundiGreetingCompletionReason reason) {
-    final generation = _activeRendererGeneration;
-    final identity = _playedGreetingIdentity;
-    if (generation == null || identity == null) return;
-    _lifecycleTelemetry.completeGreeting(
-      generation: generation,
-      textureId: _renderSurfaceId,
-      identity: identity,
-      reason: reason,
-    );
   }
 }
 
