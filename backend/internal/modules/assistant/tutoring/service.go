@@ -3,6 +3,7 @@ package tutoring
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type Intent string
@@ -54,12 +55,13 @@ func NewService() *Service { return &Service{} }
 
 func (s *Service) Analyze(text string, gradeLevel int, activeHomework bool) Analysis {
 	normalized := normalize(text)
+	readyAnswerRequest := looksLikeReadyAnswerRequest(normalized)
 	intent := IntentGeneralQuestion
 	mode := ResponseModeAnswer
 	help := "direct"
 
 	switch {
-	case containsAny(normalized, readyAnswerMarkers):
+	case readyAnswerRequest:
 		intent, mode, help = IntentRequestReadyAnswer, ResponseModeHint, "scaffolded"
 	case containsAny(normalized, attemptMarkers):
 		intent, mode, help = IntentCheckStudentAttempt, ResponseModeCheck, "feedback"
@@ -75,7 +77,7 @@ func (s *Service) Analyze(text string, gradeLevel int, activeHomework bool) Anal
 	// academic context cannot match it to a known homework record. Bypass
 	// language is handled the same way; activeHomework remains an additional
 	// signal used by Finalize to inspect otherwise legitimate homework help.
-	risk := intent == IntentRequestReadyAnswer || containsAny(normalized, bypassMarkers)
+	risk := readyAnswerRequest || containsAny(normalized, bypassMarkers)
 	if risk {
 		intent, mode, help = IntentRequestReadyAnswer, ResponseModeHint, "scaffolded"
 	}
@@ -84,6 +86,28 @@ func (s *Service) Analyze(text string, gradeLevel int, activeHomework bool) Anal
 		ReadyAnswerRisk: risk, ActiveHomework: activeHomework,
 		GradeBand: GradeBand(gradeLevel),
 	}
+}
+
+func looksLikeReadyAnswerRequest(text string) bool {
+	normalized := normalizeIntentPhrase(text)
+	for _, marker := range safeReadyAnswerRequestMarkers {
+		normalized = strings.ReplaceAll(normalized, marker, " ")
+	}
+	normalized = strings.Join(strings.Fields(normalized), " ")
+	return containsAny(normalized, readyAnswerMarkers) ||
+		containsAny(normalized, kazakhReadyAnswerRequestMarkers)
+}
+
+func normalizeIntentPhrase(text string) string {
+	var normalized strings.Builder
+	for _, r := range strings.ToLower(strings.TrimSpace(text)) {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			normalized.WriteRune(r)
+			continue
+		}
+		normalized.WriteByte(' ')
+	}
+	return strings.Join(strings.Fields(normalized.String()), " ")
 }
 
 func (s *Service) BuildPrompt(question string, gradeLevel int, analysis Analysis, academicContext, history string) string {
@@ -229,7 +253,28 @@ var readyAnswerMarkers = []string{"только ответ", "готовый о�
 var safeReadyAnswerRefusalPhrases = []string{"не дам готовый ответ", "не даю готовый ответ", "не буду давать готовый ответ", "без готового ответа", "дайын жауапты емес", "дайын жауапты бермей", "дайын жауап бермей", "дайын жауапты ұсынбай", "without giving the final answer", "will not give the final answer", "won't give the final answer", "not a complete solution"}
 var submissionReadyOutputMarkers = []string{"готово к сдаче", "готовый код", "полный код", "готовое сочинение", "полное сочинение", "тапсыруға дайын", "дайын код", "толық шешім", "final answer", "ready to submit", "ready-to-submit", "submission-ready", "complete essay", "complete code", "full source code"}
 var completeCodeMarkers = []string{"package main", "func main(", "public static void main", "public class ", "static void main", "def main(", "if __name__ ==", "int main("}
-var attemptMarkers = []string{"проверь мой", "проверь мою", "мой ответ", "моя попытка", "я решил", "я решила", "қатемді тексер", "менің жауабым", "check my", "my answer"}
+var kazakhReadyAnswerRequestMarkers = []string{
+	"дайын жауап бер", "дайын жауапты бер", "дайын жауабын бер", "дайын жауабын айт",
+	"тек жауап бер", "тек жауабын айт", "жауабын ғана айт", "жауапты ғана жаз",
+	"шешіп бер", "шығарып бер", "мен үшін шеш", "менің орныма шеш",
+	"толық шешіп бер", "толық шешімін бер", "толық шешу жолын бер",
+	"соңғы нәтижесін бер", "соңғы нәтижені айт", "соңғы жауабын бер", "соңғы жауапты айт",
+	"дайын жұмысты жаз", "дайын жұмысты бер", "жұмысты жазып бер", "эссені жазып бер", "менің орныма жазып бер",
+}
+
+var safeReadyAnswerRequestMarkers = []string{
+	"дайын жауап берме", "дайын жауапты берме", "дайын жауабын берме", "дайын жауабын айтпа",
+	"тек жауап берме", "жауабын ғана айтпа", "жауапты ғана жазба", "жауабын айтпа",
+	"шешіп берме", "шығарып берме", "мен үшін шешпе", "менің орныма шешпе",
+	"толық шешімін берме", "толық шешіп берме", "соңғы нәтижесін берме", "соңғы жауапты айтпа",
+	"дайын жұмысты жазба", "жұмысты жазып берме", "дайын жауапсыз түсіндір", "дайын жауапты айтпай түсіндір",
+	"дайын жауапты емес", "дайын жауап керек емес", "дайын жауап қажет емес", "дайын жауаптың керегі жоқ",
+	"дайын жауабы керек емес", "дайын жауабы қажет емес", "жауабын бермей түсіндір", "тек түсіндір", "тек қана түсіндір",
+	"готовый ответ не давай", "не давай готовый ответ", "готовый ответ не нужен", "без готового ответа", "только объясни",
+	"do not give the final answer", "don t give the final answer", "i don t need the final answer", "without the final answer", "explain without the answer",
+}
+
+var attemptMarkers = []string{"проверь мой", "проверь мою", "мой ответ", "моя попытка", "я решил", "я решила", "қатемді тексер", "менің жауабым", "менің жауабымды", "жауабымды тексер", "шешімімді тексер", "check my", "my answer"}
 var adviceMarkers = []string{"как учить", "как подготовиться", "план подготовки", "қалай дайындал", "how to study", "study plan"}
 var homeworkMarkers = []string{"домашн", "дз", "задани", "үй тапсыр", "homework", "assignment"}
 var explanationMarkers = []string{"объясни", "почему", "как работает", "түсіндір", "неге", "explain", "how does"}
