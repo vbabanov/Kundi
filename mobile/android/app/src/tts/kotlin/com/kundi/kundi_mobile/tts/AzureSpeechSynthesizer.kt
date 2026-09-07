@@ -2,7 +2,6 @@ package com.kundi.kundi_mobile.tts
 
 import android.util.Log
 import com.microsoft.cognitiveservices.speech.*
-import com.microsoft.cognitiveservices.speech.audio.*
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -64,88 +63,78 @@ class AzureSpeechSynthesizer(private val post: (() -> Unit) -> Unit) : Synthesiz
                         val collector = SpeechCollector(active.cancelled)
                         active.collector = collector
                         try {
-                            AudioOutputStream.createPushStream(
-                                    object : PushAudioOutputStreamCallback() {
-                                        override fun write(data: ByteArray): Int =
-                                            collector.write(data)
-
-                                        override fun close() {}
-                                    }
-                                )
-                                .use { stream ->
-                                    AudioConfig.fromStreamOutput(stream).use { audio ->
-                                        SpeechSynthesizer(config, audio).use { sdk ->
-                                            synchronized(active) { active.sdk = sdk }
-                                            try {
-                                                check(!active.cancelled.get())
-                                                sdk.SynthesisStarted.addEventListener { _, _ ->
-                                                    collector.started = true
-                                                    post {
-                                                        if (!disposed && !active.cancelled.get())
-                                                            event("synthesisStarted")
-                                                    }
-                                                }
-                                                sdk.Synthesizing.addEventListener { _, _ ->
-                                                    collector.chunks++
-                                                }
-                                                sdk.SynthesisCompleted.addEventListener { _, _ ->
-                                                    collector.completed = true
-                                                }
-                                                sdk.SynthesisCanceled.addEventListener { _, _ ->
-                                                    collector.cancelled = true
-                                                }
-                                                sdk.VisemeReceived.addEventListener { _, e ->
-                                                    collector.viseme(
-                                                        AzureViseme(
-                                                            e.visemeId.toInt(),
-                                                            e.audioOffset / 10000,
-                                                        )
-                                                    )
-                                                }
-                                                sdk.WordBoundary.addEventListener { _, e ->
-                                                    if (
-                                                        e.boundaryType ==
-                                                            SpeechSynthesisBoundaryType.Word
-                                                    ) {
-                                                        collector.word(
-                                                            WordBoundary(
-                                                                e.audioOffset / 10000,
-                                                                e.duration / 10000,
-                                                                e.textOffset.toInt(),
-                                                                e.wordLength.toInt(),
-                                                            )
-                                                        )
-                                                    }
-                                                }
-                                                sdk.SpeakTextAsync(request.text)
-                                                    .get(
-                                                        SpeechLimits.synthesisTimeoutSeconds,
-                                                        TimeUnit.SECONDS,
-                                                    )
-                                                    .use { result ->
-                                                        check(
-                                                            result.reason ==
-                                                                ResultReason
-                                                                    .SynthesizingAudioCompleted
-                                                        )
-                                                        check(!active.cancelled.get())
-                                                        output =
-                                                            collector.finish(
-                                                                request.locale,
-                                                                request.voice,
-                                                            )
-                                                    }
-                                            } finally {
-                                                // Do not hold the cancellation lock while awaiting
-                                                // SDK cleanup.
-                                                synchronized(active) { active.sdk = null }
-                                                runCatching {
-                                                    sdk.StopSpeakingAsync().get(2, TimeUnit.SECONDS)
-                                                }
-                                            }
+                            // A null AudioConfig keeps playback under Kundi's AudioTrack while
+                            // exposing PCM through SpeechSynthesisResult.audioData. The SDK push
+                            // stream completed with zero bytes on the Redmi Note 7/API 29.
+                            SpeechSynthesizer(config, null).use { sdk ->
+                                synchronized(active) { active.sdk = sdk }
+                                try {
+                                    check(!active.cancelled.get())
+                                    sdk.SynthesisStarted.addEventListener { _, _ ->
+                                        collector.started = true
+                                        post {
+                                            if (!disposed && !active.cancelled.get())
+                                                event("synthesisStarted")
                                         }
                                     }
+                                    sdk.Synthesizing.addEventListener { _, _ -> collector.chunks++ }
+                                    sdk.SynthesisCompleted.addEventListener { _, _ ->
+                                        collector.completed = true
+                                    }
+                                    sdk.SynthesisCanceled.addEventListener { _, _ ->
+                                        collector.cancelled = true
+                                    }
+                                    sdk.VisemeReceived.addEventListener { _, e ->
+                                        collector.viseme(
+                                            AzureViseme(
+                                                e.visemeId.toInt(),
+                                                e.audioOffset / 10000,
+                                            )
+                                        )
+                                    }
+                                    sdk.WordBoundary.addEventListener { _, e ->
+                                        if (e.boundaryType == SpeechSynthesisBoundaryType.Word) {
+                                            collector.word(
+                                                WordBoundary(
+                                                    e.audioOffset / 10000,
+                                                    e.duration / 10000,
+                                                    e.textOffset.toInt(),
+                                                    e.wordLength.toInt(),
+                                                )
+                                            )
+                                        }
+                                    }
+                                    sdk.SpeakTextAsync(request.text)
+                                        .get(
+                                            SpeechLimits.synthesisTimeoutSeconds,
+                                            TimeUnit.SECONDS,
+                                        )
+                                        .use { result ->
+                                            check(
+                                                result.reason ==
+                                                    ResultReason.SynthesizingAudioCompleted
+                                            )
+                                            check(!active.cancelled.get())
+                                            val audioData = result.audioData
+                                            try {
+                                                check(collector.write(audioData) > 0)
+                                            } finally {
+                                                audioData.fill(0)
+                                            }
+                                            output =
+                                                collector.finish(
+                                                    request.locale,
+                                                    request.voice,
+                                                )
+                                        }
+                                } finally {
+                                    // Do not hold the cancellation lock while awaiting SDK cleanup.
+                                    synchronized(active) { active.sdk = null }
+                                    runCatching {
+                                        sdk.StopSpeakingAsync().get(2, TimeUnit.SECONDS)
+                                    }
                                 }
+                            }
                         } finally {
                             collector.clear()
                             active.collector = null

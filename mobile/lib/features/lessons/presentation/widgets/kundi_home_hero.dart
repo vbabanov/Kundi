@@ -225,30 +225,22 @@ class KundiHomeHero extends StatelessWidget {
                   onLongPressStart: onAvatarLongPressStart,
                   onLongPressEnd: onAvatarLongPressEnd,
                   onLongPressCancel: onAvatarLongPressCancel,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      boxShadow: voiceListening
-                          ? const <BoxShadow>[
-                              BoxShadow(
-                                color: Color(0x4D58D8FF),
-                                blurRadius: 9,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : const <BoxShadow>[],
-                    ),
-                    child: _KundiHomeAvatar(
-                      ttsState: ttsState,
-                      assetPath: assetPath,
-                      realtimeEnabled: realtimeAvatarEnabled,
-                      realtimePreparing: realtimeAvatarPreparing,
-                      preparedLoadingFrame: preparedLoadingFrame,
-                      isVisible: isVisible,
-                      animationCueName: animationCueName,
-                      animationIdentity: animationIdentity,
-                    ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    fit: StackFit.expand,
+                    children: [
+                      _KundiListeningGlow(visible: voiceListening),
+                      _KundiHomeAvatar(
+                        ttsState: ttsState,
+                        assetPath: assetPath,
+                        realtimeEnabled: realtimeAvatarEnabled,
+                        realtimePreparing: realtimeAvatarPreparing,
+                        preparedLoadingFrame: preparedLoadingFrame,
+                        isVisible: isVisible,
+                        animationCueName: animationCueName,
+                        animationIdentity: animationIdentity,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -309,6 +301,47 @@ class _KundiHomeAvatar extends StatefulWidget {
 
   @override
   State<_KundiHomeAvatar> createState() => _KundiHomeAvatarState();
+}
+
+class _KundiListeningGlow extends StatelessWidget {
+  const _KundiListeningGlow({required this.visible});
+
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        key: const Key('kundi-home-listening-glow'),
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+        child: Align(
+          alignment: const Alignment(0.13, 0),
+          child: Transform.scale(
+            scaleX: 1.08,
+            scaleY: 2.35,
+            child: const SizedBox.square(
+              dimension: 150,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    stops: <double>[0, 0.58, 1],
+                    colors: <Color>[
+                      Color(0x4058D8FF),
+                      Color(0x2058D8FF),
+                      Color(0x0058D8FF),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
