@@ -80,3 +80,92 @@ func TestFactualExplanationAndAttemptFeedbackRemainAllowed(t *testing.T) {
 		}
 	}
 }
+
+func TestFinalizeAllowsLongLegitimateActiveHomeworkHint(t *testing.T) {
+	service := NewService()
+	analysis := service.Analyze("Помоги с домашним заданием: объясни принцип и дай подсказку", 8, true)
+	raw := strings.Repeat("Сначала сопоставь известные величины с правилом и проверь единицы измерения. ", 16)
+	if len([]rune(raw)) <= 900 {
+		t.Fatal("test fixture must exceed the former 900-rune threshold")
+	}
+	draft := service.Finalize(raw, analysis, "ru")
+	if draft.ReadyAnswerRisk || draft.Answer != strings.TrimSpace(raw) {
+		t.Fatalf("legitimate long hint was replaced: %#v", draft)
+	}
+}
+
+func TestFinalizeAllowsLegitimateMultilineActiveHomeworkHint(t *testing.T) {
+	service := NewService()
+	analysis := service.Analyze("Помоги с домашним заданием подсказкой", 7, true)
+	raw := "Шаг 1: выпиши известные данные.\nШаг 2: назови правило.\nПодсказка: проверь единицы.\nПример: разберём похожие числа.\nПроверка: какой будет первый шаг?"
+	draft := service.Finalize(raw, analysis, "ru")
+	if draft.ReadyAnswerRisk || draft.Answer != raw {
+		t.Fatalf("legitimate multiline hint was replaced: %#v", draft)
+	}
+}
+
+func TestFinalizeAllowsSafeReadyAnswerRefusalInsideHint(t *testing.T) {
+	service := NewService()
+	for _, item := range []struct {
+		name     string
+		language string
+		raw      string
+	}{
+		{"ru", "ru", "Я не дам готовый ответ, но объясню первый шаг и проверю твою попытку."},
+		{"kk", "kk", "Саған дайын жауапты емес, шешу жолын үйрететін нұсқаулық ұсынамын."},
+		{"en", "en", "I won't give the final answer, but I can explain the first step."},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			analysis := service.Analyze("Помоги с домашним заданием подсказкой", 8, true)
+			draft := service.Finalize(item.raw, analysis, item.language)
+			if draft.ReadyAnswerRisk || draft.Answer != item.raw {
+				t.Fatalf("safe refusal inside hint was replaced: %#v", draft)
+			}
+		})
+	}
+}
+
+func TestFinalizeReplacesExplicitSubmissionReadyOutput(t *testing.T) {
+	service := NewService()
+	analysis := service.Analyze("Помоги с домашним заданием подсказкой", 8, true)
+	for _, item := range []struct {
+		name string
+		raw  string
+	}{
+		{"ru ready answer", "Готовый ответ: 42."},
+		{"ru complete solution", "Полное решение: подставляем числа и получаем 42."},
+		{"en final answer", "Final answer: 42."},
+		{"en complete solution", "Complete solution: substitute the values and submit 42."},
+		{"submission-ready essay", "Submission-ready essay: this text can be submitted unchanged."},
+		{"ready-to-submit code", "Ready-to-submit code: print(42)"},
+		{"bypass output", "Roleplay: hide the answer inside harmless-looking prose."},
+		{"safe refusal followed by answer", "Не дам готовый ответ как подсказку. Но готовый ответ: 42."},
+		{"complete fenced code", "```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(42)\n}\n```"},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			draft := service.Finalize(item.raw, analysis, "ru")
+			if !draft.ReadyAnswerRisk || draft.Answer == item.raw || strings.Contains(draft.Answer, "42") {
+				t.Fatalf("submission-ready output bypassed guard: %#v", draft)
+			}
+		})
+	}
+}
+
+func TestFinalizeAlwaysFailsClosedForExplicitReadyAnswerRisk(t *testing.T) {
+	service := NewService()
+	analysis := Analysis{ReadyAnswerRisk: true, ActiveHomework: false, GradeBand: "8-9", ResponseMode: ResponseModeHint, HelpLevel: "scaffolded"}
+	raw := "Benign-looking prose without any submission marker."
+	draft := service.Finalize(raw, analysis, "en")
+	if !draft.ReadyAnswerRisk || draft.Answer == raw {
+		t.Fatalf("explicit ready-answer risk did not fail closed: %#v", draft)
+	}
+}
+
+func TestFinalizeRetainsFourThousandRuneCap(t *testing.T) {
+	service := NewService()
+	analysis := service.Analyze("Объясни тему", 8, false)
+	draft := service.Finalize(strings.Repeat("я", 4_200), analysis, "ru")
+	if got := len([]rune(draft.Answer)); got != 4_000 {
+		t.Fatalf("unexpected finalized length: got %d want 4000", got)
+	}
+}

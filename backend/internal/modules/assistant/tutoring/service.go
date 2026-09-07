@@ -3,7 +3,6 @@ package tutoring
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
 type Intent string
@@ -141,10 +140,26 @@ func LooksLikeHomework(text string) bool {
 
 func looksSubmissionReady(text string) bool {
 	n := normalize(text)
-	if strings.Count(n, "\n") >= 4 || utf8.RuneCountInString(n) > 900 {
+	markerText := removeSafeRefusalPhrases(n)
+	if containsAny(markerText, readyAnswerMarkers) || containsAny(n, bypassMarkers) || containsAny(markerText, submissionReadyOutputMarkers) {
 		return true
 	}
-	return containsAny(n, []string{"готовый ответ", "полное решение", "ответ:", "сочинение", "```", "final answer", "complete solution", "essay:"})
+	return looksLikeCompleteCode(text, n)
+}
+
+func removeSafeRefusalPhrases(text string) string {
+	for _, phrase := range safeReadyAnswerRefusalPhrases {
+		text = strings.ReplaceAll(text, phrase, "")
+	}
+	return text
+}
+
+func looksLikeCompleteCode(text, normalized string) bool {
+	if strings.Count(text, "```") < 2 {
+		return false
+	}
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	return len(lines) >= 8 && containsAny(normalized, completeCodeMarkers)
 }
 
 func ageInstruction(grade int) string {
@@ -211,6 +226,9 @@ func boundRunes(text string, max int) string {
 }
 
 var readyAnswerMarkers = []string{"только ответ", "готовый ответ", "готовое решение", "готовую работу", "полное решение", "реши за меня", "сделай за меня", "напиши сочинение", "дай решение целиком", "тек жауап", "дайын жауап", "мен үшін шеш", "just answer", "do it for me", "write my essay", "complete solution"}
+var safeReadyAnswerRefusalPhrases = []string{"не дам готовый ответ", "не даю готовый ответ", "не буду давать готовый ответ", "без готового ответа", "дайын жауапты емес", "дайын жауапты бермей", "дайын жауап бермей", "дайын жауапты ұсынбай", "without giving the final answer", "will not give the final answer", "won't give the final answer", "not a complete solution"}
+var submissionReadyOutputMarkers = []string{"готово к сдаче", "готовый код", "полный код", "готовое сочинение", "полное сочинение", "тапсыруға дайын", "дайын код", "толық шешім", "final answer", "ready to submit", "ready-to-submit", "submission-ready", "complete essay", "complete code", "full source code"}
+var completeCodeMarkers = []string{"package main", "func main(", "public static void main", "public class ", "static void main", "def main(", "if __name__ ==", "int main("}
 var attemptMarkers = []string{"проверь мой", "проверь мою", "мой ответ", "моя попытка", "я решил", "я решила", "қатемді тексер", "менің жауабым", "check my", "my answer"}
 var adviceMarkers = []string{"как учить", "как подготовиться", "план подготовки", "қалай дайындал", "how to study", "study plan"}
 var homeworkMarkers = []string{"домашн", "дз", "задани", "үй тапсыр", "homework", "assignment"}
