@@ -3,7 +3,7 @@
 Date: 2026-03-30
 
 ## Scope
-- Android only.
+- Android only, using the `internal` private-distribution flavor.
 - No backend/iOS changes.
 - Staging configuration via `dart-define`.
 
@@ -23,13 +23,13 @@ From repo root:
 2. `flutter clean`
 3. `flutter pub get`
 4. Debug APK:
-   - `flutter build apk --debug --dart-define-from-file=env/dart_define.staging.example.json`
+   - `flutter build apk --flavor internal --debug --dart-define-from-file=env/dart_define.staging.example.json`
 5. Optional release APK:
-   - `flutter build apk --dart-define-from-file=env/dart_define.staging.example.json`
+   - `flutter build apk --flavor internal --dart-define-from-file=env/dart_define.staging.example.json`
 
 Expected outputs:
-- `mobile/build/app/outputs/flutter-apk/app-debug.apk`
-- `mobile/build/app/outputs/flutter-apk/app-release.apk`
+- `mobile/build/app/outputs/flutter-apk/app-internal-debug.apk`
+- `mobile/build/app/outputs/flutter-apk/app-internal-release.apk`
 
 ## GitHub Actions build steps
 - Workflow: `.github/workflows/android-apk-build.yml`
@@ -38,7 +38,7 @@ Expected outputs:
 2. Setup Java 17 (Temurin)
 3. Setup Flutter 3.41.4
 4. `flutter pub get`
-5. `flutter build apk --debug --dart-define-from-file=env/dart_define.staging.example.json`
+5. `flutter build apk --flavor internal --debug --dart-define-from-file=env/dart_define.staging.example.json`
 6. Upload artifact `kundi-android-apk`
 
 ## Operational note

@@ -30,14 +30,14 @@ try {
         $env:ENABLE_KUNDI_HOME_REALTIME_AVATAR = $item.Avatar
         $taskLog = Join-Path $taskOutput ($item.Name + '.build.log')
         Write-Output "Building matrix $($item.Name)"
-        & flutter build apk --release --target-platform android-arm64 --target lib/main.dart `
+        & flutter build apk --flavor internal --release --target-platform android-arm64 --target lib/main.dart `
             "--dart-define=ENABLE_KUNDI_ASSISTANT=$($item.Assistant)" `
             "--dart-define=ENABLE_KUNDI_VOICE_INPUT=$($item.Voice)" `
             "--dart-define=ENABLE_KUNDI_TTS=$($item.Tts)" `
             "--dart-define=ENABLE_KUNDI_HOME_REALTIME_AVATAR=$($item.Avatar)" *> $taskLog
         if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath $taskLog -Tail 50; throw "Matrix $($item.Name) failed" }
         $apk = Join-Path $taskOutput ($item.Name + '.apk')
-        Copy-Item -LiteralPath (Join-Path $taskMobile 'build\app\outputs\flutter-apk\app-release.apk') -Destination $apk -Force
+        Copy-Item -LiteralPath (Join-Path $taskMobile 'build\app\outputs\flutter-apk\app-internal-release.apk') -Destination $apk -Force
         $zip = [IO.Compression.ZipFile]::OpenRead($apk)
         try {
             $entries = @($zip.Entries.FullName)

@@ -5,23 +5,23 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val releaseKeystorePath = providers.environmentVariable("KUNDI_ANDROID_KEYSTORE_PATH").orNull?.trim().orEmpty()
-val releaseKeystorePassword = providers.environmentVariable("KUNDI_ANDROID_KEYSTORE_PASSWORD").orNull.orEmpty()
-val releaseKeyAlias = providers.environmentVariable("KUNDI_ANDROID_KEY_ALIAS").orNull?.trim().orEmpty()
-val releaseKeyPassword = providers.environmentVariable("KUNDI_ANDROID_KEY_PASSWORD").orNull.orEmpty()
-val releaseSigningValues = listOf(
-    releaseKeystorePath,
-    releaseKeystorePassword,
-    releaseKeyAlias,
-    releaseKeyPassword,
+val internalKeystorePath = providers.environmentVariable("KUNDI_INTERNAL_ANDROID_KEYSTORE_PATH").orNull?.trim().orEmpty()
+val internalKeystorePassword = providers.environmentVariable("KUNDI_INTERNAL_ANDROID_KEYSTORE_PASSWORD").orNull.orEmpty()
+val internalKeyAlias = providers.environmentVariable("KUNDI_INTERNAL_ANDROID_KEY_ALIAS").orNull?.trim().orEmpty()
+val internalKeyPassword = providers.environmentVariable("KUNDI_INTERNAL_ANDROID_KEY_PASSWORD").orNull.orEmpty()
+val internalSigningValues = listOf(
+    internalKeystorePath,
+    internalKeystorePassword,
+    internalKeyAlias,
+    internalKeyPassword,
 )
-val productionSigningConfigured = releaseSigningValues.all { it.isNotEmpty() }
-check(releaseSigningValues.none { it.isNotEmpty() } || productionSigningConfigured) {
-    "Android release signing configuration is incomplete; provide all KUNDI_ANDROID_* signing variables"
+val internalSigningConfigured = internalSigningValues.all { it.isNotEmpty() }
+check(internalSigningValues.none { it.isNotEmpty() } || internalSigningConfigured) {
+    "Android internal signing configuration is incomplete; provide all KUNDI_INTERNAL_ANDROID_* signing variables"
 }
-if (productionSigningConfigured) {
-    check(file(releaseKeystorePath).isFile) {
-        "KUNDI_ANDROID_KEYSTORE_PATH does not identify a readable file"
+if (internalSigningConfigured) {
+    check(file(internalKeystorePath).isFile) {
+        "KUNDI_INTERNAL_ANDROID_KEYSTORE_PATH does not identify a readable file"
     }
 }
 
@@ -83,12 +83,23 @@ android {
     }
 
     signingConfigs {
-        if (productionSigningConfigured) {
-            create("production") {
-                storeFile = file(releaseKeystorePath)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+        if (internalSigningConfigured) {
+            create("internalDistribution") {
+                storeFile = file(internalKeystorePath)
+                storePassword = internalKeystorePassword
+                keyAlias = internalKeyAlias
+                keyPassword = internalKeyPassword
+            }
+        }
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("internal") {
+            dimension = "distribution"
+            applicationId = "com.kundi.kundi_mobile.internal"
+            if (internalSigningConfigured) {
+                signingConfig = signingConfigs.getByName("internalDistribution")
             }
         }
     }
@@ -167,12 +178,6 @@ android {
     buildTypes {
         release {
             if (kundiTtsEnabled) proguardFiles("tts-proguard-rules.pro")
-            signingConfig =
-                if (productionSigningConfigured) {
-                    signingConfigs.getByName("production")
-                } else {
-                    null
-                }
         }
     }
 }
@@ -191,11 +196,27 @@ val verifyReleaseSigningPolicy =
 
 tasks.register("verifyProductionSigningConfiguration") {
     group = "verification"
-    description = "Requires an approved external Android release identity."
+    description = "Confirms that the future Play Store identity is intentionally not configured."
     dependsOn(verifyReleaseSigningPolicy)
     doLast {
-        check(productionSigningConfigured) {
-            "Production signing identity is not configured; publishing is blocked"
+        error("Production/store signing identity is intentionally not configured")
+    }
+}
+
+tasks.register("verifyInternalReleaseConfiguration") {
+    group = "verification"
+    description = "Requires the stable external identity for private internal releases."
+    dependsOn(verifyReleaseSigningPolicy)
+    doLast {
+        check(internalSigningConfigured) {
+            "Internal distribution signing identity is not configured"
+        }
+        val internalFlavor = android.productFlavors.getByName("internal")
+        check(internalFlavor.applicationId == "com.kundi.kundi_mobile.internal") {
+            "Internal applicationId changed unexpectedly"
+        }
+        check(internalFlavor.signingConfig?.name == "internalDistribution") {
+            "Internal release is not bound to the internal distribution signing identity"
         }
     }
 }

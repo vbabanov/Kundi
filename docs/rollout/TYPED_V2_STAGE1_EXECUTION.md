@@ -21,7 +21,7 @@
 1. Build canary APK:
 ```powershell
 cd D:\Kundi\mobile
-flutter build apk --debug `
+flutter build apk --flavor internal --debug `
   --dart-define-from-file=env/dart_define.prod.example.json `
   --dart-define=USE_TYPED_V2_READ=true `
   --dart-define=ENABLE_V2_PARITY_SHADOW=true `
@@ -34,7 +34,7 @@ flutter build apk --debug `
 
 2. Install to tester device:
 ```powershell
-C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r D:\Kundi\mobile\build\app\outputs\flutter-apk\app-debug.apk
+C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r D:\Kundi\mobile\build\app\outputs\flutter-apk\app-internal-debug.apk
 ```
 
 3. Verify app-side cohort decision:

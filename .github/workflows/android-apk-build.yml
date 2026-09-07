@@ -123,7 +123,7 @@ jobs:
       - name: Build staging debug APK with all Phase 2B flags off
         run: |
           set -o pipefail
-          flutter build apk --debug --target-platform android-arm64 \
+          flutter build apk --flavor internal --debug --target-platform android-arm64 \
             --dart-define-from-file=env/dart_define.staging.example.json \
             --dart-define=ENABLE_KUNDI_TTS=false \
             --dart-define=ENABLE_KUNDI_HOME_REALTIME_AVATAR=false \
@@ -150,7 +150,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kundi-android-off-debug-apk
-          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          path: mobile/build/app/outputs/flutter-apk/app-internal-debug.apk
           if-no-files-found: error
 
   android-tts-compile:
@@ -199,7 +199,7 @@ jobs:
       - name: Compile Android TTS source without Azure credentials
         run: |
           set -o pipefail
-          flutter build apk --debug --target-platform android-arm64 \
+          flutter build apk --flavor internal --debug --target-platform android-arm64 \
             --dart-define=ENABLE_KUNDI_ASSISTANT=true \
             --dart-define=ENABLE_KUNDI_VOICE_INPUT=true \
             --dart-define=ENABLE_KUNDI_TTS=true \
@@ -224,7 +224,7 @@ jobs:
           if-no-files-found: warn
 
   android-unsigned-release:
-    name: Android unsigned release AAB and signing policy
+    name: Android unsigned internal release AAB and signing policy
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -270,19 +270,19 @@ jobs:
 
       - name: Build unsigned release AAB
         run: |
-          flutter build appbundle --release --target-platform android-arm64 \
+          flutter build appbundle --flavor internal --release --target-platform android-arm64 \
             --dart-define=KUNDI_CRASH_REPORTING_ENABLED=false \
             --dart-define=ENABLE_KUNDI_TTS=false \
             --dart-define=ENABLE_KUNDI_HOME_REALTIME_AVATAR=false
 
       - name: Verify artifact is not signed with a configured identity
         run: |
-          test -f build/app/outputs/bundle/release/app-release.aab
-          ! bash android/gradlew -p android :app:verifyProductionSigningConfiguration
+          test -f build/app/outputs/bundle/internalRelease/app-internal-release.aab
+          ! bash android/gradlew -p android :app:verifyInternalReleaseConfiguration
 
       - name: Upload explicitly unsigned AAB
         uses: actions/upload-artifact@v4
         with:
-          name: kundi-android-unsigned-release-aab
-          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          name: kundi-android-unsigned-internal-release-aab
+          path: mobile/build/app/outputs/bundle/internalRelease/app-internal-release.aab
           if-no-files-found: error

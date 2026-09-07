@@ -24,9 +24,9 @@ Alternative:
 ### 1) Build + install
 ```powershell
 cd D:\Kundi\mobile
-flutter build apk --debug --dart-define-from-file=env/dart_define.staging.example.json --dart-define=USE_TYPED_V2_READ=true --dart-define=ENABLE_V2_PARITY_SHADOW=true
+flutter build apk --flavor internal --debug --dart-define-from-file=env/dart_define.staging.example.json --dart-define=USE_TYPED_V2_READ=true --dart-define=ENABLE_V2_PARITY_SHADOW=true
 C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe devices
-C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r D:\Kundi\mobile\build\app\outputs\flutter-apk\app-debug.apk
+C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r D:\Kundi\mobile\build\app\outputs\flutter-apk\app-internal-debug.apk
 ```
 
 ### 2) Start clean capture before any user action
@@ -38,11 +38,11 @@ $fullLog=Join-Path $reports 'stage0_full.log'
 if (!(Test-Path $reports)) { New-Item -ItemType Directory -Path $reports | Out-Null }
 if (Test-Path $flutterLog) { Remove-Item $flutterLog -Force }
 if (Test-Path $fullLog) { Remove-Item $fullLog -Force }
-& $adb shell am force-stop com.kundi.kundi_mobile
+& $adb shell am force-stop com.kundi.kundi_mobile.internal
 & $adb logcat -c
 $p1=Start-Process -FilePath $adb -ArgumentList 'logcat -v threadtime -s flutter:D *:S' -RedirectStandardOutput $flutterLog -NoNewWindow -PassThru
 $p2=Start-Process -FilePath $adb -ArgumentList 'logcat -v threadtime' -RedirectStandardOutput $fullLog -NoNewWindow -PassThru
-& $adb shell am start -n com.kundi.kundi_mobile/.MainActivity
+& $adb shell am start -n com.kundi.kundi_mobile.internal/com.kundi.kundi_mobile.MainActivity
 ```
 
 ### 3) Deterministic smoke action (mandatory)
@@ -68,7 +68,7 @@ Select-String -Path D:\Kundi\reports\stage0_flutter.log -Pattern 'typed_read_ref
 ```powershell
 $adb='C:\Users\baban\AppData\Local\Android\Sdk\platform-tools\adb.exe'
 $dbOut='D:\Kundi\reports\stage0_device.db'
-cmd /c """$adb"" exec-out run-as com.kundi.kundi_mobile cat databases/kundi_mobile.db > ""$dbOut"""
+cmd /c """$adb"" exec-out run-as com.kundi.kundi_mobile.internal cat databases/kundi_mobile.db > ""$dbOut"""
 ```
 
 ## Stage 0 Pass Criteria
