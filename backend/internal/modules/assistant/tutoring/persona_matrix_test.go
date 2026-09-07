@@ -178,3 +178,12 @@ func TestVoiceBoundsUseCompletedLocalizedFallbackWithoutSentenceBoundary(t *test
 		}
 	}
 }
+
+func TestIncorrectAttemptNaturalWordingMapsToSoftSorrow(t *testing.T) {
+	service := NewService()
+	analysis := service.Analyze("Проверь мою попытку: 2/3 + 1/3 = 2/6", 7, true)
+	draft := service.FinalizeForChannel("Твой ответ не совсем верен. Проверим знаменатель.", analysis, "ru", "text")
+	if draft.Emotion != "sorrow" || draft.EmotionIntensity != 0.26 {
+		t.Fatalf("natural incorrect-attempt wording lost soft Sorrow: %#v", draft)
+	}
+}

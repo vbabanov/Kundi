@@ -80,6 +80,7 @@ func TestReadyAnswerClassificationRegression(t *testing.T) {
 			wantRisk:   true,
 		},
 		{name: "KK ready answer colloquial", input: "Дайын жауабын берші", wantIntent: IntentRequestReadyAnswer, wantMode: ResponseModeHint, wantRisk: true},
+		{name: "KK ready answer with intervening modifier", input: "x + 7 = 12 есебінің дайын жауабын толық бер", homework: true, wantIntent: IntentRequestReadyAnswer, wantMode: ResponseModeHint, wantRisk: true},
 		{name: "KK solve it for me", input: "Осы есепті мен үшін шешіп бер", wantIntent: IntentRequestReadyAnswer, wantMode: ResponseModeHint, wantRisk: true},
 		{name: "KK solve in my place", input: "Менің орныма толық шешіп берші", wantIntent: IntentRequestReadyAnswer, wantMode: ResponseModeHint, wantRisk: true},
 		{name: "KK final result", input: "Соңғы нәтижесін бер", wantIntent: IntentRequestReadyAnswer, wantMode: ResponseModeHint, wantRisk: true},

@@ -174,7 +174,7 @@ RECENT SAFE HISTORY
 STUDENT QUESTION
 %s`, gradeLevel, analysis.GradeBand, profile.Channel, analysis.Intent, analysis.ResponseMode, analysis.HelpLevel,
 		profile.Role, profile.Language, profile.ResponseShape, profile.LearnerAgency,
-		channelInstruction(profile.Channel), supportInstruction, chatInstruction,
+		channelInstruction(profile), supportInstruction, chatInstruction,
 		emptyAsNone(academicContext), emptyAsNone(history), strings.TrimSpace(question))
 }
 
@@ -299,9 +299,20 @@ func ResolveCommunicationProfile(grade int, channelRaw string) CommunicationProf
 	return profile
 }
 
-func channelInstruction(channel CommunicationChannel) string {
-	if channel == CommunicationChannelVoice {
-		return "VOICE: be noticeably shorter and more conversational than text; use no headings, bullet lists, tables, or long multi-part structures; speak only the current useful step."
+func channelInstruction(profile CommunicationProfile) string {
+	if profile.Channel == CommunicationChannelVoice {
+		sentenceBudget := 4
+		switch profile.GradeBand {
+		case "1-2":
+			sentenceBudget = 2
+		case "3-4":
+			sentenceBudget = 3
+		case "8-9":
+			sentenceBudget = 5
+		case "10-11":
+			sentenceBudget = 6
+		}
+		return fmt.Sprintf("VOICE: be noticeably shorter and more conversational than text; use no headings, bullet lists, tables, or long multi-part structures; speak only the current useful step; target at most %d short sentences and do not fill the character limit.", sentenceBudget)
 	}
 	return "TEXT: use compact structure only when it improves clarity; stay within the age-band response shape."
 }
@@ -501,7 +512,7 @@ func gradeLevelForBand(band string) int {
 	}
 }
 
-var readyAnswerMarkers = []string{"только ответ", "готовый ответ", "готовое решение", "готовую работу", "полное решение", "реши за меня", "сделай за меня", "напиши сочинение", "дай решение целиком", "тек жауап", "дайын жауап", "мен үшін шеш", "just answer", "do it for me", "write my essay", "complete solution"}
+var readyAnswerMarkers = []string{"только ответ", "готовый ответ", "готовое решение", "готовую работу", "полное решение", "реши за меня", "сделай за меня", "напиши сочинение", "дай решение целиком", "тек жауап", "дайын жауап", "дайын жауаб", "мен үшін шеш", "just answer", "do it for me", "write my essay", "complete solution"}
 var safeReadyAnswerRefusalPhrases = []string{"не дам готовый ответ", "не даю готовый ответ", "не буду давать готовый ответ", "без готового ответа", "дайын жауапты емес", "дайын жауапты бермей", "дайын жауап бермей", "дайын жауапты ұсынбай", "without giving the final answer", "will not give the final answer", "won't give the final answer", "not a complete solution"}
 var submissionReadyOutputMarkers = []string{"готово к сдаче", "готовый код", "полный код", "готовое сочинение", "полное сочинение", "тапсыруға дайын", "дайын код", "толық шешім", "final answer", "ready to submit", "ready-to-submit", "submission-ready", "complete essay", "complete code", "full source code"}
 var completeCodeMarkers = []string{"package main", "func main(", "public static void main", "public class ", "static void main", "def main(", "if __name__ ==", "int main("}
@@ -534,4 +545,4 @@ var bypassMarkers = []string{"это не домаш", "не для школы",
 var struggleMarkers = []string{"не понимаю", "не понял", "не поняла", "не получается", "не могу", "слишком сложно", "мне сложно", "түсінбедім", "түсінбеймін", "қолымнан келмей жатыр", "қиын", "i don't understand", "i do not understand", "i can't", "too hard"}
 var lightGeneralChatMarkers = []string{"привет", "как дела", "расскажи шутку", "спасибо", "сәлем", "қалайсың", "әзіл айт", "рақмет", "hello", "how are you", "tell me a joke", "thank you"}
 var correctAttemptMarkers = []string{"верно", "правильно", "точно", "дұрыс", "correct", "that's right"}
-var incorrectAttemptMarkers = []string{"неверно", "неправильно", "ошибка", "не так", "қате", "дұрыс емес", "incorrect", "not correct", "mistake"}
+var incorrectAttemptMarkers = []string{"неверно", "неправильно", "не совсем вер", "ответ не вер", "ошибка", "не так", "қате", "дұрыс емес", "incorrect", "not correct", "mistake"}
