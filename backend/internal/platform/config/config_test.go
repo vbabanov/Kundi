@@ -1,11 +1,44 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+func TestPrometheusObservabilityRequiresLoopbackListener(t *testing.T) {
+	for _, address := range []string{"0.0.0.0:29090", ":29090", "localhost:29090", "127.0.0.1", "127.0.0.1:0"} {
+		t.Run(strings.ReplaceAll(address, ":", "_"), func(t *testing.T) {
+			t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
+			t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
+			t.Setenv("OBSERVABILITY_MODE", "prometheus")
+			t.Setenv("OBSERVABILITY_METRICS_LISTEN_ADDR", address)
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "loopback IP and port") {
+				t.Fatalf("Load() error=%v for %q", err, address)
+			}
+		})
+	}
+}
+
+func TestPrometheusObservabilityAcceptsIPv4AndIPv6Loopback(t *testing.T) {
+	for _, address := range []string{"127.0.0.1:29090", "[::1]:29090"} {
+		t.Run(address, func(t *testing.T) {
+			t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")
+			t.Setenv("FIELD_ENCRYPTION_KEY", "12345678901234567890123456789012")
+			t.Setenv("OBSERVABILITY_MODE", "prometheus")
+			t.Setenv("OBSERVABILITY_METRICS_LISTEN_ADDR", address)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Observability.MetricsListenAddr != address {
+				t.Fatalf("metrics address=%q want=%q", cfg.Observability.MetricsListenAddr, address)
+			}
+		})
+	}
+}
 
 func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	t.Setenv("ACCESS_TOKEN_SECRET", "test-secret")

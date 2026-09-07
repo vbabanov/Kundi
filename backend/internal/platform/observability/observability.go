@@ -3,8 +3,11 @@ package observability
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Metrics is a minimal seam for counters/histograms.
@@ -29,8 +32,9 @@ func (NoopTracer) Start(ctx context.Context, _ string) (context.Context, func(er
 }
 
 type Hooks struct {
-	Metrics Metrics
-	Tracer  Tracer
+	Metrics        Metrics
+	Tracer         Tracer
+	MetricsHandler http.Handler
 }
 
 type Config struct {
@@ -46,7 +50,20 @@ func New(cfg Config, logger *slog.Logger) Hooks {
 			Tracer:  NoopTracer{},
 		}
 	case "", "log":
-		fallthrough
+		return Hooks{
+			Metrics: LogMetrics{logger: logger},
+			Tracer:  LogTracer{logger: logger},
+		}
+	case "prometheus":
+		promMetrics := newPrometheusMetrics()
+		return Hooks{
+			Metrics: multiMetrics{LogMetrics{logger: logger}, promMetrics},
+			Tracer:  LogTracer{logger: logger},
+			MetricsHandler: promhttp.HandlerFor(
+				promMetrics.registry,
+				promhttp.HandlerOpts{EnableOpenMetrics: true},
+			),
+		}
 	default:
 		return Hooks{
 			Metrics: LogMetrics{logger: logger},
@@ -67,6 +84,20 @@ func Ensure(h Hooks) Hooks {
 
 type LogMetrics struct {
 	logger *slog.Logger
+}
+
+type multiMetrics []Metrics
+
+func (m multiMetrics) Incr(name string, tags map[string]string) {
+	for _, metrics := range m {
+		metrics.Incr(name, tags)
+	}
+}
+
+func (m multiMetrics) Observe(name string, value float64, tags map[string]string) {
+	for _, metrics := range m {
+		metrics.Observe(name, value, tags)
+	}
 }
 
 func (m LogMetrics) Incr(name string, tags map[string]string) {

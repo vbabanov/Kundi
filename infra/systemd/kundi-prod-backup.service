@@ -1,0 +1,20 @@
+[Unit]
+Description=Kundi production PostgreSQL logical backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/kundi-prod-backup
+StateDirectory=kundi-prod-backup
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/root/kundi-prod/shared/backups /var/lib/kundi-prod-backup
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+

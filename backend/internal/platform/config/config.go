@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -111,7 +112,8 @@ type JobsConfig struct {
 }
 
 type ObservabilityConfig struct {
-	Mode string
+	Mode              string
+	MetricsListenAddr string
 }
 
 func Load() (Config, error) {
@@ -197,8 +199,12 @@ func Load() (Config, error) {
 			AutoMigrate:   envBool("DB_AUTO_MIGRATE", true),
 		},
 		Observability: ObservabilityConfig{
-			Mode: env("OBSERVABILITY_MODE", "log"),
+			Mode:              env("OBSERVABILITY_MODE", "log"),
+			MetricsListenAddr: env("OBSERVABILITY_METRICS_LISTEN_ADDR", "127.0.0.1:29090"),
 		},
+	}
+	if err := validateObservability(cfg.Observability); err != nil {
+		return Config{}, err
 	}
 
 	if strings.TrimSpace(cfg.Security.AccessTokenSecret) == "" {
@@ -212,6 +218,22 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func validateObservability(cfg ObservabilityConfig) error {
+	if strings.ToLower(strings.TrimSpace(cfg.Mode)) != "prometheus" {
+		return nil
+	}
+	host, port, err := net.SplitHostPort(cfg.MetricsListenAddr)
+	if err != nil {
+		return fmt.Errorf("OBSERVABILITY_METRICS_LISTEN_ADDR must be a loopback IP and port")
+	}
+	ip := net.ParseIP(host)
+	portNumber, portErr := strconv.Atoi(port)
+	if ip == nil || !ip.IsLoopback() || portErr != nil || portNumber < 1 || portNumber > 65535 {
+		return fmt.Errorf("OBSERVABILITY_METRICS_LISTEN_ADDR must be a loopback IP and port")
+	}
+	return nil
 }
 
 // LoadDatabase returns the only configuration required by the standalone

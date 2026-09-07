@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: kundi-prod-assistant
+    static_configs:
+      - targets:
+          - 127.0.0.1:29090
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: assistant_(requests_total|latency_ms_(bucket|count|sum)|generation_requests_total|generation_latency_ms_(bucket|count|sum)|generation_attempts_total|generation_attempt_latency_ms_(bucket|count|sum))
+        action: keep
