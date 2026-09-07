@@ -165,6 +165,49 @@ func TestQwenUsesMinimumCompletionBudgetAndRejectsEmptyContent(t *testing.T) {
 	}
 }
 
+func TestGemmaUsesCanaryCompletionBudget(t *testing.T) {
+	if gemmaCompletionTokenBudget != 1400 {
+		t.Fatalf("Gemma completion budget=%d", gemmaCompletionTokenBudget)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Model     string `json:"model"`
+			MaxTokens int    `json:"max_tokens"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if request.Model != "gemma4" || request.MaxTokens != gemmaCompletionTokenBudget {
+			t.Fatalf("unexpected Gemma request model=%q max_tokens=%d", request.Model, request.MaxTokens)
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"safe answer"},"finish_reason":"stop"}]}`))
+	}))
+	defer server.Close()
+
+	response, err := NewOpenAICompatibleProvider(server.URL, "key", "gemma4", time.Second).Generate(context.Background(), Request{Prompt: "q"})
+	if err != nil || response.Text != "safe answer" {
+		t.Fatalf("unexpected response=%#v err=%v", response, err)
+	}
+}
+
+func TestCanaryTimeoutDefaults(t *testing.T) {
+	policy := normalizedFallbackPolicy(FallbackPolicy{})
+	if DefaultPrimaryTimeout != 25*time.Second || policy.PrimaryTimeout != 25*time.Second {
+		t.Fatalf("primary timeout default=%s policy=%s", DefaultPrimaryTimeout, policy.PrimaryTimeout)
+	}
+	if DefaultTotalTimeout != 28*time.Second || policy.TotalTimeout != 28*time.Second {
+		t.Fatalf("total timeout default=%s policy=%s", DefaultTotalTimeout, policy.TotalTimeout)
+	}
+	if DefaultFallbackTimeout != 8*time.Second || policy.FallbackTimeout != 8*time.Second {
+		t.Fatalf("fallback timeout changed: default=%s policy=%s", DefaultFallbackTimeout, policy.FallbackTimeout)
+	}
+
+	provider := NewOpenAICompatibleProvider("https://example.invalid", "key", "gemma4", 0)
+	if provider.client.Timeout != 25*time.Second {
+		t.Fatalf("provider default timeout=%s", provider.client.Timeout)
+	}
+}
+
 func TestOpenAICompatibleProviderResponseContract(t *testing.T) {
 	tests := []struct {
 		name       string

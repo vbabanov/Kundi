@@ -21,13 +21,13 @@ The text assistant uses the OpenAI-compatible chat-completions contract. `ALEM_B
 - `ALEM_API_KEY` (legacy shared-key fallback for both key slots)
 - `ALEM_PRIMARY_MODEL`
 - `ALEM_FALLBACK_MODEL` (optional)
-- `AI_ASSISTANT_PRIMARY_TIMEOUT_SEC` (default `10`)
+- `AI_ASSISTANT_PRIMARY_TIMEOUT_SEC` (default `25`)
 - `AI_ASSISTANT_FALLBACK_TIMEOUT_SEC` (default `8`)
-- `AI_ASSISTANT_LLM_TIMEOUT_SEC` (total deadline, default `12`)
+- `AI_ASSISTANT_LLM_TIMEOUT_SEC` (total deadline, default `28`)
 
 Model IDs must be exact values supplied by the deployed Alem configuration or its real model catalog. Primary and fallback providers use their corresponding keys; `ALEM_API_KEY` remains supported when one shared key is intentionally used. The fallback is called once only after a fast network/unavailable or 5xx failure. A primary timeout returns the normal safe provider-failure response without calling the fallback, because the measured fallback latency cannot fit reliably inside the remaining request budget. Validation and safety blocks happen before any provider call; 4xx, 429, malformed output, and configuration errors do not call the fallback.
 
-Local synthetic probes on 2026-09-04 verified the configured IDs `gemma4` (primary) and `qwen3-8` (fallback). They remain environment-configured values and are deliberately not compiled as defaults.
+The initial canary uses only `gemma4` with a compiled completion budget of `1400`. Qwen remains disabled and has no fallback role in this contract. Model IDs remain environment-configured values and are deliberately not compiled as model-selection defaults.
 
 ## API
 

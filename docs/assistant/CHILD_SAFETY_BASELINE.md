@@ -48,7 +48,7 @@ Every provider response, including the stable provider-failure fallback, passes 
 
 Safety responses are short, calm, non-accusatory, and localized to Russian, Kazakh, or English when detected. Immediate-concern responses ask the child to contact a trusted adult and, if danger is immediate, local emergency services. Kundi never claims that it contacted a parent or emergency service.
 
-LLM calls have a configurable service timeout (`AI_ASSISTANT_LLM_TIMEOUT_SEC`, default 12 seconds) matching the existing HTTP provider timeout. Timeout, provider 4xx, provider 5xx, malformed response, moderation failure, cancellation, and internal failure are logged as sanitized typed result/error codes. The client receives stable safe text, and there are no automatic retries.
+LLM calls have a configurable service timeout (`AI_ASSISTANT_LLM_TIMEOUT_SEC`, default 28 seconds); the initial Gemma primary deadline is 25 seconds. Timeout, provider 4xx, provider 5xx, malformed response, moderation failure, cancellation, and internal failure are logged as sanitized typed result/error codes. The client receives stable safe text, and there are no automatic retries.
 
 ## Privacy and logging
 

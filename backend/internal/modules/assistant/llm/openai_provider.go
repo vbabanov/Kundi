@@ -17,10 +17,11 @@ const (
 	maxProviderResponseBytes         int64 = 1 << 20
 	maxProviderTokenCount                  = 10_000_000
 	defaultCompletionTokenBudget           = 700
+	gemmaCompletionTokenBudget             = 1400
 	qwenMinimumCompletionTokenBudget       = 96
-	DefaultPrimaryTimeout                  = 10 * time.Second
+	DefaultPrimaryTimeout                  = 25 * time.Second
 	DefaultFallbackTimeout                 = 8 * time.Second
-	DefaultTotalTimeout                    = 12 * time.Second
+	DefaultTotalTimeout                    = 28 * time.Second
 )
 
 // OpenAICompatibleProvider implements the bounded text-only Alem chat contract.
@@ -39,7 +40,7 @@ func NewOpenAICompatibleProvider(baseURL, apiKey, model string, timeout time.Dur
 
 func NewOpenAICompatibleProviderForStage(baseURL, apiKey, model string, timeout time.Duration, stage ExecutionStage) *OpenAICompatibleProvider {
 	if timeout <= 0 {
-		timeout = 12 * time.Second
+		timeout = DefaultPrimaryTimeout
 	}
 	return &OpenAICompatibleProvider{
 		baseURL:  strings.TrimRight(strings.TrimSpace(baseURL), "/"),
@@ -293,6 +294,9 @@ func timeoutError() error {
 }
 
 func completionTokenBudget(model string) int {
+	if strings.EqualFold(strings.TrimSpace(model), "gemma4") {
+		return gemmaCompletionTokenBudget
+	}
 	budget := defaultCompletionTokenBudget
 	if strings.EqualFold(strings.TrimSpace(model), "qwen3-8") && budget < qwenMinimumCompletionTokenBudget {
 		return qwenMinimumCompletionTokenBudget

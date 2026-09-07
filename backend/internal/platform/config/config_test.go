@@ -51,7 +51,7 @@ func TestAssistantDefaultsDisabledWithoutModelGuessing(t *testing.T) {
 	if cfg.AI.AlemAPIKey != "" || cfg.AI.AlemPrimaryAPIKey != "" || cfg.AI.AlemFallbackAPIKey != "" || cfg.AI.AlemPrimaryModel != "" || cfg.AI.AlemFallbackModel != "" {
 		t.Fatal("Alem credentials and exact model IDs must not have guessed defaults")
 	}
-	if cfg.AI.AssistantPrimaryTimeout != 10*time.Second || cfg.AI.AssistantFallbackTimeout != 8*time.Second || cfg.AI.AssistantLLMTimeout != 12*time.Second {
+	if cfg.AI.AssistantPrimaryTimeout != 25*time.Second || cfg.AI.AssistantFallbackTimeout != 8*time.Second || cfg.AI.AssistantLLMTimeout != 28*time.Second {
 		t.Fatalf("unexpected canary timeout policy: primary=%s fallback=%s total=%s", cfg.AI.AssistantPrimaryTimeout, cfg.AI.AssistantFallbackTimeout, cfg.AI.AssistantLLMTimeout)
 	}
 	if cfg.AI.AssistantHomeworkOverdueDays != 21 || cfg.AI.AssistantHomeworkUpcomingDays != 30 || cfg.AI.AssistantHomeworkUndatedDays != 21 || cfg.AI.AssistantAcademicResultDays != 120 {

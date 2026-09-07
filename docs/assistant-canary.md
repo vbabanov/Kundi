@@ -32,6 +32,8 @@ The Alem configuration contract for this canary is:
 
 - required: `ALEM_BASE_URL`, `ALEM_PRIMARY_API_KEY`, and `ALEM_PRIMARY_MODEL=gemma4`;
 - primary-only: both `ALEM_FALLBACK_MODEL` and `ALEM_FALLBACK_API_KEY` are absent;
+- Gemma completion budget: `max_tokens=1400`;
+- timeout contract: `AI_ASSISTANT_PRIMARY_TIMEOUT_SEC=25`, `AI_ASSISTANT_LLM_TIMEOUT_SEC=28`, and unchanged `AI_ASSISTANT_FALLBACK_TIMEOUT_SEC=8`;
 - optional future fallback: model and key must either both be present or both be absent. Supplying only one is a readiness error.
 
 An empty fallback model means there is no secondary provider. A timeout remains terminal and is not fallback-eligible. The existing fallback implementation is otherwise unchanged and may only run after a provider 5xx or network/unavailable failure when a complete fallback pair is configured.
@@ -59,6 +61,9 @@ KUNDI_ASSISTANT_CANARY_STUDENT_IDS=<approved-student-uuid>
 ALEM_BASE_URL=<approved-alem-base-url>
 ALEM_PRIMARY_API_KEY=<approved-primary-secret-reference>
 ALEM_PRIMARY_MODEL=gemma4
+AI_ASSISTANT_PRIMARY_TIMEOUT_SEC=25
+AI_ASSISTANT_LLM_TIMEOUT_SEC=28
+AI_ASSISTANT_FALLBACK_TIMEOUT_SEC=8
 # ALEM_FALLBACK_MODEL is absent
 # ALEM_FALLBACK_API_KEY is absent
 ```
