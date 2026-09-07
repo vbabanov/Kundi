@@ -233,7 +233,7 @@ class KundiHomeHero extends StatelessWidget {
                           ? const <BoxShadow>[
                               BoxShadow(
                                 color: Color(0x4D58D8FF),
-                                blurRadius: 18,
+                                blurRadius: 9,
                                 spreadRadius: 1,
                               ),
                             ]

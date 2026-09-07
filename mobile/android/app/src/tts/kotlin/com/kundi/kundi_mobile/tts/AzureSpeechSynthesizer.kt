@@ -1,5 +1,6 @@
 package com.kundi.kundi_mobile.tts
 
+import android.util.Log
 import com.microsoft.cognitiveservices.speech.*
 import com.microsoft.cognitiveservices.speech.audio.*
 import java.util.concurrent.SynchronousQueue
@@ -163,6 +164,14 @@ class AzureSpeechSynthesizer(private val post: (() -> Unit) -> Unit) : Synthesiz
                 }
                 val packageData = output
                 val code = failed
+                if (packageData != null) {
+                    Log.i(
+                        "KundiTts",
+                        "synthesis_ready pcm_bytes=${packageData.pcm.size} visemes=${packageData.visemes.size}",
+                    )
+                } else {
+                    Log.w("KundiTts", "synthesis_failed code=${code ?: "synthesis_failed"}")
+                }
                 post {
                     if (disposed || active.cancelled.get()) packageData?.pcm?.fill(0)
                     else if (packageData != null) ready(packageData)

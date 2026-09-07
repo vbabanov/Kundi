@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -46,8 +47,13 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
             synth,
             { AndroidPcmPlayer(activity) { cancel() } },
             { id, name, payload ->
-                if (!disposed)
+                if (!disposed) {
+                    if (name != "visemeDue") {
+                        val code = payload["code"] as? String ?: "none"
+                        Log.i("KundiTts", "event=$name code=$code generation=$id")
+                    }
                     sink?.success(mapOf("generation" to id, "name" to name, "payload" to payload))
+                }
             },
             System::currentTimeMillis,
         )
@@ -86,6 +92,7 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
                                 activity.isFinishing ||
                                 !activity.hasWindowFocus()
                         ) {
+                            Log.w("KundiTts", "speak_rejected reason=host_not_ready")
                             result.success(false)
                         } else {
                             val args = call.arguments as Map<*, *>
@@ -106,7 +113,7 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
                                     .digest(text.toByteArray(Charsets.UTF_8))
                                     .joinToString("") { "%02x".format(it) }
                             require(hash == args["message_content_sha256"])
-                            result.success(
+                            val accepted =
                                 engine.start(
                                     SpeechRequest(
                                         (args["generation"] as Number).toLong(),
@@ -119,7 +126,8 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
                                         args["endpoint"] as String,
                                     )
                                 )
-                            )
+                            Log.i("KundiTts", "speak_accepted=$accepted generation=${args["generation"]}")
+                            result.success(accepted)
                             handler.removeCallbacks(tick)
                             handler.post(tick)
                         }
@@ -135,6 +143,7 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
                     else -> result.notImplemented()
                 }
             } catch (_: Exception) {
+                Log.w("KundiTts", "speak_rejected reason=command_invalid")
                 result.error("speech_command_invalid", "Speech unavailable", null)
             }
         }
