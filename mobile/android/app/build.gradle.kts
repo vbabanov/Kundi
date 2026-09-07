@@ -5,6 +5,26 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseKeystorePath = providers.environmentVariable("KUNDI_ANDROID_KEYSTORE_PATH").orNull?.trim().orEmpty()
+val releaseKeystorePassword = providers.environmentVariable("KUNDI_ANDROID_KEYSTORE_PASSWORD").orNull.orEmpty()
+val releaseKeyAlias = providers.environmentVariable("KUNDI_ANDROID_KEY_ALIAS").orNull?.trim().orEmpty()
+val releaseKeyPassword = providers.environmentVariable("KUNDI_ANDROID_KEY_PASSWORD").orNull.orEmpty()
+val releaseSigningValues = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+)
+val productionSigningConfigured = releaseSigningValues.all { it.isNotEmpty() }
+check(releaseSigningValues.none { it.isNotEmpty() } || productionSigningConfigured) {
+    "Android release signing configuration is incomplete; provide all KUNDI_ANDROID_* signing variables"
+}
+if (productionSigningConfigured) {
+    check(file(releaseKeystorePath).isFile) {
+        "KUNDI_ANDROID_KEYSTORE_PATH does not identify a readable file"
+    }
+}
+
 val kundiHomeRealtimeAvatarEnabled =
     providers.gradleProperty("ENABLE_KUNDI_HOME_REALTIME_AVATAR")
         .orElse(providers.environmentVariable("ENABLE_KUNDI_HOME_REALTIME_AVATAR"))
@@ -60,6 +80,17 @@ android {
 
     buildFeatures {
         buildConfig = true
+    }
+
+    signingConfigs {
+        if (productionSigningConfigured) {
+            create("production") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     compileOptions {
@@ -136,10 +167,42 @@ android {
     buildTypes {
         release {
             if (kundiTtsEnabled) proguardFiles("tts-proguard-rules.pro")
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (productionSigningConfigured) {
+                    signingConfigs.getByName("production")
+                } else {
+                    null
+                }
         }
+    }
+}
+
+val verifyReleaseSigningPolicy =
+    tasks.register("verifyReleaseSigningPolicy") {
+        group = "verification"
+        description = "Rejects accidental debug signing of Android release artifacts."
+        doLast {
+            val signingName = android.buildTypes.getByName("release").signingConfig?.name
+            check(signingName != "debug") {
+                "Release artifacts must never use the debug signing identity"
+            }
+        }
+    }
+
+tasks.register("verifyProductionSigningConfiguration") {
+    group = "verification"
+    description = "Requires an approved external Android release identity."
+    dependsOn(verifyReleaseSigningPolicy)
+    doLast {
+        check(productionSigningConfigured) {
+            "Production signing identity is not configured; publishing is blocked"
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "preReleaseBuild") {
+        dependsOn(verifyReleaseSigningPolicy)
     }
 }
 
