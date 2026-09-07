@@ -71,7 +71,7 @@ func TestPostgresSessionReplaySnapshotAndConcurrentDuplicate(t *testing.T) {
 	if first.Session == nil || first.Session.Title != command.Text {
 		t.Fatalf("updated session snapshot missing: %#v", first.Session)
 	}
-	if first.HelpLevel != "guided" || first.Emotion != "neutral" || first.AnimationCue != "standing" || len(first.Suggestions) != 3 {
+	if first.HelpLevel != "guided" || first.Emotion != "surprised" || first.EmotionIntensity != 0.18 || first.AnimationCue != "standing" || len(first.Suggestions) != 3 {
 		t.Fatalf("response metadata was not restored: %#v", first)
 	}
 	stored, found, err := repository.FindExchange(ctx, studentID, uuid.MustParse(session.ID), clientID)
