@@ -319,10 +319,10 @@ class _KundiListeningGlow extends StatelessWidget {
         child: Align(
           alignment: const Alignment(0.13, 0),
           child: Transform.scale(
-            scaleX: 1.08,
-            scaleY: 2.35,
+            scaleX: 1.15,
+            scaleY: 2.45,
             child: const SizedBox.square(
-              dimension: 150,
+              dimension: 165,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
