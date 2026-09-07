@@ -25,9 +25,10 @@ $expectedDefines = [ordered]@{
     API_BASE_URL = 'https://api.kundi.lucartmax.kz'
     ENABLE_DEBUG_SURFACES = 'false'
     ENABLE_KUNDI_ASSISTANT = 'true'
+    ENABLE_KUNDI_BEHAVIOR_CORE = 'true'
     ENABLE_KUNDI_HOME_REALTIME_AVATAR = 'true'
-    ENABLE_KUNDI_VOICE_INPUT = 'false'
-    ENABLE_KUNDI_TTS = 'false'
+    ENABLE_KUNDI_VOICE_INPUT = 'true'
+    ENABLE_KUNDI_TTS = 'true'
     KUNDI_CRASH_REPORTING_ENABLED = 'false'
 }
 foreach ($entry in $expectedDefines.GetEnumerator()) {
@@ -51,8 +52,8 @@ $environmentValues = [ordered]@{
     KUNDI_INTERNAL_ANDROID_KEY_ALIAS = 'kundi-internal-distribution'
     KUNDI_INTERNAL_ANDROID_KEY_PASSWORD = $keyPassword
     ENABLE_KUNDI_HOME_REALTIME_AVATAR = 'true'
-    ENABLE_KUNDI_VOICE_INPUT = 'false'
-    ENABLE_KUNDI_TTS = 'false'
+    ENABLE_KUNDI_VOICE_INPUT = 'true'
+    ENABLE_KUNDI_TTS = 'true'
 }
 
 try {
@@ -63,6 +64,12 @@ try {
 
     Push-Location $mobileDirectory
     try {
+        # Worktrees can otherwise reuse stale Flutter/Kotlin intermediates whose
+        # recorded roots point at another checkout. Internal artifacts must be
+        # compiled from the exact source SHA printed in their filename.
+        & flutter clean
+        if ($LASTEXITCODE -ne 0) { throw 'flutter clean failed' }
+
         & flutter pub get
         if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
 

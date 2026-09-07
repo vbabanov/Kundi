@@ -232,14 +232,14 @@ class KundiHomeHero extends StatelessWidget {
                       boxShadow: voiceListening
                           ? const <BoxShadow>[
                               BoxShadow(
-                                color: Color(0x9958D8FF),
-                                blurRadius: 28,
-                                spreadRadius: 4,
+                                color: Color(0x4D58D8FF),
+                                blurRadius: 18,
+                                spreadRadius: 1,
                               ),
                             ]
                           : const <BoxShadow>[],
                     ),
-                    child: KundiRealtimeAvatar(
+                    child: _KundiHomeAvatar(
                       ttsState: ttsState,
                       assetPath: assetPath,
                       realtimeEnabled: realtimeAvatarEnabled,
@@ -286,9 +286,8 @@ class KundiHomeHero extends StatelessWidget {
   }
 }
 
-class KundiRealtimeAvatar extends StatefulWidget {
-  const KundiRealtimeAvatar({
-    super.key,
+class _KundiHomeAvatar extends StatefulWidget {
+  const _KundiHomeAvatar({
     required this.ttsState,
     required this.assetPath,
     required this.realtimeEnabled,
@@ -309,10 +308,10 @@ class KundiRealtimeAvatar extends StatefulWidget {
   final String animationIdentity;
 
   @override
-  State<KundiRealtimeAvatar> createState() => KundiRealtimeAvatarState();
+  State<_KundiHomeAvatar> createState() => _KundiHomeAvatarState();
 }
 
-class KundiRealtimeAvatarState extends State<KundiRealtimeAvatar> {
+class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   final _ttsDriver = KundiTtsAvatarDriver();
   static const Duration _greetingDuration = Duration(milliseconds: 2600);
 
@@ -353,7 +352,7 @@ class KundiRealtimeAvatarState extends State<KundiRealtimeAvatar> {
   }
 
   @override
-  void didUpdateWidget(covariant KundiRealtimeAvatar oldWidget) {
+  void didUpdateWidget(covariant _KundiHomeAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.ttsState != widget.ttsState &&
         (oldWidget.ttsState.active || widget.ttsState.active)) {
@@ -602,7 +601,11 @@ class KundiRealtimeAvatarState extends State<KundiRealtimeAvatar> {
     }
     if (!_transition.beginRendererSession()) return;
     _activeRendererGeneration = _revealGate.beginSession(
-      loadingImagePrepared: widget.preparedLoadingFrame != null,
+      // The realtime path always paints an explicit transparent loading
+      // barrier. A decoded bitmap is optional and is retained only for the
+      // fatal fallback, so it must not gate Filament presentation priming.
+      loadingImagePrepared:
+          widget.realtimeEnabled || widget.preparedLoadingFrame != null,
       textureId: _renderSurfaceId,
       textureMounted: _renderSurfaceMounted,
       modelLoaded: _modelReady,

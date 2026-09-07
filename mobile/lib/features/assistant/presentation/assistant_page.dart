@@ -3,14 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../runtimes/kundi_native_avatar/kundi_home_avatar_placement.dart';
-import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_feature.dart';
-import '../../../runtimes/kundi_system_speech/kundi_system_speech_controller.dart';
-import '../../lessons/presentation/widgets/kundi_home_hero.dart';
 import '../application/assistant_controller.dart';
 import '../application/kundi_tts_coordinator.dart';
-import '../application/kundi_voice_assistant_coordinator.dart';
-import '../assistant_feature.dart';
 import '../domain/assistant_entity.dart';
 
 class AssistantPage extends ConsumerStatefulWidget {
@@ -42,15 +36,9 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(assistantControllerProvider);
-    final ttsEnabled = ref.watch(kundiTtsEnabledProvider);
-    final ttsState = ttsEnabled
-        ? ref.watch(kundiTtsCoordinatorProvider)
-        : const KundiTtsState();
-    final speechError = ttsState.errorMessage;
-    final voiceEnabled = ref.watch(kundiVoiceInputEnabledProvider);
-    final recognition = voiceEnabled
-        ? ref.watch(kundiVoiceAssistantCoordinatorProvider)
-        : const KundiSpeechRecognitionState();
+    final speechError = ref.watch(kundiTtsEnabledProvider)
+        ? ref.watch(kundiTtsCoordinatorProvider.select((s) => s.errorMessage))
+        : '';
     ref.listen(assistantControllerProvider, (previous, next) {
       final before = previous?.valueOrNull?.messages.length ?? 0;
       final after = next.valueOrNull?.messages.length ?? 0;
@@ -94,12 +82,6 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         data: (view) => Column(
           children: [
             if (view.isRefreshing) const LinearProgressIndicator(minHeight: 2),
-            if (KundiNativeAvatarFeature.enabled)
-              _AssistantAvatar(
-                view: view,
-                recognition: recognition,
-                ttsState: ttsState,
-              ),
             Expanded(child: _messageList(view)),
             if (view.refreshErrorMessage.isNotEmpty)
               _TransportError(
@@ -306,69 +288,6 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
           .read(assistantControllerProvider.notifier)
           .deleteCurrentSession();
     }
-  }
-}
-
-class _AssistantAvatar extends StatelessWidget {
-  const _AssistantAvatar({
-    required this.view,
-    required this.recognition,
-    required this.ttsState,
-  });
-
-  final AssistantViewState view;
-  final KundiSpeechRecognitionState recognition;
-  final KundiTtsState ttsState;
-
-  @override
-  Widget build(BuildContext context) {
-    final cue = _cue();
-    final identity = <String>[
-      'assistant',
-      cue,
-      recognition.requestId,
-      ttsState.messageId,
-      view.activeSession?.id ?? '',
-    ].join(':');
-    return SizedBox(
-      key: const Key('assistant-avatar-slot'),
-      height: 174,
-      child: Center(
-        child: RepaintBoundary(
-          key: const Key('assistant-realtime-avatar'),
-          child: SizedBox(
-            width: 116,
-            height: 174,
-            child: KundiRealtimeAvatar(
-              ttsState: ttsState,
-              assetPath: KundiHomeAvatarPlacement.fatalFallbackAssetPath,
-              realtimeEnabled: true,
-              realtimePreparing: false,
-              preparedLoadingFrame: null,
-              isVisible: true,
-              animationCueName: cue,
-              animationIdentity: identity,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _cue() {
-    if (recognition.status == KundiSpeechRecognitionStatus.listening) {
-      return 'listen';
-    }
-    if (ttsState.status == KundiTtsStatus.speaking) return 'speak';
-    if (ttsState.status == KundiTtsStatus.synthesizing || view.isSending) {
-      return 'think';
-    }
-    if (ttsState.status == KundiTtsStatus.error ||
-        recognition.status == KundiSpeechRecognitionStatus.error ||
-        view.errorMessage.isNotEmpty) {
-      return 'error';
-    }
-    return 'neutral';
   }
 }
 
