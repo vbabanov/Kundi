@@ -73,6 +73,10 @@ func TestAssistantEndpointHappyPath(t *testing.T) {
 	if data["avatar_emotion"] == "" {
 		t.Fatalf("assistant response avatar emotion is required")
 	}
+	intensity, ok := data["avatar_emotion_intensity"].(float64)
+	if !ok || intensity < 0 || intensity > 1 {
+		t.Fatalf("assistant response avatar emotion intensity is invalid: %#v", data["avatar_emotion_intensity"])
+	}
 	if _, ok := data["visemes"].([]any); !ok {
 		t.Fatalf("assistant response visemes must be an array")
 	}
@@ -80,8 +84,8 @@ func TestAssistantEndpointHappyPath(t *testing.T) {
 	if !ok {
 		t.Fatalf("assistant response behavior meta is required")
 	}
-	if behavior["grade_band"] != "primary" {
-		t.Fatalf("expected primary grade_band, got %#v", behavior["grade_band"])
+	if behavior["grade_band"] != "3-4" {
+		t.Fatalf("expected 3-4 grade_band, got %#v", behavior["grade_band"])
 	}
 }
 

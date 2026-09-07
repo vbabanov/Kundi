@@ -17,11 +17,16 @@ type Service struct{}
 func NewService() *Service { return &Service{} }
 
 func (s *Service) Resolve(_ context.Context, _ uuid.UUID, gradeLevel int) Profile {
-	if gradeLevel <= 4 {
-		return Profile{ToneProfile: "warm_playful", StyleProfile: "simple_examples", GradeLevel: gradeLevel}
+	switch {
+	case gradeLevel <= 2:
+		return Profile{ToneProfile: "calm_companion", StyleProfile: "one_simple_step", GradeLevel: gradeLevel}
+	case gradeLevel <= 4:
+		return Profile{ToneProfile: "warm_guide", StyleProfile: "short_example_check", GradeLevel: gradeLevel}
+	case gradeLevel <= 7:
+		return Profile{ToneProfile: "friendly_coach", StyleProfile: "guided_independence", GradeLevel: gradeLevel}
+	case gradeLevel <= 9:
+		return Profile{ToneProfile: "respectful_coach", StyleProfile: "terms_and_reasoning", GradeLevel: gradeLevel}
+	default:
+		return Profile{ToneProfile: "mentor", StyleProfile: "strategy_argument_exam", GradeLevel: gradeLevel}
 	}
-	if gradeLevel <= 8 {
-		return Profile{ToneProfile: "energetic_coach", StyleProfile: "step_by_step", GradeLevel: gradeLevel}
-	}
-	return Profile{ToneProfile: "mentor", StyleProfile: "exam_oriented", GradeLevel: gradeLevel}
 }

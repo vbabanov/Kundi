@@ -106,6 +106,29 @@ class KundiNativeAvatarProtocolTest {
     }
 
     @Test
+    fun `facial commands accept bounded intensity and keep legacy defaults`() {
+        assertEquals(
+            NativeAvatarCommand.SetEmotion("Joy", 0.35f),
+            parse("setEmotion", mapOf("emotion" to "Joy", "intensity" to 0.35)),
+        )
+        assertEquals(
+            NativeAvatarCommand.SetEmotion("Joy", 1f),
+            parse("setEmotion", mapOf("emotion" to "Joy")),
+        )
+        assertEquals(
+            NativeAvatarCommand.SetViseme("A", 0.8f),
+            parse("setViseme", mapOf("viseme" to "A", "weight" to 0.8)),
+        )
+        assertEquals(NativeAvatarCommand.ClearViseme, parse("clearViseme"))
+        assertThrows(ProtocolException::class.java) {
+            parse("setEmotion", mapOf("emotion" to "Joy", "intensity" to 1.1))
+        }
+        assertThrows(ProtocolException::class.java) {
+            parse("setViseme", mapOf("viseme" to "A", "weight" to -0.1))
+        }
+    }
+
+    @Test
     fun `invalid command and protocol version are rejected`() {
         assertThrows(ProtocolException::class.java) {
             parse("playTalking", mapOf("variant" to 4))

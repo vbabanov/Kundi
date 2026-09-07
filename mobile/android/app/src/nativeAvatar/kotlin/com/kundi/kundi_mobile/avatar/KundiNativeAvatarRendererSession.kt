@@ -182,6 +182,7 @@ internal class KundiNativeAvatarRendererSession(
             -> retainedAnimationCommand = command
             is NativeAvatarCommand.SetEmotion -> retainedEmotionCommand = command
             is NativeAvatarCommand.SetViseme -> retainedVisemeCommand = command
+            NativeAvatarCommand.ClearViseme -> retainedVisemeCommand = null
             NativeAvatarCommand.ResetFace -> {
                 retainedEmotionCommand = null
                 retainedVisemeCommand = null

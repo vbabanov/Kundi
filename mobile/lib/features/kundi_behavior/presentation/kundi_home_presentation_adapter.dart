@@ -1,4 +1,5 @@
 import '../domain/kundi_behavior_state.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_protocol.dart';
 
 enum KundiVisualEmphasis { none, gentle, attention }
 
@@ -10,6 +11,7 @@ class KundiHomePresentation {
     required this.semanticLabel,
     required this.visualEmphasis,
     required this.animationCueName,
+    required this.facialExpression,
   });
 
   final String assetPath;
@@ -18,6 +20,7 @@ class KundiHomePresentation {
   final String semanticLabel;
   final KundiVisualEmphasis visualEmphasis;
   final String animationCueName;
+  final KundiFacialExpression facialExpression;
 }
 
 class KundiHomePresentationAdapter {
@@ -53,6 +56,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi радуется успеху',
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'celebrate',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.joy,
+            intensity: 0.52,
+          ),
         );
       case KundiBehaviorKind.thinking:
         return _presentation(
@@ -61,6 +68,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi думает',
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'think',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.surprised,
+            intensity: 0.18,
+          ),
         );
       case KundiBehaviorKind.speaking:
         return _presentation(
@@ -69,6 +80,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi готовит ответ',
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'speak',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.joy,
+            intensity: 0.14,
+          ),
         );
       case KundiBehaviorKind.listening:
         return _presentation(
@@ -77,6 +92,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi слушает',
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'listen',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.joy,
+            intensity: 0.16,
+          ),
         );
       case KundiBehaviorKind.warning:
         return _presentation(
@@ -85,6 +104,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi предлагает проверить важное',
           emphasis: KundiVisualEmphasis.attention,
           cueName: 'warn',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.sorrow,
+            intensity: 0.22,
+          ),
         );
       case KundiBehaviorKind.error:
         return _presentation(
@@ -93,6 +116,10 @@ class KundiHomePresentationAdapter {
           semanticLabel: 'Kundi временно недоступен',
           emphasis: KundiVisualEmphasis.attention,
           cueName: 'error',
+          expression: const KundiFacialExpression(
+            emotion: KundiNativeAvatarEmotion.sorrow,
+            intensity: 0.32,
+          ),
         );
     }
   }
@@ -108,6 +135,7 @@ class KundiHomePresentationAdapter {
       semanticLabel: semanticLabel,
       emphasis: KundiVisualEmphasis.none,
       cueName: 'neutral',
+      expression: const KundiFacialExpression.neutral(),
     );
   }
 
@@ -117,6 +145,7 @@ class KundiHomePresentationAdapter {
     required String semanticLabel,
     required KundiVisualEmphasis emphasis,
     required String cueName,
+    required KundiFacialExpression expression,
   }) {
     return KundiHomePresentation(
       assetPath: fallbackAssetPath,
@@ -125,6 +154,7 @@ class KundiHomePresentationAdapter {
       semanticLabel: semanticLabel,
       visualEmphasis: emphasis,
       animationCueName: cueName,
+      facialExpression: expression,
     );
   }
 

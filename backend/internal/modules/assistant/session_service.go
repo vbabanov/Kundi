@@ -54,6 +54,7 @@ type SessionMessageResult struct {
 	HelpLevel        string            `json:"help_level"`
 	FollowUpQuestion string            `json:"follow_up_question,omitempty"`
 	Emotion          string            `json:"emotion"`
+	EmotionIntensity float64           `json:"emotion_intensity"`
 	AnimationCue     string            `json:"animation_cue"`
 	Suggestions      []string          `json:"suggestions"`
 	Session          *AssistantSession `json:"session,omitempty"`
@@ -70,6 +71,7 @@ type sessionResponseMetadata struct {
 	ActiveHomework   bool            `json:"active_homework"`
 	GradeBand        string          `json:"grade_band,omitempty"`
 	Emotion          string          `json:"emotion,omitempty"`
+	EmotionIntensity float64         `json:"emotion_intensity,omitempty"`
 	AnimationCue     string          `json:"animation_cue,omitempty"`
 	Suggestions      []string        `json:"suggestions,omitempty"`
 }
@@ -238,7 +240,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		analysis := tutoring.Analysis{Intent: tutoring.IntentGeneralQuestion, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", GradeBand: tutoring.GradeBand(session.GradeLevel)}
 		outcome.SetAnalysis(analysis)
 		outcome.SetSafety(inputSafety.Category)
-		result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "neutral", AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
+		result, err := s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, tutoring.TutorResponseDraft{Answer: safe.Text, ResponseMode: tutoring.ResponseModeSafety, HelpLevel: "safety", Emotion: "sorrow", EmotionIntensity: 0.20, AnimationCue: "standing"}, analysis, "", "", string(inputSafety.Category), nil)
 		if err == nil {
 			outcome.SetResult(OutcomeSafetyIntervention, OutcomeSafetyIntervention)
 		}
@@ -257,7 +259,7 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 	activeHomework := academic.MatchesActiveHomework(validated.Text) || tutoring.LooksLikeHomework(validated.Text)
 	analysis := s.tutoring.Analyze(inputSafety.SanitizedText, session.GradeLevel, activeHomework)
 	outcome.SetAnalysis(analysis)
-	prompt := s.tutoring.BuildPrompt(inputSafety.SanitizedText, session.GradeLevel, analysis, academic.Render(), renderSessionHistory(history))
+	prompt := s.tutoring.BuildPromptForChannel(inputSafety.SanitizedText, session.GradeLevel, analysis, academic.Render(), renderSessionHistory(history), inputMode)
 
 	llmCtx, cancel := context.WithTimeout(ctx, s.llmTimeout)
 	generation := newAssistantGenerationOutcome(s.observe.Metrics, string(language), inputMode)
@@ -283,10 +285,12 @@ func (s *Service) SendSessionMessage(ctx context.Context, cmd SendSessionMessage
 		safetyCategory = string(outputSafety.Category)
 		outcome.SetSafety(outputSafety.Category)
 	}
-	draft := s.tutoring.Finalize(raw, analysis, string(language))
+	draft := s.tutoring.FinalizeForChannel(raw, analysis, string(language), inputMode)
 	if !outputSafety.Allowed {
 		draft.ResponseMode = tutoring.ResponseModeSafety
 		draft.HelpLevel = "safety"
+		draft.Emotion = "sorrow"
+		draft.EmotionIntensity = 0.20
 	}
 	result, err = s.persistSessionDraft(ctx, studentID, sessionID, clientMessageID, validated.Text, inputMode, draft, analysis, providerResponse.Provider, providerResponse.Model, safetyCategory, academic.Suggestions())
 	if err == nil {
@@ -307,7 +311,7 @@ func (s *Service) persistSessionDraft(ctx context.Context, studentID, sessionID,
 		SchemaVersion: sessionResponseMetadataVersion, Intent: analysis.Intent,
 		HelpLevel: draft.HelpLevel, FollowUpQuestion: draft.FollowUpQuestion,
 		ReadyAnswerRisk: draft.ReadyAnswerRisk, ActiveHomework: analysis.ActiveHomework,
-		GradeBand: analysis.GradeBand, Emotion: draft.Emotion,
+		GradeBand: analysis.GradeBand, Emotion: draft.Emotion, EmotionIntensity: draft.EmotionIntensity,
 		AnimationCue: draft.AnimationCue, Suggestions: suggestions,
 	}
 	policy, _ := json.Marshal(metadata)
@@ -333,7 +337,7 @@ func (s *Service) normalizeInputMode(raw string) (string, error) {
 }
 
 func resultFromExchange(exchange StoredExchange) SessionMessageResult {
-	metadata := sessionResponseMetadata{Emotion: "neutral", AnimationCue: "standing", Suggestions: []string{}}
+	metadata := sessionResponseMetadata{Emotion: "neutral", EmotionIntensity: 1.0, AnimationCue: "standing", Suggestions: []string{}}
 	if len(exchange.Assistant.TutoringPolicy) > 0 {
 		var stored sessionResponseMetadata
 		if err := json.Unmarshal(exchange.Assistant.TutoringPolicy, &stored); err == nil {
@@ -342,6 +346,13 @@ func resultFromExchange(exchange StoredExchange) SessionMessageResult {
 	}
 	if metadata.Emotion == "" {
 		metadata.Emotion = "neutral"
+	}
+	if metadata.EmotionIntensity < 0 || metadata.EmotionIntensity > 1 {
+		metadata.EmotionIntensity = 1.0
+	}
+	if metadata.EmotionIntensity == 0 && metadata.Emotion == "neutral" {
+		// Stored v1 metadata had no intensity. Preserve its full Neutral face.
+		metadata.EmotionIntensity = 1.0
 	}
 	if metadata.AnimationCue == "" {
 		metadata.AnimationCue = "standing"
@@ -359,7 +370,8 @@ func resultFromExchange(exchange StoredExchange) SessionMessageResult {
 		UserMessage: exchange.User, AssistantMessage: exchange.Assistant,
 		ResponseMode: exchange.Assistant.ResponseMode, HelpLevel: metadata.HelpLevel,
 		FollowUpQuestion: metadata.FollowUpQuestion, Emotion: metadata.Emotion,
-		AnimationCue: metadata.AnimationCue, Suggestions: metadata.Suggestions,
+		EmotionIntensity: metadata.EmotionIntensity,
+		AnimationCue:     metadata.AnimationCue, Suggestions: metadata.Suggestions,
 		Session: session,
 	}
 }

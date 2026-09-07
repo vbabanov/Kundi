@@ -58,11 +58,17 @@ internal class KundiFilamentRenderer(
     private val readyRenderables = IntArray(128)
     private val addedRenderableEntities = HashSet<Int>()
     private val morphBindings = LinkedHashMap<Int, Map<String, Int>>()
-    private val faceWeights = HashMap<String, Float>()
+    private val faceState =
+        KundiAvatarFaceState(
+            neutralBlendShape = neutralBlendShape,
+            blinkBlendShape = blinkBlendShape,
+        )
     private val animationByName = LinkedHashMap<String, AnimationMetadata>()
     private val blinkReset = Runnable {
-        blinkWeight = 0f
+        faceState.setBlink(0f)
+        faceFramePending = true
         applyFaceWeights()
+        scheduleFrame()
     }
     private val scheduleRestorationFrame = Runnable(::scheduleFrame)
     private val presentationPriming = KundiPresentationPrimingTracker()
@@ -91,6 +97,23 @@ internal class KundiFilamentRenderer(
             onPassiveBurstRequested = ::startPassiveIdleAnimation,
             onModeChanged = ::onCadenceModeChanged,
         )
+    private val blinkController =
+        KundiAvatarBlinkController(
+            scheduler =
+                object : KundiAvatarBlinkScheduler {
+                    override fun schedule(
+                        delayMillis: Long,
+                        task: Runnable,
+                    ) {
+                        mainHandler.postDelayed(task, delayMillis)
+                    }
+
+                    override fun cancel(task: Runnable) {
+                        mainHandler.removeCallbacks(task)
+                    }
+                },
+            onBlinkRequested = ::blink,
+        )
 
     private var swapChain: SwapChain? = null
     private var asset: FilamentAsset? = null
@@ -100,7 +123,6 @@ internal class KundiFilamentRenderer(
     private var previousAnimation: PreviousAnimation? = null
     private var fixedAnimationSample: FixedAnimationSample? = null
     private var crossFadeStartedNanos = 0L
-    private var blinkWeight = 0f
     private var attached = false
     private var hostResumed = true
     private var requestedVisible = true
@@ -112,6 +134,7 @@ internal class KundiFilamentRenderer(
     private var pendingPresentationPriming: NativeAvatarCommand.StartPresentationPriming? = null
     private var activePresentationPriming: NativeAvatarCommand.StartPresentationPriming? = null
     private var restorationFramePending = false
+    private var faceFramePending = false
     private var freezeAfterRestorationFrame = false
     private val commandsPendingModelLoad = mutableListOf<NativeAvatarCommand>()
     private var modelSha256 = ""
@@ -234,6 +257,7 @@ internal class KundiFilamentRenderer(
         if (disposed || attached == value) return
         attached = value
         cadence.setAttached(value)
+        blinkController.setAttached(value)
         if (value) {
             resumeIfPossible()
         } else {
@@ -245,6 +269,7 @@ internal class KundiFilamentRenderer(
         if (disposed) return
         hostResumed = true
         cadence.setHostResumed(true)
+        blinkController.setHostResumed(true)
         resumeIfPossible()
     }
 
@@ -252,6 +277,7 @@ internal class KundiFilamentRenderer(
         if (disposed) return
         hostResumed = false
         cadence.setHostResumed(false)
+        blinkController.setHostResumed(false)
         if (lifecycle.pause()) {
             emitLifecycle("paused")
         }
@@ -283,8 +309,9 @@ internal class KundiFilamentRenderer(
                     NativeAvatarAnimationCadence.PASSIVE_BURST -> cadence.startPassiveBurst()
                 }
             }
-            is NativeAvatarCommand.SetEmotion -> setEmotion(command.emotion)
-            is NativeAvatarCommand.SetViseme -> setViseme(command.viseme)
+            is NativeAvatarCommand.SetEmotion -> setEmotion(command.emotion, command.intensity)
+            is NativeAvatarCommand.SetViseme -> setViseme(command.viseme, command.weight)
+            NativeAvatarCommand.ClearViseme -> clearViseme()
             is NativeAvatarCommand.SetVisible -> Unit
             NativeAvatarCommand.SettleRestPose -> settleRestPose()
             is NativeAvatarCommand.StartPresentationPriming ->
@@ -299,6 +326,7 @@ internal class KundiFilamentRenderer(
         if (disposed || requestedVisible == value) return
         requestedVisible = value
         cadence.setVisible(value)
+        blinkController.setVisible(value)
         if (value) {
             resumeIfPossible()
         } else {
@@ -317,7 +345,7 @@ internal class KundiFilamentRenderer(
                 frameLoop.evaluate(
                     frameTimeNanos = frameTimeNanos,
                     targetFps = cadence.targetFps,
-                    oneShotPending = restorationFramePending,
+                    oneShotPending = restorationFramePending || faceFramePending || faceState.transitionPending,
                 )
             ) {
                 KundiAvatarFrameDirective.STOP -> return@runCatching
@@ -330,7 +358,7 @@ internal class KundiFilamentRenderer(
                 -> Unit
             }
             updateAnimation(frameTimeNanos)
-            applyFaceWeights()
+            applyFaceWeights(frameTimeNanos)
             val rendered =
                 swapChain?.let { chain ->
                     if (renderer.beginFrame(chain, frameTimeNanos)) {
@@ -344,6 +372,7 @@ internal class KundiFilamentRenderer(
             if (rendered) {
                 renderedFrameCount++
                 restorationFramePending = false
+                faceFramePending = false
                 recordPresentationPrimeSubmission()
             }
             recordFrameMetrics(frameTimeNanos, rendered)
@@ -391,6 +420,7 @@ internal class KundiFilamentRenderer(
         if (!lifecycle.dispose()) return
         disposed = true
         cadence.dispose()
+        blinkController.dispose()
         resetPresentationPriming(reason = "renderer_disposed", emitReset = false)
         stopFrames()
         mainHandler.removeCallbacks(blinkReset)
@@ -416,7 +446,7 @@ internal class KundiFilamentRenderer(
             fixedAnimationSample = null
             animationByName.clear()
             morphBindings.clear()
-            faceWeights.clear()
+            faceState.reset()
             addedRenderableEntities.clear()
             assetLoader.destroy()
             materialProvider.destroyMaterials()
@@ -453,6 +483,7 @@ internal class KundiFilamentRenderer(
                             renderTarget.retainedTextureEntryCount,
                         "frameCallbacks" to if (frameScheduled) 1 else 0,
                         "cadenceTimers" to cadence.pendingTimerCount,
+                        "blinkTimers" to blinkController.pendingTimerCount,
                         "releaseCompleted" to nativeReleaseCompleted,
                     ),
                 ),
@@ -657,6 +688,7 @@ internal class KundiFilamentRenderer(
         sourceBuffer = null
         resourceLoader.evictResourceData()
         modelReady = true
+        blinkController.setModelReady(true)
         applyStandingPose()
         val primingWasRequestedBeforeModelReady =
             pendingPresentationPriming != null ||
@@ -812,8 +844,9 @@ internal class KundiFilamentRenderer(
         previousAnimation = null
         loadedAnimator.applyAnimation(metadata.index, sampleTime)
         loadedAnimator.updateBoneMatrices()
-        resetFace()
-        setEmotion("Neutral")
+        faceState.clearViseme()
+        faceFramePending = true
+        applyFaceWeights()
     }
 
     private fun requestPresentationPriming(
@@ -947,54 +980,83 @@ internal class KundiFilamentRenderer(
             "modelId" to modelSha256.take(16),
         )
 
-    private fun setEmotion(emotion: String) {
-        KundiNativeAvatarProtocol.emotionBlendShapes.values.forEach(faceWeights::remove)
-        faceWeights[checkNotNull(KundiNativeAvatarProtocol.emotionBlendShapes[emotion])] = 1f
+    private fun setEmotion(
+        emotion: String,
+        intensity: Float,
+    ) {
+        faceState.setEmotion(
+            blendShape = checkNotNull(KundiNativeAvatarProtocol.emotionBlendShapes[emotion]),
+            intensity = intensity,
+            nowNanos = animationClockNanos(),
+        )
+        faceFramePending = true
         applyFaceWeights()
-        emitFaceState("emotion", emotion)
+        scheduleFrame()
+        emitFaceState("emotion", emotion, mapOf("intensity" to intensity))
     }
 
-    private fun setViseme(viseme: String) {
-        KundiNativeAvatarProtocol.visemeBlendShapes.values.forEach(faceWeights::remove)
-        faceWeights[checkNotNull(KundiNativeAvatarProtocol.visemeBlendShapes[viseme])] = 1f
+    private fun setViseme(
+        viseme: String,
+        weight: Float,
+    ) {
+        faceState.setViseme(
+            blendShape = checkNotNull(KundiNativeAvatarProtocol.visemeBlendShapes[viseme]),
+            weight = weight,
+        )
+        faceFramePending = true
         applyFaceWeights()
-        emitFaceState("viseme", viseme)
+        scheduleFrame()
+        emitFaceState("viseme", viseme, mapOf("weight" to weight))
+    }
+
+    private fun clearViseme() {
+        faceState.clearViseme()
+        faceFramePending = true
+        applyFaceWeights()
+        scheduleFrame()
+        emitFaceState("viseme", "Neutral", mapOf("weight" to 0f))
     }
 
     private fun blink() {
         mainHandler.removeCallbacks(blinkReset)
-        blinkWeight = 1f
+        faceState.setBlink(1f)
+        faceFramePending = true
         applyFaceWeights()
+        scheduleFrame()
         emitFaceState("blink", blinkBlendShape)
         mainHandler.postDelayed(blinkReset, blinkDurationMillis)
     }
 
     private fun resetFace() {
         mainHandler.removeCallbacks(blinkReset)
-        blinkWeight = 0f
-        faceWeights.clear()
+        faceState.reset()
+        faceFramePending = true
         applyFaceWeights()
+        scheduleFrame()
         emitFaceState("reset", "neutral")
     }
 
     private fun emitFaceState(
         mode: String,
         value: String,
+        extra: Map<String, Any?> = emptyMap(),
     ) {
         emitEvent(
             KundiNativeAvatarProtocol.event(
                 "faceStateChanged",
-                mapOf(
-                    "mode" to mode,
-                    "value" to value,
-                    "renderableBindings" to morphBindings.size,
-                ),
+                buildMap {
+                    put("mode", mode)
+                    put("value", value)
+                    put("renderableBindings", morphBindings.size)
+                    putAll(extra)
+                },
             ),
         )
     }
 
-    private fun applyFaceWeights() {
+    private fun applyFaceWeights(nowNanos: Long = animationClockNanos()) {
         if (!modelReady || disposed) return
+        val facialWeights = faceState.snapshot(nowNanos)
         val renderableManager = engine.renderableManager
         morphBindings.forEach { (entity, bindings) ->
             val instance = renderableManager.getInstance(entity)
@@ -1002,11 +1064,7 @@ internal class KundiFilamentRenderer(
             val weights = FloatArray(renderableManager.getMorphTargetCount(instance))
             bindings.forEach { (name, index) ->
                 weights[index] =
-                    if (name == blinkBlendShape) {
-                        max(blinkWeight, faceWeights[name] ?: 0f)
-                    } else {
-                        faceWeights[name] ?: 0f
-                    }
+                    facialWeights[name] ?: 0f
             }
             renderableManager.setMorphWeights(instance, weights, 0)
         }
@@ -1068,7 +1126,7 @@ internal class KundiFilamentRenderer(
             requestedVisible &&
             frameLoop.canSchedule(
                 targetFps = cadence.targetFps,
-                oneShotPending = restorationFramePending,
+                oneShotPending = restorationFramePending || faceFramePending || faceState.transitionPending,
             ) &&
             lifecycle.state == RendererLifecycleState.RUNNING
 
@@ -1167,6 +1225,7 @@ internal class KundiFilamentRenderer(
         const val expectedJointCount = 153
         const val expectedMeshCount = 3
         const val expectedMaterialCount = 6
+        const val neutralBlendShape = "Fcl_ALL_Neutral"
         const val blinkBlendShape = "Fcl_EYE_Close"
         const val blinkDurationMillis = 140L
         const val crossFadeDurationNanos = 180_000_000.0

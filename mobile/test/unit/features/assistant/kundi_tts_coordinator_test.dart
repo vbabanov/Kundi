@@ -7,12 +7,19 @@ import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
 import 'package:kundi_mobile/runtimes/kundi_tts/kundi_tts_transport.dart';
 import 'package:kundi_mobile/runtimes/kundi_tts/kundi_tts_avatar_driver.dart';
 import 'package:kundi_mobile/runtimes/kundi_native_avatar/kundi_native_avatar_controller.dart';
+import 'package:kundi_mobile/runtimes/kundi_native_avatar/kundi_native_avatar_protocol.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  const expression = KundiFacialExpression(
+    emotion: KundiNativeAvatarEmotion.joy,
+    intensity: 0.4,
+  );
   test('viseme during delayed body transition does not swallow Talking',
       () async {
-    final wire = FakeAvatar()..delayReset = Completer<void>();
+    final wire = FakeAvatar()
+      ..delayedCommand = 'setEmotion'
+      ..delay = Completer<void>();
     final controller = KundiNativeAvatarController(wire);
     final driver = KundiTtsAvatarDriver();
     addTearDown(controller.dispose);
@@ -22,7 +29,7 @@ void main() {
         controller,
         const KundiTtsState(
             status: KundiTtsStatus.speaking, messageId: 'm', viseme: 'A'));
-    wire.delayReset!.complete();
+    wire.delay!.complete();
     await started;
     expect(wire.commands.where((c) => c['name'] == 'playTalking').length, 1);
     expect((wire.commands.last['payload'] as Map)['viseme'], 'A');
@@ -49,8 +56,11 @@ void main() {
     expect(tts.state.status, KundiTtsStatus.synthesizing);
     transport.emit(KundiTtsEventType.playbackStarted);
     expect(tts.state.status, KundiTtsStatus.speaking);
+    expect(tts.state.expression.emotion, KundiNativeAvatarEmotion.joy);
+    expect(tts.state.expression.intensity, 0.4);
     transport.emit(KundiTtsEventType.visemeDue, viseme: 'A');
     expect(tts.state.viseme, 'A');
+    expect(tts.state.expression.emotion, KundiNativeAvatarEmotion.joy);
     transport.emit(KundiTtsEventType.playbackCompleted);
     expect(tts.state.status, KundiTtsStatus.idle);
     await tts.speakResponse(reply, expectedEpoch: tts.epoch);
@@ -144,23 +154,45 @@ void main() {
     await driver.apply(
         controller,
         const KundiTtsState(
-            status: KundiTtsStatus.synthesizing, messageId: 'm'));
-    await driver.apply(controller,
-        const KundiTtsState(status: KundiTtsStatus.speaking, messageId: 'm'));
+            status: KundiTtsStatus.synthesizing,
+            messageId: 'm',
+            expression: expression));
     await driver.apply(
         controller,
         const KundiTtsState(
-            status: KundiTtsStatus.speaking, messageId: 'm', viseme: 'A'));
+            status: KundiTtsStatus.speaking,
+            messageId: 'm',
+            expression: expression));
+    await driver.apply(
+        controller,
+        const KundiTtsState(
+            status: KundiTtsStatus.speaking,
+            messageId: 'm',
+            viseme: 'A',
+            expression: expression));
     expect(wire.commands.where((c) => c['name'] == 'playTalking').length, 1);
+    expect(wire.commands.any((c) => c['name'] == 'resetFace'), isFalse);
+    final emotion = wire.commands.firstWhere((c) => c['name'] == 'setEmotion');
+    expect((emotion['payload'] as Map)['emotion'], 'Joy');
+    expect((emotion['payload'] as Map)['intensity'], 0.4);
     expect(wire.commands.last['name'], 'setViseme');
     expect((wire.commands.last['payload'] as Map)['viseme'], 'A');
     await driver.apply(controller, const KundiTtsState());
     expect(wire.commands.last['name'], 'settleRestPose');
+    final lastMouthCommand = wire.commands.lastWhere(
+      (c) => c['name'] == 'clearViseme' || c['name'] == 'setViseme',
+    );
+    expect(lastMouthCommand['name'], 'clearViseme');
     expect(wire.commands.any((c) => c['name'] == 'playWaiting'), isTrue);
   });
 }
 
-AssistantMessageResult result({String mode = 'voice', bool replayed = false}) {
+AssistantMessageResult result({
+  String mode = 'voice',
+  bool replayed = false,
+  String emotion = 'joy',
+  double emotionIntensity = 0.4,
+}) {
   final now = DateTime.utc(2026);
   return AssistantMessageResult(
     userMessage: AssistantMessageEntity(
@@ -181,7 +213,8 @@ AssistantMessageResult result({String mode = 'voice', bool replayed = false}) {
         createdAt: now),
     responseMode: '',
     helpLevel: '',
-    emotion: '',
+    emotion: emotion,
+    emotionIntensity: emotionIntensity,
     animationCue: '',
     suggestions: const [],
     replayed: replayed,
@@ -233,14 +266,15 @@ class FakeTts implements KundiTtsTransport {
 }
 
 class FakeAvatar implements KundiNativeAvatarTransport {
-  Completer<void>? delayReset;
+  String? delayedCommand;
+  Completer<void>? delay;
   final commands = <Map<String, Object>>[];
   @override
   Stream<Object?> get events => const Stream.empty();
   @override
   Future<Object?> send(Map<String, Object> envelope) async {
     commands.add(envelope);
-    if (envelope['name'] == 'resetFace') await delayReset?.future;
+    if (envelope['name'] == delayedCommand) await delay?.future;
     return null;
   }
 

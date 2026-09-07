@@ -104,6 +104,7 @@ class KundiHomeHero extends StatelessWidget {
     this.isVisible = true,
     this.animationCueName = 'neutral',
     this.animationIdentity = 'home:neutral',
+    this.facialExpression = const KundiFacialExpression.neutral(),
   });
 
   static const heroKey = Key('kundi-home-hero');
@@ -130,6 +131,7 @@ class KundiHomeHero extends StatelessWidget {
   final bool isVisible;
   final String animationCueName;
   final String animationIdentity;
+  final KundiFacialExpression facialExpression;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +241,7 @@ class KundiHomeHero extends StatelessWidget {
                         isVisible: isVisible,
                         animationCueName: animationCueName,
                         animationIdentity: animationIdentity,
+                        facialExpression: facialExpression,
                       ),
                     ],
                   ),
@@ -288,6 +291,7 @@ class _KundiHomeAvatar extends StatefulWidget {
     required this.isVisible,
     required this.animationCueName,
     required this.animationIdentity,
+    required this.facialExpression,
   });
 
   final KundiTtsState ttsState;
@@ -298,6 +302,7 @@ class _KundiHomeAvatar extends StatefulWidget {
   final bool isVisible;
   final String animationCueName;
   final String animationIdentity;
+  final KundiFacialExpression facialExpression;
 
   @override
   State<_KundiHomeAvatar> createState() => _KundiHomeAvatarState();
@@ -398,6 +403,9 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
     }
     if (oldWidget.animationCueName != widget.animationCueName ||
         oldWidget.animationIdentity != widget.animationIdentity ||
+        oldWidget.facialExpression.emotion != widget.facialExpression.emotion ||
+        oldWidget.facialExpression.intensity !=
+            widget.facialExpression.intensity ||
         oldWidget.isVisible != widget.isVisible) {
       unawaited(_applyCue());
     }
@@ -763,26 +771,25 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
       return;
     }
     _ttsDriver.invalidate();
-    await controller.resetFace();
+    await controller.clearViseme();
+    await controller.setEmotion(
+      widget.facialExpression.emotion,
+      intensity: widget.facialExpression.intensity,
+    );
     final decision = KundiAvatarAnimationPolicy.resolve(
       cueName: widget.animationCueName,
       identity: widget.animationIdentity,
     );
     switch (decision.target) {
       case KundiAvatarAnimationTarget.dansing:
-        await controller.setEmotion(KundiNativeAvatarEmotion.joy);
         await controller.playCelebration();
       case KundiAvatarAnimationTarget.waiting:
-        await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
         await controller.playWaiting();
       case KundiAvatarAnimationTarget.idle:
-        await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
         await controller.playIdle();
       case KundiAvatarAnimationTarget.talking:
-        await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
         await controller.playTalking(decision.talkingVariant!);
       case KundiAvatarAnimationTarget.standing:
-        await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
         await controller.settleRestPose();
     }
   }

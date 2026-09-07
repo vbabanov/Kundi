@@ -28,17 +28,38 @@ final class KundiTtsAvatarDriver {
     bool current() => generation == _generation;
     try {
       if (bodyChanged) {
-        await controller.resetFace();
-        if (!current()) return;
-        if (next.status == KundiTtsStatus.synthesizing) {
-          await controller.playWaiting();
-        } else if (next.status == KundiTtsStatus.speaking) {
-          await controller.playTalking(
-              KundiAvatarAnimationPolicy.talkingVariant(next.messageId));
-        } else {
-          await controller.setViseme(KundiNativeAvatarViseme.neutral);
+        final expressionChanged = before == null ||
+            before.messageId != next.messageId ||
+            before.expression.emotion != next.expression.emotion ||
+            before.expression.intensity != next.expression.intensity;
+        if (next.status == KundiTtsStatus.idle ||
+            next.status == KundiTtsStatus.error) {
+          await controller.clearViseme();
+          if (!current()) return;
+          await controller.setEmotion(KundiNativeAvatarEmotion.neutral);
           if (!current()) return;
           await controller.settleRestPose();
+        } else if (next.status == KundiTtsStatus.synthesizing) {
+          if (expressionChanged) {
+            await controller.setEmotion(
+              next.expression.emotion,
+              intensity: next.expression.intensity,
+            );
+            if (!current()) return;
+          }
+          await controller.clearViseme();
+          if (!current()) return;
+          await controller.playWaiting();
+        } else if (next.status == KundiTtsStatus.speaking) {
+          if (expressionChanged) {
+            await controller.setEmotion(
+              next.expression.emotion,
+              intensity: next.expression.intensity,
+            );
+            if (!current()) return;
+          }
+          await controller.playTalking(
+              KundiAvatarAnimationPolicy.talkingVariant(next.messageId));
         }
       }
       final latest = _previous;

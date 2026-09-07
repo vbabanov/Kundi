@@ -10,6 +10,40 @@ enum KundiNativeAvatarEmotion {
   final String wireName;
 }
 
+KundiNativeAvatarEmotion kundiNativeAvatarEmotionFromWire(String raw) {
+  final normalized = raw.trim().toLowerCase();
+  return KundiNativeAvatarEmotion.values.firstWhere(
+    (emotion) => emotion.wireName.toLowerCase() == normalized,
+    orElse: () => KundiNativeAvatarEmotion.neutral,
+  );
+}
+
+final class KundiFacialExpression {
+  const KundiFacialExpression({
+    required this.emotion,
+    required this.intensity,
+  }) : assert(intensity >= 0 && intensity <= 1);
+
+  const KundiFacialExpression.neutral()
+      : emotion = KundiNativeAvatarEmotion.neutral,
+        intensity = 1;
+
+  factory KundiFacialExpression.fromApi({
+    required String emotion,
+    required double intensity,
+  }) {
+    final safeIntensity =
+        intensity.isFinite ? intensity.clamp(0, 1).toDouble() : 1.0;
+    return KundiFacialExpression(
+      emotion: kundiNativeAvatarEmotionFromWire(emotion),
+      intensity: safeIntensity,
+    );
+  }
+
+  final KundiNativeAvatarEmotion emotion;
+  final double intensity;
+}
+
 enum KundiNativeAvatarViseme {
   neutral('Neutral'),
   a('A'),

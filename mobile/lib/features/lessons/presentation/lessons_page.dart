@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../runtimes/kundi_native_avatar/kundi_home_avatar_loading_frame.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_protocol.dart';
 import '../../../shared/widgets/kundi_surface.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
@@ -160,6 +161,8 @@ class LessonsPage extends ConsumerWidget {
                 isHomeVisible: isHomeVisible,
                 animationCueName: animationCueName,
                 animationIdentity: animationIdentity,
+                facialExpression: behaviorPresentation?.facialExpression ??
+                    const KundiFacialExpression.neutral(),
                 homeworkText: _homeworkActionText(today.homeworkCount),
                 gradesTitle: _recentResultsTitle(summary),
                 gradesText: _latestGradesText(summary),
@@ -462,6 +465,7 @@ class _HeroActionStack extends ConsumerWidget {
     required this.isHomeVisible,
     required this.animationCueName,
     required this.animationIdentity,
+    required this.facialExpression,
     required this.homeworkText,
     required this.gradesTitle,
     required this.gradesText,
@@ -490,6 +494,7 @@ class _HeroActionStack extends ConsumerWidget {
   final bool isHomeVisible;
   final String animationCueName;
   final String animationIdentity;
+  final KundiFacialExpression facialExpression;
   final String homeworkText;
   final String gradesTitle;
   final String gradesText;
@@ -573,6 +578,7 @@ class _HeroActionStack extends ConsumerWidget {
           isVisible: isHomeVisible,
           animationCueName: animationCueName,
           animationIdentity: animationIdentity,
+          facialExpression: facialExpression,
           onAvatarTap: onAssistantTap,
           onAvatarPointerDown: onAssistantPointerDown,
           onAvatarPointerUp: onAssistantPointerUp,

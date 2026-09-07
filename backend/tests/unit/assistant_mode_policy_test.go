@@ -30,8 +30,8 @@ func TestAssistantModeRoutingAndGradeBand(t *testing.T) {
 	if tutor.Behavior.Mode != "tutor" {
 		t.Fatalf("expected tutor mode, got %s", tutor.Behavior.Mode)
 	}
-	if tutor.Behavior.GradeBand != "primary" {
-		t.Fatalf("expected primary grade band, got %s", tutor.Behavior.GradeBand)
+	if tutor.Behavior.GradeBand != "3-4" {
+		t.Fatalf("expected 3-4 grade band, got %s", tutor.Behavior.GradeBand)
 	}
 	if !tutor.Pedagogy.NeedsScaffold {
 		t.Fatalf("tutor mode must include scaffold")
@@ -49,8 +49,8 @@ func TestAssistantModeRoutingAndGradeBand(t *testing.T) {
 	if general.Behavior.Mode != "general_chat" {
 		t.Fatalf("expected general_chat mode, got %s", general.Behavior.Mode)
 	}
-	if general.Behavior.GradeBand != "senior" {
-		t.Fatalf("expected senior grade band, got %s", general.Behavior.GradeBand)
+	if general.Behavior.GradeBand != "10-11" {
+		t.Fatalf("expected 10-11 grade band, got %s", general.Behavior.GradeBand)
 	}
 	if general.Pedagogy.NeedsScaffold {
 		t.Fatalf("general mode should not force scaffold")

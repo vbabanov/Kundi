@@ -16,7 +16,8 @@ func TestIntentAndGradeAdaptation(t *testing.T) {
 		mode      ResponseMode
 		gradeBand string
 	}{
-		{"primary explanation", "Объясни дроби", 3, false, IntentConceptExplanation, ResponseModeExplanation, "1-4"},
+		{"early primary explanation", "Объясни дроби", 2, false, IntentConceptExplanation, ResponseModeExplanation, "1-2"},
+		{"later primary explanation", "Объясни дроби", 3, false, IntentConceptExplanation, ResponseModeExplanation, "3-4"},
 		{"middle homework", "Помоги с домашним заданием", 6, true, IntentHomeworkHelp, ResponseModeHint, "5-7"},
 		{"attempt check", "Проверь мой ответ: 4", 8, true, IntentCheckStudentAttempt, ResponseModeCheck, "8-9"},
 		{"senior plan", "Составь план подготовки", 11, false, IntentLearningAdvice, ResponseModePlan, "10-11"},

@@ -3,9 +3,10 @@ package avatar_cues
 import "github.com/kundi/kundi/backend/internal/modules/assistant/persona_policy"
 
 type Cue struct {
-	Emotion string
-	Gesture string
-	Visemes []Viseme
+	Emotion   string
+	Intensity float64
+	Gesture   string
+	Visemes   []Viseme
 }
 
 type Viseme struct {
@@ -29,8 +30,24 @@ func (s *Service) Build(text string, persona persona_policy.Persona) Cue {
 		visemes = append(visemes, Viseme{OffsetMs: 600, ID: "U", Weight: 0.5})
 	}
 	return Cue{
-		Emotion: persona.DefaultEmotion,
-		Gesture: persona.DefaultGesture,
-		Visemes: visemes,
+		Emotion:   persona.DefaultEmotion,
+		Intensity: defaultIntensity(persona.DefaultEmotion),
+		Gesture:   persona.DefaultGesture,
+		Visemes:   visemes,
+	}
+}
+
+func defaultIntensity(emotion string) float64 {
+	switch emotion {
+	case "joy":
+		return 0.32
+	case "fun":
+		return 0.34
+	case "surprised":
+		return 0.18
+	case "sorrow":
+		return 0.24
+	default:
+		return 1.0
 	}
 }

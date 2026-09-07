@@ -35,14 +35,15 @@ type Viseme struct {
 }
 
 type Response struct {
-	Text          string        `json:"text"`
-	AudioURL      string        `json:"audioUrl"`
-	AudioStatus   AudioStatus   `json:"audio_status"`
-	Visemes       []Viseme      `json:"visemes"`
-	AvatarEmotion string        `json:"avatar_emotion"`
-	GestureTags   []string      `json:"gesture_tags"`
-	Pedagogy      PedagogyFlags `json:"pedagogy_flags"`
-	Behavior      BehaviorMeta  `json:"behavior"`
+	Text                   string        `json:"text"`
+	AudioURL               string        `json:"audioUrl"`
+	AudioStatus            AudioStatus   `json:"audio_status"`
+	Visemes                []Viseme      `json:"visemes"`
+	AvatarEmotion          string        `json:"avatar_emotion"`
+	AvatarEmotionIntensity float64       `json:"avatar_emotion_intensity"`
+	GestureTags            []string      `json:"gesture_tags"`
+	Pedagogy               PedagogyFlags `json:"pedagogy_flags"`
+	Behavior               BehaviorMeta  `json:"behavior"`
 }
 
 type AudioStatus string

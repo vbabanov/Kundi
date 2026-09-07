@@ -115,6 +115,7 @@ void main() {
             'response_mode': 'explanation',
             'help_level': 'guided',
             'emotion': 'neutral',
+            'emotion_intensity': 0.18,
             'animation_cue': 'standing',
             'suggestions': ['Повторить: дроби'],
             'session': {
@@ -154,6 +155,7 @@ void main() {
     expect(messages.items.single.content, 'Привет!');
     expect(sent.assistantMessage.content, 'Ответ');
     expect(sent.animationCue, 'standing');
+    expect(sent.emotionIntensity, 0.18);
     expect(sent.session?.title, 'Вопрос');
     expect(seenPaths, contains('DELETE /v1/assistant/sessions/session-1'));
   });
@@ -185,6 +187,7 @@ void main() {
       text: 'Вопрос',
     );
     expect(result.session, isNull);
+    expect(result.emotionIntensity, 1);
   });
 
   test('assistant repository maps structured server errors safely', () async {

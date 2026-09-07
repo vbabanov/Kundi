@@ -17,8 +17,9 @@ void main() {
       textureId: 42,
     );
     await controller.freeze();
-    await controller.setEmotion(KundiNativeAvatarEmotion.joy);
-    await controller.setViseme(KundiNativeAvatarViseme.o);
+    await controller.setEmotion(KundiNativeAvatarEmotion.joy, intensity: 0.4);
+    await controller.setViseme(KundiNativeAvatarViseme.o, weight: 0.75);
+    await controller.setViseme(KundiNativeAvatarViseme.neutral);
 
     expect(transport.commands, [
       {
@@ -58,17 +59,41 @@ void main() {
         'version': 1,
         'kind': 'command',
         'name': 'setEmotion',
-        'payload': {'emotion': 'Joy'},
+        'payload': {'emotion': 'Joy', 'intensity': 0.4},
       },
       {
         'version': 1,
         'kind': 'command',
         'name': 'setViseme',
-        'payload': {'viseme': 'O'},
+        'payload': {'viseme': 'O', 'weight': 0.75},
+      },
+      {
+        'version': 1,
+        'kind': 'command',
+        'name': 'clearViseme',
+        'payload': <String, Object>{},
       },
     ]);
 
     await controller.dispose();
+  });
+
+  test('facial intensity and viseme weight reject values outside 0..1',
+      () async {
+    final controller = KundiNativeAvatarController(_FakeTransport());
+    addTearDown(controller.dispose);
+
+    expect(
+      () => controller.setEmotion(
+        KundiNativeAvatarEmotion.joy,
+        intensity: 1.1,
+      ),
+      throwsRangeError,
+    );
+    expect(
+      () => controller.setViseme(KundiNativeAvatarViseme.a, weight: -0.1),
+      throwsRangeError,
+    );
   });
 
   test('invalid native event becomes rendererError without crashing', () async {

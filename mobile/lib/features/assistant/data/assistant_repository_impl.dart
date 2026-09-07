@@ -133,6 +133,7 @@ class AssistantRepositoryImpl implements AssistantRepository {
       helpLevel: (payload['help_level'] ?? '').toString(),
       followUpQuestion: (payload['follow_up_question'] ?? '').toString(),
       emotion: (payload['emotion'] ?? 'neutral').toString(),
+      emotionIntensity: _unitDouble(payload['emotion_intensity']),
       animationCue: (payload['animation_cue'] ?? 'standing').toString(),
       suggestions: suggestions,
       session: payload['session'] is Map
@@ -314,6 +315,12 @@ class AssistantRepositoryImpl implements AssistantRepository {
   DateTime _date(dynamic raw) =>
       DateTime.tryParse((raw ?? '').toString())?.toUtc() ??
       DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+  double _unitDouble(dynamic raw) {
+    final parsed = double.tryParse((raw ?? '1').toString());
+    if (parsed == null || !parsed.isFinite) return 1;
+    return parsed.clamp(0, 1).toDouble();
+  }
 
   AppException _assistantAppException(DioException error) {
     final status = error.response?.statusCode;

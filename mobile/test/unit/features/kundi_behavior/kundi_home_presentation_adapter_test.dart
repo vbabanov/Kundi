@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/kundi_behavior/domain/kundi_behavior_state.dart';
 import 'package:kundi_mobile/features/kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
+import 'package:kundi_mobile/runtimes/kundi_native_avatar/kundi_native_avatar_protocol.dart';
 
 void main() {
   const adapter = KundiHomePresentationAdapter();
@@ -86,6 +87,35 @@ void main() {
     for (final message in messages) {
       expect(message, isNot(contains(RegExp(r'виноват|плохо|опасно'))));
       expect(message, isNot(contains(RegExp(r'Рµ|Р°|СЃ|вЂ'))));
+    }
+  });
+
+  test(
+      'behavior states map to bounded soft expressions and never auto-use Angry',
+      () {
+    final expected = <KundiBehaviorKind, (KundiNativeAvatarEmotion, double)>{
+      KundiBehaviorKind.neutral: (KundiNativeAvatarEmotion.neutral, 1),
+      KundiBehaviorKind.celebrating: (KundiNativeAvatarEmotion.joy, 0.52),
+      KundiBehaviorKind.thinking: (KundiNativeAvatarEmotion.surprised, 0.18),
+      KundiBehaviorKind.speaking: (KundiNativeAvatarEmotion.joy, 0.14),
+      KundiBehaviorKind.listening: (KundiNativeAvatarEmotion.joy, 0.16),
+      KundiBehaviorKind.warning: (KundiNativeAvatarEmotion.sorrow, 0.22),
+      KundiBehaviorKind.error: (KundiNativeAvatarEmotion.sorrow, 0.32),
+    };
+
+    for (final entry in expected.entries) {
+      final expression = adapter
+          .adapt(
+            state: _state(entry.key, now),
+            neutralTitle: 'Kundi',
+            neutralMessage: 'План',
+            neutralSemanticLabel: 'План',
+          )
+          .facialExpression;
+      expect(expression.emotion, entry.value.$1, reason: entry.key.name);
+      expect(expression.intensity, entry.value.$2, reason: entry.key.name);
+      expect(expression.intensity, inInclusiveRange(0, 1));
+      expect(expression.emotion, isNot(KundiNativeAvatarEmotion.angry));
     }
   });
 }

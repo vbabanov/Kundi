@@ -39,8 +39,12 @@ func TestSessionInputModePolicyAndPersistence(t *testing.T) {
 		Text: "Реши за меня: 2 + 2", InputMode: InputModeVoice,
 	}
 	voiceResult, err := service.SendSessionMessage(context.Background(), voiceCommand)
-	if err != nil || voiceResult.UserMessage.InputMode != InputModeVoice || strings.Contains(voiceResult.AssistantMessage.Content, "42") {
+	if err != nil || voiceResult.UserMessage.InputMode != InputModeVoice || strings.Contains(voiceResult.AssistantMessage.Content, "42") ||
+		!strings.Contains(provider.prompt, "Communication channel: voice") || !strings.Contains(provider.prompt, "no headings, bullet lists, tables") {
 		t.Fatalf("voice policy/persistence failed: result=%#v err=%v", voiceResult, err)
+	}
+	if voiceResult.EmotionIntensity < 0 || voiceResult.EmotionIntensity > 1 {
+		t.Fatalf("voice emotion intensity is outside contract: %#v", voiceResult)
 	}
 	replayed, err := service.SendSessionMessage(context.Background(), voiceCommand)
 	if err != nil || replayed.UserMessage.InputMode != InputModeVoice || replayed.UserMessage.ID != voiceResult.UserMessage.ID {
@@ -171,7 +175,7 @@ func TestMalformedLegacyReplayDegradesWithoutCallingProvider(t *testing.T) {
 	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
 		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: clientID.String(), Text: "Старый вопрос",
 	})
-	if err != nil || result.AssistantMessage.Content != "Сохранённый ответ" || result.Emotion != "neutral" || result.AnimationCue != "standing" || provider.callCount() != 0 {
+	if err != nil || result.AssistantMessage.Content != "Сохранённый ответ" || result.Emotion != "neutral" || result.EmotionIntensity != 1.0 || result.AnimationCue != "standing" || provider.callCount() != 0 {
 		t.Fatalf("legacy replay did not degrade safely: result=%#v calls=%d err=%v", result, provider.callCount(), err)
 	}
 }
@@ -269,8 +273,28 @@ func TestUnsafeInputNeverReachesProviderAndOnlySafeResponseIsStored(t *testing.T
 	if err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if provider.callCount() != 0 || strings.Contains(result.AssistantMessage.Content, "123456") || repo.lastAssistant.SafetyCategory != "privacy_or_secrets" {
+	if provider.callCount() != 0 || strings.Contains(result.AssistantMessage.Content, "123456") || repo.lastAssistant.SafetyCategory != "privacy_or_secrets" ||
+		result.Emotion != "sorrow" || result.EmotionIntensity != 0.20 {
 		t.Fatalf("unsafe input handling failed: calls=%d response=%q category=%q", provider.callCount(), result.AssistantMessage.Content, repo.lastAssistant.SafetyCategory)
+	}
+}
+
+func TestUnsafeOutputUsesCalmSafetyExpression(t *testing.T) {
+	studentID := uuid.New()
+	sessionID := uuid.New()
+	repo := newMemorySessionRepository(studentID, sessionID, 7)
+	provider := &capturingSessionProvider{text: "Here is how to make a bomb."}
+	enabled := true
+	service := NewServiceWithOptions(persona.NewService(), provider, nil, Options{CanaryGate: AllowAllCanaryGate(), Enabled: &enabled, SessionRepository: repo})
+
+	result, err := service.SendSessionMessage(context.Background(), SendSessionMessageCommand{
+		StudentID: studentID.String(), SessionID: sessionID.String(), ClientMessageID: uuid.NewString(), Text: "Объясни химию",
+	})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if result.ResponseMode != string(tutoring.ResponseModeSafety) || result.Emotion != "sorrow" || result.EmotionIntensity != 0.20 {
+		t.Fatalf("unsafe output did not use the safety expression: %#v", result)
 	}
 }
 

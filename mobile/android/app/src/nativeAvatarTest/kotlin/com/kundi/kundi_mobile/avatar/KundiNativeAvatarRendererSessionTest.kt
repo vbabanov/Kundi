@@ -139,6 +139,22 @@ class KundiNativeAvatarRendererSessionTest {
     }
 
     @Test
+    fun `clear viseme drops retained mouth without dropping retained emotion`() {
+        val fixture = Fixture()
+        val emotion = NativeAvatarCommand.SetEmotion("Joy", 0.4f)
+
+        fixture.attachAndShow()
+        fixture.session.execute(emotion)
+        fixture.session.execute(NativeAvatarCommand.SetViseme("A", 0.8f))
+        fixture.session.execute(NativeAvatarCommand.ClearViseme)
+        fixture.session.onHostPause()
+        fixture.session.onAppUiHidden()
+        fixture.session.onHostResume()
+
+        assertEquals(listOf(emotion), fixture.renderers.last().commands)
+    }
+
+    @Test
     fun `deterministic rest pose is retained as the final animation state`() {
         val fixture = Fixture()
 

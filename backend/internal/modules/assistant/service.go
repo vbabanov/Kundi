@@ -278,7 +278,7 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Res
 
 	audioURL, ttsErr := s.tts.Render(ctx, text)
 	audioStatus := AudioStatusUnavailable
-	cues := avatar_cues.Cue{Emotion: "neutral"}
+	cues := avatar_cues.Cue{Emotion: "neutral", Intensity: 1.0}
 	if ttsErr == nil && strings.TrimSpace(audioURL) != "" {
 		validatedAudioURL, audioErr := s.audioURLs.Validate(audioURL)
 		if audioErr == nil {
@@ -296,12 +296,13 @@ func (s *Service) Message(ctx context.Context, cmd MessageCommand) (response Res
 		gestureTags = append(gestureTags, cues.Gesture)
 	}
 	response = Response{
-		Text:          text,
-		AudioURL:      audioURL,
-		AudioStatus:   audioStatus,
-		Visemes:       toContractVisemes(cues.Visemes),
-		AvatarEmotion: cues.Emotion,
-		GestureTags:   gestureTags,
+		Text:                   text,
+		AudioURL:               audioURL,
+		AudioStatus:            audioStatus,
+		Visemes:                toContractVisemes(cues.Visemes),
+		AvatarEmotion:          cues.Emotion,
+		AvatarEmotionIntensity: cues.Intensity,
+		GestureTags:            gestureTags,
 		Pedagogy: PedagogyFlags{
 			NeedsScaffold:      pedagogy.NeedsScaffold,
 			ContainsHint:       pedagogy.ContainsHint,
@@ -327,12 +328,13 @@ func (s *Service) resolvePersona(ctx context.Context, studentID uuid.UUID, mode 
 
 func (s *Service) safetyResponse(text, mode string, gradeLevel int, resolved persona_policy.Persona) Response {
 	return Response{
-		Text:          text,
-		AudioURL:      "",
-		AudioStatus:   AudioStatusUnavailable,
-		Visemes:       nil,
-		AvatarEmotion: "neutral",
-		GestureTags:   nil,
+		Text:                   text,
+		AudioURL:               "",
+		AudioStatus:            AudioStatusUnavailable,
+		Visemes:                nil,
+		AvatarEmotion:          "neutral",
+		AvatarEmotionIntensity: 1.0,
+		GestureTags:            nil,
 		Pedagogy: PedagogyFlags{
 			SafetyIntervention: true,
 		},

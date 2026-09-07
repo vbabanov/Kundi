@@ -127,7 +127,8 @@ internal object KundiNativeAvatarProtocol {
                 if (emotion !in emotionBlendShapes) {
                     throw ProtocolException("unknown emotion: $emotion")
                 }
-                NativeAvatarCommand.SetEmotion(emotion)
+                val intensity = numericUnitValue(payload, "intensity", defaultValue = 1f)
+                NativeAvatarCommand.SetEmotion(emotion, intensity)
             }
             "blink" -> NativeAvatarCommand.Blink
             "setViseme" -> {
@@ -136,8 +137,10 @@ internal object KundiNativeAvatarProtocol {
                 if (viseme !in visemeBlendShapes) {
                     throw ProtocolException("unknown viseme: $viseme")
                 }
-                NativeAvatarCommand.SetViseme(viseme)
+                val weight = numericUnitValue(payload, "weight", defaultValue = 1f)
+                NativeAvatarCommand.SetViseme(viseme, weight)
             }
+            "clearViseme" -> NativeAvatarCommand.ClearViseme
             "resetFace" -> NativeAvatarCommand.ResetFace
             else -> throw ProtocolException("unknown command: $name")
         }
@@ -153,6 +156,20 @@ internal object KundiNativeAvatarProtocol {
             "name" to name,
             "payload" to payload,
         )
+
+    private fun numericUnitValue(
+        payload: Map<*, *>,
+        name: String,
+        defaultValue: Float,
+    ): Float {
+        val raw = payload[name] ?: return defaultValue
+        val value = (raw as? Number)?.toFloat()
+            ?: throw ProtocolException("$name must be a number")
+        if (!value.isFinite() || value !in 0f..1f) {
+            throw ProtocolException("$name must be between 0 and 1")
+        }
+        return value
+    }
 }
 
 internal sealed interface NativeAvatarCommand {
@@ -161,8 +178,8 @@ internal sealed interface NativeAvatarCommand {
         val animation: String,
         val cadence: NativeAvatarAnimationCadence,
     ) : NativeAvatarCommand
-    data class SetEmotion(val emotion: String) : NativeAvatarCommand
-    data class SetViseme(val viseme: String) : NativeAvatarCommand
+    data class SetEmotion(val emotion: String, val intensity: Float = 1f) : NativeAvatarCommand
+    data class SetViseme(val viseme: String, val weight: Float = 1f) : NativeAvatarCommand
     data class StartPresentationPriming(
         val rendererGeneration: Int,
         val textureId: Long,
@@ -170,6 +187,7 @@ internal sealed interface NativeAvatarCommand {
     data object SettleRestPose : NativeAvatarCommand
     data object Freeze : NativeAvatarCommand
     data object Blink : NativeAvatarCommand
+    data object ClearViseme : NativeAvatarCommand
     data object ResetFace : NativeAvatarCommand
 }
 

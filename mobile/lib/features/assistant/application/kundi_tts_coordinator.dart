@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../runtimes/kundi_system_speech/terminal_request_cache.dart';
 import '../../../runtimes/kundi_tts/kundi_tts_transport.dart';
+import '../../../runtimes/kundi_native_avatar/kundi_native_avatar_protocol.dart';
 import '../../../shared/providers/providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../assistant_feature.dart';
@@ -55,10 +56,12 @@ final class KundiTtsState {
   const KundiTtsState(
       {this.status = KundiTtsStatus.idle,
       this.messageId = '',
-      this.viseme = 'Neutral'});
+      this.viseme = 'Neutral',
+      this.expression = const KundiFacialExpression.neutral()});
   final KundiTtsStatus status;
   final String messageId;
   final String viseme;
+  final KundiFacialExpression expression;
   bool get active =>
       status == KundiTtsStatus.synthesizing ||
       status == KundiTtsStatus.speaking;
@@ -120,8 +123,14 @@ class KundiTtsCoordinator extends StateNotifier<KundiTtsState>
     }
     _activeMessage = message.id;
     final generation = _generation = ++_nextGeneration;
+    final expression = KundiFacialExpression.fromApi(
+      emotion: result.emotion,
+      intensity: result.emotionIntensity,
+    );
     state = KundiTtsState(
-        status: KundiTtsStatus.synthesizing, messageId: message.id);
+        status: KundiTtsStatus.synthesizing,
+        messageId: message.id,
+        expression: expression);
     try {
       final auth =
           await _authorize(message).timeout(const Duration(seconds: 10));
@@ -159,13 +168,16 @@ class KundiTtsCoordinator extends StateNotifier<KundiTtsState>
         break;
       case KundiTtsEventType.playbackStarted:
         state = KundiTtsState(
-            status: KundiTtsStatus.speaking, messageId: _activeMessage!);
+            status: KundiTtsStatus.speaking,
+            messageId: _activeMessage!,
+            expression: state.expression);
       case KundiTtsEventType.visemeDue:
         if (state.status == KundiTtsStatus.speaking) {
           state = KundiTtsState(
               status: state.status,
               messageId: _activeMessage!,
-              viseme: event.viseme);
+              viseme: event.viseme,
+              expression: state.expression);
         }
       case KundiTtsEventType.playbackCompleted:
       case KundiTtsEventType.playbackCancelled:

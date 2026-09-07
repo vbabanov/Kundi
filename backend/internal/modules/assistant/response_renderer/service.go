@@ -23,10 +23,14 @@ func (s *Service) Render(mode string, persona persona_policy.Persona, ctx contex
 	}
 
 	switch persona.GradeBand {
-	case "primary":
-		return fmt.Sprintf("Let's solve it together in small steps: %s", question)
-	case "middle":
-		return fmt.Sprintf("Step-by-step plan for this task: %s", question)
+	case "1-2":
+		return fmt.Sprintf("Let's take one simple step together: %s", question)
+	case "3-4":
+		return fmt.Sprintf("Here is a short explanation, one example, and a check: %s", question)
+	case "5-7":
+		return fmt.Sprintf("Let's work through this as a team while you make the key choices: %s", question)
+	case "8-9":
+		return fmt.Sprintf("Use the right terms and show a concise rationale for: %s", question)
 	default:
 		return fmt.Sprintf("Exam-focused walkthrough: %s", question)
 	}

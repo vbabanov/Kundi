@@ -119,6 +119,7 @@ class AssistantMessageResult {
     required this.emotion,
     required this.animationCue,
     required this.suggestions,
+    this.emotionIntensity = 1,
     this.followUpQuestion = '',
     this.session,
     this.replayed = false,
@@ -130,6 +131,7 @@ class AssistantMessageResult {
   final String helpLevel;
   final String followUpQuestion;
   final String emotion;
+  final double emotionIntensity;
   final String animationCue;
   final List<String> suggestions;
   final AssistantSessionEntity? session;

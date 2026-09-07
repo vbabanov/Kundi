@@ -49,15 +49,33 @@ final class KundiNativeAvatarController {
 
   Future<void> freeze() => _send('freeze');
 
-  Future<void> setEmotion(KundiNativeAvatarEmotion emotion) =>
-      _send('setEmotion', <String, Object>{'emotion': emotion.wireName});
+  Future<void> setEmotion(
+    KundiNativeAvatarEmotion emotion, {
+    double intensity = 1,
+  }) {
+    _requireUnitValue(intensity, 'Emotion intensity');
+    return _send('setEmotion', <String, Object>{
+      'emotion': emotion.wireName,
+      'intensity': intensity,
+    });
+  }
 
   Future<void> blink() => _send('blink');
 
-  Future<void> setViseme(KundiNativeAvatarViseme viseme) =>
-      viseme == KundiNativeAvatarViseme.neutral
-          ? resetFace()
-          : _send('setViseme', <String, Object>{'viseme': viseme.wireName});
+  Future<void> setViseme(
+    KundiNativeAvatarViseme viseme, {
+    double weight = 1,
+  }) {
+    _requireUnitValue(weight, 'Viseme weight');
+    return viseme == KundiNativeAvatarViseme.neutral
+        ? clearViseme()
+        : _send('setViseme', <String, Object>{
+            'viseme': viseme.wireName,
+            'weight': weight,
+          });
+  }
+
+  Future<void> clearViseme() => _send('clearViseme');
 
   Future<void> resetFace() => _send('resetFace');
 
@@ -77,6 +95,12 @@ final class KundiNativeAvatarController {
       throw StateError('Native avatar controller is disposed.');
     }
     await _transport.send(KundiNativeAvatarEnvelope.command(name, payload));
+  }
+
+  void _requireUnitValue(double value, String label) {
+    if (!value.isFinite || value < 0 || value > 1) {
+      throw RangeError('$label must be between 0 and 1.');
+    }
   }
 
   void _onRawEvent(Object? value) {
