@@ -63,6 +63,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   late final bool _voiceInputEnabled;
   bool _avatarRuntimeReady = false;
   bool _avatarRuntimeResolved = false;
+  bool _assistantRouteVisible = false;
   int _voiceGestureGeneration = 0;
   _VoiceGestureTransaction? _activeVoiceGesture;
   int? _tapSuppressionGeneration;
@@ -285,9 +286,16 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     if (_behaviorCoreEnabled) {
       ref.read(kundiBehaviorControllerProvider.notifier).dismiss();
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AssistantPage()),
-    );
+    setState(() => _assistantRouteVisible = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const AssistantPage()),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _assistantRouteVisible = false);
+      }
+    }
   }
 
   void _voicePointerDown() {
@@ -671,7 +679,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           realtimeAvatarPreparing:
               KundiNativeAvatarFeature.enabled && !_avatarRuntimeResolved,
           realtimeAvatarLoadingFrame: widget.avatarLoadingFrame,
-          isHomeVisible: _rootPageIndex == _initialPage && _homePageSettled,
+          isHomeVisible: _rootPageIndex == _initialPage &&
+              _homePageSettled &&
+              !_assistantRouteVisible,
         ),
       ),
       const GradesPage(),

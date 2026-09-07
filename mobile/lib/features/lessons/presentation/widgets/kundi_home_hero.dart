@@ -239,7 +239,7 @@ class KundiHomeHero extends StatelessWidget {
                             ]
                           : const <BoxShadow>[],
                     ),
-                    child: _KundiHomeAvatar(
+                    child: KundiRealtimeAvatar(
                       ttsState: ttsState,
                       assetPath: assetPath,
                       realtimeEnabled: realtimeAvatarEnabled,
@@ -286,8 +286,9 @@ class KundiHomeHero extends StatelessWidget {
   }
 }
 
-class _KundiHomeAvatar extends StatefulWidget {
-  const _KundiHomeAvatar({
+class KundiRealtimeAvatar extends StatefulWidget {
+  const KundiRealtimeAvatar({
+    super.key,
     required this.ttsState,
     required this.assetPath,
     required this.realtimeEnabled,
@@ -308,10 +309,10 @@ class _KundiHomeAvatar extends StatefulWidget {
   final String animationIdentity;
 
   @override
-  State<_KundiHomeAvatar> createState() => _KundiHomeAvatarState();
+  State<KundiRealtimeAvatar> createState() => KundiRealtimeAvatarState();
 }
 
-class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
+class KundiRealtimeAvatarState extends State<KundiRealtimeAvatar> {
   final _ttsDriver = KundiTtsAvatarDriver();
   static const Duration _greetingDuration = Duration(milliseconds: 2600);
 
@@ -352,7 +353,7 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
   }
 
   @override
-  void didUpdateWidget(covariant _KundiHomeAvatar oldWidget) {
+  void didUpdateWidget(covariant KundiRealtimeAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.ttsState != widget.ttsState &&
         (oldWidget.ttsState.active || widget.ttsState.active)) {
@@ -404,27 +405,26 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
     );
     final showLoading = staticLayer == KundiHomeAvatarStaticLayer.loading;
     final preparedFrame = widget.preparedLoadingFrame;
-    final usePreparedFrame = preparedFrame != null &&
-        (widget.realtimePreparing ||
-            widget.realtimeEnabled ||
-            _transition.rendererFailed);
     final Widget staticAvatar;
-    if (usePreparedFrame) {
+    if (showLoading) {
+      // The production GLB path must never present a static character as its
+      // normal state. This transparent paint barrier preserves the safe
+      // handoff without flashing the WebP fallback while Filament initializes.
       staticAvatar = KundiFirstPaintNotifier(
         generation: _activeRendererGeneration ?? 0,
         onMounted: _onLoadingLayerMounted,
         onPainted: _onLoadingLayerPainted,
-        child: RawImage(
-          image: showLoading
-              ? preparedFrame.loadingImage
-              : preparedFrame.fatalFallbackImage,
-          key: showLoading
-              ? KundiHomeAvatarPlacement.loadingAssetKey
-              : KundiHomeHero.assetKey,
-          fit: showLoading ? BoxFit.fill : BoxFit.contain,
-          alignment: Alignment.bottomRight,
-          filterQuality: FilterQuality.high,
+        child: const SizedBox.expand(
+          key: KundiHomeAvatarPlacement.loadingAssetKey,
         ),
+      );
+    } else if (_transition.rendererFailed && preparedFrame != null) {
+      staticAvatar = RawImage(
+        image: preparedFrame.fatalFallbackImage,
+        key: KundiHomeHero.assetKey,
+        fit: BoxFit.contain,
+        alignment: Alignment.bottomRight,
+        filterQuality: FilterQuality.high,
       );
     } else {
       staticAvatar = Image.asset(
