@@ -192,7 +192,11 @@ func (s *Service) FinalizeForChannel(raw string, analysis Analysis, language, ch
 	if profile.Channel == CommunicationChannelVoice {
 		answer = strings.Join(strings.Fields(answer), " ")
 	}
-	answer = boundRunesAtBoundary(answer, profile.MaximumRunes)
+	if profile.Channel == CommunicationChannelVoice {
+		answer = boundRunesAtBoundary(answer, profile.MaximumRunes, language, analysis.GradeBand)
+	} else {
+		answer = boundRunes(answer, profile.MaximumRunes)
+	}
 	emotion, intensity := responseEmotion(analysis, answer, readyRisk)
 	return TutorResponseDraft{
 		Answer: answer, ResponseMode: analysis.ResponseMode, HelpLevel: analysis.HelpLevel,
@@ -399,23 +403,54 @@ func boundRunes(text string, max int) string {
 	return string(r[:max])
 }
 
-func boundRunesAtBoundary(text string, max int) string {
+func boundRunesAtBoundary(text string, max int, language, band string) string {
 	trimmed := strings.TrimSpace(text)
 	runes := []rune(trimmed)
 	if len(runes) <= max {
 		return trimmed
 	}
 	cut := runes[:max]
-	for i := len(cut) - 1; i >= max/2; i-- {
+	for i := len(cut) - 1; i >= 0; i-- {
 		switch cut[i] {
-		case '.', '!', '?', '。', '！', '？':
+		case '.', '!', '?', '…', '。', '！', '？':
 			return strings.TrimSpace(string(cut[:i+1]))
 		}
 	}
-	if max == 1 {
-		return "…"
+	// A long response with no completed sentence is discarded rather than
+	// exposing a misleading fragment. The prompt is the primary length control;
+	// this localized fallback is only a defensive last resort.
+	return completedBoundaryFallback(language, band)
+}
+
+func completedBoundaryFallback(language, band string) string {
+	if band == "1-2" {
+		switch language {
+		case "kk":
+			return "Бір қадамнан бастайық. Қай жері түсініксіз?"
+		case "ru":
+			return "Начнём с одного шага. Что здесь непонятно?"
+		default:
+			return "Let's start with one step. Which part is unclear?"
+		}
 	}
-	return strings.TrimSpace(string(cut[:max-1])) + "…"
+	if band == "10-11" {
+		switch language {
+		case "kk":
+			return "Қысқаша тұжырымдайық. Дәлелдің қай бөлігін алдымен талдау керек?"
+		case "ru":
+			return "Сформулируем короче. Какую часть аргумента нужно разобрать первой?"
+		default:
+			return "Let's state it more concisely. Which part of the argument should we examine first?"
+		}
+	}
+	switch language {
+	case "kk":
+		return "Қысқаша бастайық. Қай қадамды алдымен талдау керек?"
+	case "ru":
+		return "Начнём короче. Какой шаг нужно разобрать первым?"
+	default:
+		return "Let's make this shorter. Which step should we examine first?"
+	}
 }
 
 func responseEmotion(analysis Analysis, answer string, readyRisk bool) (string, float64) {

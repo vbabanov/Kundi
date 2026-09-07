@@ -12,12 +12,13 @@ func TestCommunicationProfilesCoverFiveAgeBandsAndChannels(t *testing.T) {
 		band      string
 		rolePart  string
 		shapePart string
+		voiceMax  int
 	}{
-		{1, "1-2", "patient learning companion", "exactly one idea"},
-		{3, "3-4", "warm learning guide", "one concrete example"},
-		{6, "5-7", "friendly coach", "useful example or hint"},
-		{8, "8-9", "respectful coach", "justify the important steps"},
-		{11, "10-11", "mentor", "argument quality"},
+		{1, "1-2", "patient learning companion", "exactly one idea", 240},
+		{3, "3-4", "warm learning guide", "one concrete example", 380},
+		{6, "5-7", "friendly coach", "useful example or hint", 520},
+		{8, "8-9", "respectful coach", "justify the important steps", 650},
+		{11, "10-11", "mentor", "argument quality", 800},
 	}
 	service := NewService()
 	for _, test := range tests {
@@ -37,7 +38,7 @@ func TestCommunicationProfilesCoverFiveAgeBandsAndChannels(t *testing.T) {
 					t.Fatalf("prompt misses age/channel contract:\n%s", prompt)
 				}
 				if channel == "voice" {
-					if profile.MaximumRunes >= 1_000 || !strings.Contains(prompt, "no headings, bullet lists, tables") {
+					if profile.MaximumRunes != test.voiceMax || !strings.Contains(prompt, "no headings, bullet lists, tables") {
 						t.Fatalf("voice contract is not bounded/conversational: %#v", profile)
 					}
 				} else if profile.MaximumRunes != 4_000 {
@@ -120,6 +121,60 @@ func TestRUAndKKScenarioMatrixForTextAndVoice(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+func TestVoiceBoundsKeepOnlyCompletedSentencesInRUAndKK(t *testing.T) {
+	tests := []struct {
+		name       string
+		grade      int
+		language   string
+		completed  string
+		unfinished string
+	}{
+		{"grade_1_ru", 1, "ru", "Сначала найдём одно известное число.", " Затем продолжим рассуждение без завершения"},
+		{"grade_1_kk", 1, "kk", "Алдымен бір белгілі санды табамыз.", " Содан кейін аяқталмаған талдауды жалғастырамыз"},
+		{"grade_11_ru", 11, "ru", "Сначала зафиксируем допущение и критерий проверки аргумента.", " Затем разовьём незавершённую аргументацию без итоговой точки"},
+		{"grade_11_kk", 11, "kk", "Алдымен болжам мен дәлелді тексеру критерийін белгілейміз.", " Содан кейін қорытынды нүктесіз аяқталмаған дәлелдеуді жалғастырамыз"},
+	}
+	service := NewService()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			analysis := service.Analyze("Объясни тему", test.grade, false)
+			limit := ResolveCommunicationProfile(test.grade, "voice").MaximumRunes
+			raw := test.completed + strings.Repeat(test.unfinished, limit)
+			draft := service.FinalizeForChannel(raw, analysis, test.language, "voice")
+			if draft.Answer != test.completed {
+				t.Fatalf("voice bound exposed an incomplete fragment: got %q want %q", draft.Answer, test.completed)
+			}
+			if len([]rune(draft.Answer)) > limit {
+				t.Fatalf("voice answer exceeds %d runes: %q", limit, draft.Answer)
+			}
+		})
+	}
+}
+
+func TestVoiceBoundsUseCompletedLocalizedFallbackWithoutSentenceBoundary(t *testing.T) {
+	service := NewService()
+	for _, test := range []struct {
+		grade    int
+		language string
+		prefix   string
+	}{
+		{1, "ru", "Начнём с одного шага."},
+		{1, "kk", "Бір қадамнан бастайық."},
+		{11, "ru", "Сформулируем короче."},
+		{11, "kk", "Қысқаша тұжырымдайық."},
+	} {
+		analysis := service.Analyze("Объясни тему", test.grade, false)
+		limit := ResolveCommunicationProfile(test.grade, "voice").MaximumRunes
+		raw := strings.Repeat("длинная фраза без точки ", limit)
+		draft := service.FinalizeForChannel(raw, analysis, test.language, "voice")
+		if !strings.HasPrefix(draft.Answer, test.prefix) ||
+			!(strings.HasSuffix(draft.Answer, ".") || strings.HasSuffix(draft.Answer, "?")) ||
+			len([]rune(draft.Answer)) > limit {
+			t.Fatalf("localized fallback is incomplete or unbounded: grade=%d language=%s answer=%q", test.grade, test.language, draft.Answer)
 		}
 	}
 }
