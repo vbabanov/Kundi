@@ -213,8 +213,10 @@ func validateBundleV2(bundle CanonicalIngestBundleV2) error {
 	if bundle.Identity.Provider != bundle.Source {
 		return apperrors.BadRequest("provider_source_mismatch", "identity provider must match source")
 	}
-	if len(bundle.Lessons) == 0 && len(bundle.Results) == 0 && len(bundle.Aggregates) == 0 && len(bundle.Attendance) == 0 {
-		return apperrors.BadRequest("empty_bundle", "ingest v2 bundle has no lessons/results/aggregates/attendance")
+	if !hasAcademicDataV2(bundle) {
+		if err := validateAuthoritativeAcademicEmptyV2(bundle); err != nil {
+			return err
+		}
 	}
 
 	for _, lesson := range bundle.Lessons {
@@ -270,6 +272,36 @@ func validateBundleV2(bundle CanonicalIngestBundleV2) error {
 				return apperrors.BadRequest("invalid_attendance_status", "attendance normalized_status is invalid")
 			}
 		}
+	}
+	return nil
+}
+
+func hasAcademicDataV2(bundle CanonicalIngestBundleV2) bool {
+	return len(bundle.Lessons) > 0 ||
+		len(bundle.Results) > 0 ||
+		len(bundle.Aggregates) > 0 ||
+		len(bundle.Attendance) > 0
+}
+
+// validateAuthoritativeAcademicEmptyV2 intentionally admits only the
+// identity shape produced after a complete Kundelik connector sync. The
+// authenticated mobile pipeline is responsible for not submitting a bundle
+// when any required provider request fails; the backend additionally binds
+// the provider identity to the submitted source account before accepting an
+// academically empty snapshot.
+func validateAuthoritativeAcademicEmptyV2(bundle CanonicalIngestBundleV2) error {
+	identity := bundle.Identity
+	if bundle.Source != "kundelik" {
+		return apperrors.BadRequest("empty_bundle_not_authoritative", "academic-empty ingest is supported only for an authoritative Kundelik snapshot")
+	}
+	if bundle.SyncedAt.IsZero() ||
+		bundle.SourceAccount == "" ||
+		identity.ProviderAccountRef == "" ||
+		identity.ProviderAccountRef != bundle.SourceAccount ||
+		identity.ProviderPersonID == "" ||
+		identity.ProviderSchoolID == "" ||
+		identity.ProviderGroupID == "" {
+		return apperrors.BadRequest("empty_bundle_not_authoritative", "academic-empty ingest requires a complete provider-bound identity")
 	}
 	return nil
 }
