@@ -2,6 +2,8 @@ package v1
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +31,18 @@ func TestSpeechAuthorizationAuthenticatedNoStoreAndOwnRateLimit(t *testing.T) {
 	if unauthorized.Code != 401 || unauthorized.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("auth or no-store missing")
 	}
-	for i := 0; i < speechauth.RequestsPerMinute; i++ {
+	invalidLocaleRequest := httptest.NewRequest(http.MethodPost, path, strings.NewReader(""))
+	invalidLocaleRequest.Header.Set("Authorization", "Bearer "+token)
+	invalidLocaleRequest.Header.Set("X-Kundi-Voice-Locale", "en-US")
+	invalidLocaleResponse := httptest.NewRecorder()
+	router.ServeHTTP(invalidLocaleResponse, invalidLocaleRequest)
+	if invalidLocaleResponse.Code != http.StatusBadRequest ||
+		!strings.Contains(invalidLocaleResponse.Body.String(), "speech_locale_invalid") {
+		t.Fatalf("voice locale header was not enforced: status=%d body=%s", invalidLocaleResponse.Code, invalidLocaleResponse.Body.String())
+	}
+	// The authenticated invalid-locale request above consumes one endpoint
+	// limiter slot even though the service rejects it before broker access.
+	for i := 0; i < speechauth.RequestsPerMinute-1; i++ {
 		response := performRequest(router, token, http.MethodPost, path, "")
 		if response.Code == 429 || response.Header().Get("Cache-Control") != "no-store" {
 			t.Fatal("incorrect limiter or caching")

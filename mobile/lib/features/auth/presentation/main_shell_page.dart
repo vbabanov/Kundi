@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/l10n.dart';
 import '../../../shared/providers/providers.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../../grades/application/grades_controller.dart';
@@ -70,12 +71,6 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   String _activePointerSequenceId = '';
   String _activeGestureId = '';
   bool _voiceLocalePreparing = false;
-
-  static const _rootLabels = <String>[
-    'ДЗ',
-    'Главная',
-    'Оценки',
-  ];
 
   static const _rootIcons = <IconData>[
     Icons.home_outlined,
@@ -409,8 +404,8 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           suppressTrailingTap: false,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Системное распознавание речи недоступно.'),
+          SnackBar(
+            content: Text(context.l10n.voiceRecognizerUnavailable),
           ),
         );
       case KundiVoiceStartOutcome.listening:
@@ -506,21 +501,16 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Разрешить микрофон?'),
-        content: const Text(
-          'Микрофон работает только во время удержания Kundi. '
-          'Приложение не записывает и не хранит аудио. Системная служба '
-          'устройства может обрабатывать речь локально или через своего '
-          'поставщика. Распознанный текст сохраняется в истории диалога.',
-        ),
+        title: Text(context.l10n.voicePermissionTitle),
+        content: Text(context.l10n.voicePermissionBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Не сейчас'),
+            child: Text(context.l10n.voiceNotNow),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Продолжить'),
+            child: Text(context.l10n.commonContinue),
           ),
         ],
       ),
@@ -539,7 +529,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
       if (!mounted || _hasNewerVoiceGesture(generation)) return;
       if (permission == KundiSpeechPermission.granted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Теперь удерживай Kundi и говори')),
+          SnackBar(content: Text(context.l10n.voiceHoldHint)),
         );
       } else if (permission == KundiSpeechPermission.permanentlyDenied) {
         await _showMicrophoneSettings(generation);
@@ -553,19 +543,16 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     final open = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Микрофон выключен'),
-        content: const Text(
-          'Разрешение можно включить в настройках приложения. '
-          'Текстовый помощник продолжает работать без микрофона.',
-        ),
+        title: Text(context.l10n.voiceDisabledTitle),
+        content: Text(context.l10n.voiceDisabledBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Закрыть'),
+            child: Text(context.l10n.commonClose),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Открыть настройки'),
+            child: Text(context.l10n.voiceOpenSettings),
           ),
         ],
       ),
@@ -597,19 +584,21 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   }
 
   String _voiceStatus(KundiSpeechRecognitionState speech) {
-    if (_voiceLocalePreparing) return 'Подготавливаю Kundi…';
+    if (_voiceLocalePreparing) return context.l10n.voicePreparing;
     return switch (speech.status) {
       KundiSpeechRecognitionStatus.listening => speech.partialText.isEmpty
-          ? 'Я слушаю… Говори, пока удерживаешь Kundi'
+          ? context.l10n.voiceListening
           : speech.partialText,
-      KundiSpeechRecognitionStatus.processing => 'Обрабатываю речь…',
+      KundiSpeechRecognitionStatus.processing => context.l10n.voiceProcessing,
       KundiSpeechRecognitionStatus.recognized ||
       KundiSpeechRecognitionStatus.sending =>
-        'Думаю…',
+        context.l10n.voiceThinking,
       KundiSpeechRecognitionStatus.error =>
-        speech.errorCode == 'no_speech' || speech.errorCode == 'no_match'
-            ? 'Не расслышала. Попробуй ещё раз.'
-            : 'Не удалось распознать речь.',
+        speech.errorCode == 'no_match'
+            ? context.l10n.voiceNoMatch
+            : speech.errorCode == 'no_speech'
+                ? context.l10n.voiceNoSpeech
+                : context.l10n.voiceRecognitionFailed,
       _ => '',
     };
   }
@@ -633,6 +622,11 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     final speech = voiceEnabled
         ? ref.watch(kundiVoiceAssistantCoordinatorProvider)
         : const KundiSpeechRecognitionState();
+    final rootLabels = <String>[
+      context.l10n.navHomework,
+      context.l10n.navHome,
+      context.l10n.navGrades,
+    ];
 
     final rootPages = <Widget>[
       const HomeworkPage(),
@@ -727,7 +721,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
               height: 42,
               child: Row(
                 children: List.generate(
-                  _rootLabels.length,
+                  rootLabels.length,
                   (index) {
                     final selected = index == _rootPageIndex;
                     final color = selected
@@ -760,7 +754,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                _rootLabels[index],
+                                rootLabels[index],
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelMedium

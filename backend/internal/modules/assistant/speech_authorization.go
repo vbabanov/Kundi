@@ -39,6 +39,13 @@ func (r *PostgresSessionRepository) SpeechMessage(ctx context.Context, studentID
 }
 
 func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRaw, messageRaw string) (authorization speechauth.Authorization, retErr error) {
+	return s.SpeechAuthorizationForLocale(ctx, studentRaw, sessionRaw, messageRaw, "")
+}
+
+// SpeechAuthorizationForLocale keeps content ownership bound to the stored
+// assistant session while allowing the current app language to select the
+// approved Azure voice. Empty requestedLocale preserves legacy behavior.
+func (s *Service) SpeechAuthorizationForLocale(ctx context.Context, studentRaw, sessionRaw, messageRaw, requestedLocale string) (authorization speechauth.Authorization, retErr error) {
 	outcome := newSpeechOutcome(s.observe.Metrics)
 	defer func() { outcome.Finish(retErr) }()
 	if !s.Enabled() || !s.voiceEnabled || s.speechBroker == nil || !s.speechBroker.Enabled() {
@@ -63,7 +70,11 @@ func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRa
 	if err != nil {
 		return speechauth.Authorization{}, apperrors.New(503, "speech_message_unavailable", "message unavailable", nil)
 	}
-	outcome.SetLocale(stored.Locale)
+	voiceLocale := normalizeRequestedVoiceLocale(requestedLocale, stored.Locale)
+	if voiceLocale == "" {
+		return speechauth.Authorization{}, apperrors.BadRequest("speech_locale_invalid", "speech locale must be ru-RU or kk-KZ")
+	}
+	outcome.SetLocale(voiceLocale)
 	repo, ok := s.sessions.(SpeechMessageRepository)
 	if !ok {
 		return speechauth.Authorization{}, apperrors.New(503, "speech_message_unavailable", "message unavailable", nil)
@@ -79,9 +90,24 @@ func (s *Service) SpeechAuthorization(ctx context.Context, studentRaw, sessionRa
 		return speechauth.Authorization{}, apperrors.BadRequest("speech_content_invalid", "message cannot be synthesized")
 	}
 	hash := sha256.Sum256([]byte(m.Content))
-	authorization, err = s.speechBroker.Authorize(ctx, student.String(), message.String(), stored.Locale, hex.EncodeToString(hash[:]))
+	authorization, err = s.speechBroker.Authorize(ctx, student.String(), message.String(), voiceLocale, hex.EncodeToString(hash[:]))
 	if err == nil {
 		outcome.SetResult("success")
 	}
 	return authorization, err
+}
+
+func normalizeRequestedVoiceLocale(requested, fallback string) string {
+	raw := strings.TrimSpace(requested)
+	if raw == "" {
+		raw = strings.TrimSpace(fallback)
+	}
+	switch strings.ToLower(raw) {
+	case "ru", "ru-ru", "ru-kz":
+		return "ru-RU"
+	case "kk", "kk-kz":
+		return "kk-KZ"
+	default:
+		return ""
+	}
 }

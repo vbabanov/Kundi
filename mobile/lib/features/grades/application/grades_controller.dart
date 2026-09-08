@@ -26,4 +26,10 @@ class GradesController extends AsyncNotifier<GradesScreenData> {
       () => ref.read<GradesRepository>(gradesRepositoryProvider).get(),
     );
   }
+
+  Future<void> reloadFromCache() async {
+    final next =
+        await ref.read<GradesRepository>(gradesRepositoryProvider).get();
+    state = AsyncData(next);
+  }
 }

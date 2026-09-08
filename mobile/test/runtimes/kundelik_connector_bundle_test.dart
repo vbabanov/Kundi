@@ -218,6 +218,13 @@ void main() {
       ),
     );
     client.enqueueGet(
+      'https://kundelik.kz/api/v2/marks/school/77/person/123',
+      const ConnectorHttpResponse(
+        statusCode: 200,
+        data: {'subjects': <dynamic>[]},
+      ),
+    );
+    client.enqueueGet(
       'https://kundelik.kz/api/v2/marks/final/school/77/person/123',
       const ConnectorHttpResponse(
         statusCode: 200,
@@ -451,6 +458,81 @@ void main() {
     expect(
       events.any((event) => event.code == 'kundelik_retry_status'),
       isTrue,
+    );
+  });
+
+  test('kundelik connector rejects a partial academic period fetch', () async {
+    final client = _FakeHttpClient();
+    const marksHtml = '''
+      <script>
+        var personId = "123";
+        var schoolId = "77";
+        var groupId = "5";
+        var periodId = "2395845913549013991";
+      </script>
+    ''';
+
+    client.enqueueGet(
+      'https://login.kundelik.kz/login?needRedirect=True&loginType=Basic',
+      const ConnectorHttpResponse(statusCode: 200, data: ''),
+    );
+    client.enqueuePost(
+      'https://login.kundelik.kz/login',
+      const ConnectorHttpResponse(statusCode: 200, data: ''),
+    );
+    client.enqueueGet(
+      'https://kundelik.kz/marks',
+      const ConnectorHttpResponse(statusCode: 200, data: marksHtml),
+    );
+    client.enqueueGet(
+      'https://kundelik.kz/marks',
+      const ConnectorHttpResponse(statusCode: 200, data: marksHtml),
+    );
+    client.enqueueGet(
+      'https://kundelik.kz/api/v2/marks/final/school/77/person/123',
+      const ConnectorHttpResponse(
+        statusCode: 200,
+        data: {'subjects': <dynamic>[]},
+      ),
+    );
+    client.enqueueGet(
+      'https://kundelik.kz/api/v2/marks/school/77/person/123',
+      const ConnectorHttpResponse(
+        statusCode: 200,
+        data: {'subjects': <dynamic>[]},
+      ),
+    );
+    client.enqueueGet(
+      'https://kundelik.kz/api/v2/marks/school/77/person/123',
+      const ConnectorHttpResponse(
+        statusCode: 401,
+        data: {'error': 'period unavailable'},
+      ),
+    );
+
+    final connector = KundelikConnector(
+      client: client,
+      sessionStore: ConnectorSessionStore(),
+      rawPayloadRepository: RawPayloadRepository(),
+      diagnostics: ConnectorDiagnostics(),
+      mapper: const CanonicalBundleMapper(),
+    );
+    await connector.authenticate(
+      const DiaryAuthCredentials(
+        source: 'kundelik',
+        login: 'student',
+        password: 'pass',
+      ),
+    );
+
+    await expectLater(
+      connector.fetchGrades(
+        DateTimeRange(
+          start: DateTime.utc(2026, 3, 30),
+          end: DateTime.utc(2026, 4, 5),
+        ),
+      ),
+      throwsA(isA<ConnectorException>()),
     );
   });
 

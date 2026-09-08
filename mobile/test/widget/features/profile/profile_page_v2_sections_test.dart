@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/profile/application/profile_controller.dart';
 import 'package:kundi_mobile/features/profile/domain/profile_entity.dart';
 import 'package:kundi_mobile/features/profile/domain/profile_repository.dart';
+import 'package:kundi_mobile/features/profile/domain/school_shift.dart';
 import 'package:kundi_mobile/features/profile/presentation/profile_page.dart';
+import 'package:kundi_mobile/features/settings/domain/settings_entity.dart';
+import 'package:kundi_mobile/shared/theme/app_theme.dart';
 
 void main() {
   testWidgets('renders profile hero, student data and parent contacts',
@@ -44,6 +47,8 @@ void main() {
     expect(find.text('Номер родителя 1'), findsOneWidget);
     expect(find.textContaining('Номер родителя 2'), findsOneWidget);
     expect(find.text('Сохранить изменения'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+    expect(find.text('Настройки'), findsOneWidget);
   });
 
   testWidgets('renders profile screen with empty local contacts safely',
@@ -68,7 +73,8 @@ void main() {
     expect(find.text('Профиль'), findsOneWidget);
     expect(find.text('Provider Only'), findsWidgets);
     expect(find.text('Данные ученика'), findsOneWidget);
-    expect(find.textContaining('Смена'), findsWidgets);
+    expect(find.byKey(const Key('profile-automatic-shift')), findsOneWidget);
+    expect(find.text('—'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('Сохранить изменения'),
@@ -117,6 +123,46 @@ void main() {
     expect(find.textContaining('Контакты'), findsOneWidget);
     expect(find.text('Сохранить изменения'), findsOneWidget);
   });
+
+  testWidgets('light theme keeps page chrome and dark settings card readable',
+      (tester) async {
+    final repository = _FakeProfileRepository([
+      _profileEntityWithLocal(),
+    ]);
+    final theme = AppTheme.light;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(theme: theme, home: const ProfilePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.text('Профиль')).style?.color,
+      theme.colorScheme.onSurface,
+    );
+    expect(
+      tester.widget<Text>(find.text('Данные ученика')).style?.color,
+      theme.colorScheme.onSurface,
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Тема'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.text('Тема')).style?.color, Colors.white);
+    final themeDropdown = tester.widget<DropdownButton<AppThemePreference>>(
+      find.byType(DropdownButton<AppThemePreference>),
+    );
+    expect(themeDropdown.style?.color, Colors.white);
+  });
 }
 
 class _FakeProfileRepository implements ProfileRepository {
@@ -138,7 +184,6 @@ class _FakeProfileRepository implements ProfileRepository {
 
   @override
   Future<void> saveLocalAppProfile({
-    required int shift,
     required String parentPhone1,
     required String parentPhone2,
   }) async {}
@@ -147,6 +192,7 @@ class _FakeProfileRepository implements ProfileRepository {
 ProfileEntity _profileEntityWithLocal() {
   return const ProfileEntity(
     readMode: 'v2',
+    automaticShift: SchoolShift.first,
     providerIdentity: ProviderIdentityProfileSection(
       studentId: 'student-1',
       provider: 'kundelik',

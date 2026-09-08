@@ -7,9 +7,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/errors/app_exception.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/providers/providers.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../../../shared/widgets/kundi_surface.dart';
+import '../../../shared/widgets/student_pull_to_refresh.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../homework/data/homework_day_whatsapp_repository.dart';
 import '../../homework/data/homework_whatsapp_send_repository.dart';
@@ -66,13 +68,17 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     final lessonsState = ref.watch(lessonsControllerProvider);
     return Scaffold(
       body: lessonsState.when(
-        data: (lessons) => SafeArea(
-          bottom: false,
-          child: _buildContent(context, lessons),
+        data: (lessons) => RefreshIndicator(
+          notificationPredicate: studentRefreshNotification,
+          onRefresh: () => refreshStudentFromGesture(context, ref),
+          child: SafeArea(
+            bottom: false,
+            child: _buildContent(context, lessons),
+          ),
         ),
         loading: () => const KundiStateBody.loading(),
         error: (error, _) => KundiStateBody.error(
-          label: 'Не удалось загрузить карточки уроков',
+          label: context.l10n.homeworkLoadFailed,
           onRetry: () =>
               ref.read(lessonsControllerProvider.notifier).refreshFromCache(),
         ),
@@ -125,14 +131,14 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
                     icon: Icons.menu_rounded,
                     onTap: () {},
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'ДЗ',
+                        context.l10n.navHomework,
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -184,41 +190,46 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
             ),
             const SizedBox(height: 4),
             Expanded(
-              child: selectedLessons.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18),
-                      child: _HomeworkEmptyDayCard(),
-                    )
-                  : ListView.separated(
-                      key: const Key('homework-lessons-list'),
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
-                      itemCount: selectedLessons.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 2),
-                      itemBuilder: (context, index) {
-                        final lesson = selectedLessons[index];
-                        return _HomeworkLessonCard(
-                          lesson: lesson,
-                          mode: _mode,
-                          isDone: _isLessonCompleted(lesson),
-                          progressActive: index < completedPrefixCount,
-                          sendStatus: _sendStatusByLesson[lesson.id] ??
-                              _LessonSendStatus.idle,
-                          isFirst: index == 0,
-                          isLast: index == selectedLessons.length - 1,
-                          onLessonTap: () {
-                            HapticFeedback.lightImpact();
-                            _runManualPhotoWhatsAppFlow(lesson);
-                          },
-                        );
-                      },
-                    ),
+              child: KeyedSubtree(
+                key: const Key('homework-pull-scroll'),
+                child: selectedLessons.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        children: const [_HomeworkEmptyDayCard()],
+                      )
+                    : ListView.separated(
+                        key: const Key('homework-lessons-list'),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
+                        itemCount: selectedLessons.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 2),
+                        itemBuilder: (context, index) {
+                          final lesson = selectedLessons[index];
+                          return _HomeworkLessonCard(
+                            lesson: lesson,
+                            mode: _mode,
+                            isDone: _isLessonCompleted(lesson),
+                            progressActive: index < completedPrefixCount,
+                            sendStatus: _sendStatusByLesson[lesson.id] ??
+                                _LessonSendStatus.idle,
+                            isFirst: index == 0,
+                            isLast: index == selectedLessons.length - 1,
+                            onLessonTap: () {
+                              HapticFeedback.lightImpact();
+                              _runManualPhotoWhatsAppFlow(lesson);
+                            },
+                          );
+                        },
+                      ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 2, 18, 6),
               child: SizedBox(
                 width: double.infinity,
                 child: _HomeworkWhatsAppButton(
-                  label: 'Отправить в WhatsApp за сегодня',
+                  label: context.l10n.homeworkSendToday,
                   onPressed: () => _sendDayDigest(dayKey: safeSelectedDay),
                 ),
               ),
@@ -302,12 +313,12 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
 
   Future<void> _sendDayDigest({required String dayKey}) async {
     if (dayKey == _unknownDayKey) {
-      _showMessage('Для этого дня отправка недоступна: нет корректной даты.');
+      _showMessage(context.l10n.homeworkInvalidDate);
       return;
     }
     final authSession = ref.read(authControllerProvider).valueOrNull;
     if (authSession == null || authSession.accessToken.trim().isEmpty) {
-      _showMessage('Сессия истекла. Выполните вход снова.');
+      _showMessage(context.l10n.homeworkSessionExpired);
       return;
     }
     final repository = ref.read(_homeworkDayWhatsAppRepositoryProvider);
@@ -328,11 +339,11 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
       _showMessage(
         switch (result.status) {
           WhatsappDispatchStatus.sent =>
-            'Сообщение за $dayKey отправлено в WhatsApp.',
+            context.l10n.homeworkDigestSent(dayKey),
           WhatsappDispatchStatus.queued =>
-            'Отправка за $dayKey поставлена в очередь и ещё выполняется.',
+            context.l10n.homeworkDigestQueued(dayKey),
           WhatsappDispatchStatus.failed => result.message.isEmpty
-              ? 'Не удалось отправить сообщение за $dayKey.'
+              ? context.l10n.homeworkDigestDateFailed(dayKey)
               : result.message,
         },
       );
@@ -340,7 +351,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
       if (!mounted) return;
       _showMessage(error is AppException
           ? error.message
-          : 'Не удалось отправить сообщение в WhatsApp.');
+          : context.l10n.homeworkWhatsappFailed);
     }
   }
 
@@ -350,13 +361,13 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
 
     final authSession = ref.read(authControllerProvider).valueOrNull;
     if (authSession == null || authSession.accessToken.trim().isEmpty) {
-      _showMessage('Сессия истекла. Выполните вход снова.');
+      _showMessage(context.l10n.homeworkSessionExpired);
       return;
     }
     final profile = ref.read(profileControllerProvider).valueOrNull;
     final parentPhones = _collectParentPhones(profile?.localAppProfile);
     if (parentPhones.isEmpty) {
-      _showMessage('Укажите номер родителя в профиле перед отправкой.');
+      _showMessage(context.l10n.homeworkParentPhoneRequired);
       return;
     }
 
@@ -390,7 +401,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         await _safeDeleteTemp(photoPath);
         setState(() => _sendStatusByLesson[lesson.id] = _LessonSendStatus.sent);
         HapticFeedback.lightImpact();
-        _showMessage('Фото отправлено в WhatsApp.');
+        _showMessage(context.l10n.homeworkPhotoSent);
         return;
       }
       if (sendOutcome == _SendFlowOutcome.retakeRequired) {
@@ -415,7 +426,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     while (true) {
       final photoFile = File(photoPath);
       if (!await photoFile.exists()) {
-        _showMessage('Файл фото недоступен. Снимите фото заново.');
+        _showMessage(context.l10n.homeworkPhotoMissing);
         return _SendFlowOutcome.retakeRequired;
       }
       setState(
@@ -434,7 +445,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         );
         if (!sendResult.created &&
             sendResult.status == WhatsappDispatchStatus.queued) {
-          _showMessage('Запрос уже был отправлен ранее, статус обновлён.');
+          _showMessage(context.l10n.homeworkAlreadySent);
         }
         if (sendResult.status == WhatsappDispatchStatus.sent) {
           return _SendFlowOutcome.sent;
@@ -445,7 +456,9 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
         setState(
             () => _sendStatusByLesson[lesson.id] = _LessonSendStatus.failed);
         final retryAction = await _showSendFailureDialog(
-          error is AppException ? error.message : 'Не удалось отправить фото.',
+          error is AppException
+              ? error.message
+              : context.l10n.homeworkPhotoSendFailed,
         );
         if (!mounted) return _SendFlowOutcome.cancelled;
         if (retryAction == _FailureAction.retry) continue;
@@ -472,7 +485,7 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
       final photo = await _pickFromCamera();
       return photo?.path;
     } catch (_) {
-      _showMessage('Камера недоступна. Проверьте разрешение приложения.');
+      _showMessage(context.l10n.homeworkCameraUnavailable);
       return null;
     }
   }
@@ -508,10 +521,10 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
 
   String _buildCaption(LessonsEntity lesson) {
     final subject = lesson.subjectName.trim().isEmpty
-        ? 'Предмет не указан'
+        ? context.l10n.homeworkSubjectMissing
         : lesson.subjectName.trim();
     final homework = lesson.homeworkText.trim().isEmpty
-        ? 'Не задано'
+        ? context.l10n.homeworkNotAssigned
         : lesson.homeworkText.trim();
     final date = _dayKey(lesson.date) == _unknownDayKey
         ? lesson.date.trim()
@@ -544,18 +557,18 @@ class _HomeworkPageState extends ConsumerState<HomeworkPage>
     final result = await showDialog<_FailureAction>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Ошибка отправки'),
+        title: Text(context.l10n.homeworkSendError),
         content: Text(message),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(context).pop(_FailureAction.cancel),
-              child: const Text('Отмена')),
+              child: Text(context.l10n.commonCancel)),
           TextButton(
               onPressed: () => Navigator.of(context).pop(_FailureAction.retake),
-              child: const Text('Повторить фото')),
+              child: Text(context.l10n.homeworkRetakePhoto)),
           FilledButton(
               onPressed: () => Navigator.of(context).pop(_FailureAction.retry),
-              child: const Text('Повторить отправку')),
+              child: Text(context.l10n.homeworkRetrySend)),
         ],
       ),
     );
@@ -576,6 +589,8 @@ class _HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -584,10 +599,20 @@ class _HeaderIconButton extends StatelessWidget {
         height: 46,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          color: const Color(0x4A130E30),
-          border: Border.all(color: const Color(0x70302466)),
+          color: isDark
+              ? const Color(0x4A130E30)
+              : scheme.surface.withValues(alpha: 0.92),
+          border: Border.all(
+            color: isDark
+                ? const Color(0x70302466)
+                : scheme.primary.withValues(alpha: 0.45),
+          ),
         ),
-        child: Icon(icon, color: const Color(0xFFE6DBFF), size: 23),
+        child: Icon(
+          icon,
+          color: isDark ? const Color(0xFFE6DBFF) : scheme.onSurface,
+          size: 23,
+        ),
       ),
     );
   }
@@ -733,31 +758,8 @@ class _WeekdayChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const shortWeekday = <int, String>{
-      DateTime.monday: 'Пн',
-      DateTime.tuesday: 'Вт',
-      DateTime.wednesday: 'Ср',
-      DateTime.thursday: 'Чт',
-      DateTime.friday: 'Пт',
-      DateTime.saturday: 'Сб',
-      DateTime.sunday: 'Вс',
-    };
     final isWeekend =
         date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
-    const shortMonth = <int, String>{
-      1: 'янв',
-      2: 'фев',
-      3: 'мар',
-      4: 'апр',
-      5: 'мая',
-      6: 'июн',
-      7: 'июл',
-      8: 'авг',
-      9: 'сен',
-      10: 'окт',
-      11: 'ноя',
-      12: 'дек',
-    };
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
@@ -786,7 +788,7 @@ class _WeekdayChip extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              shortWeekday[date.weekday] ?? '',
+              context.formatShortWeekday(date),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontSize: 10.8,
                     color: isWeekend
@@ -806,7 +808,7 @@ class _WeekdayChip extends StatelessWidget {
             ),
             const SizedBox(height: 0.5),
             Text(
-              shortMonth[date.month] ?? '',
+              context.formatShortMonth(date),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontSize: 10,
                     color: const Color(0xB59D91C9),
@@ -870,8 +872,8 @@ class _HomeworkSummaryCard extends StatelessWidget {
               children: [
                 Text(
                   lessonsCount == 0
-                      ? 'Сегодня уроков нет'
-                      : 'Сегодня $lessonsCount уроков',
+                      ? context.l10n.homeworkNoLessonsToday
+                      : context.l10n.homeworkLessonsToday(lessonsCount),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontSize: 14.8,
                         fontWeight: FontWeight.w700,
@@ -879,24 +881,12 @@ class _HomeworkSummaryCard extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 2),
-                RichText(
-                  text: TextSpan(
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontSize: 11.8,
-                          color: const Color(0xDAB8AEE2),
-                        ),
-                    children: [
-                      const TextSpan(text: 'Из них '),
-                      TextSpan(
-                        text: '$doneCount задания',
-                        style: const TextStyle(
-                          color: Color(0xFFA66BFF),
-                          fontWeight: FontWeight.w700,
-                        ),
+                Text(
+                  context.l10n.homeworkCompletedCount(doneCount),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 11.8,
+                        color: const Color(0xDAB8AEE2),
                       ),
-                      const TextSpan(text: ' выполнено'),
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -968,12 +958,12 @@ class _HomeworkModeToggle extends StatelessWidget {
       child: Row(
         children: [
           _ModeSegment(
-            label: 'ДЗ',
+            label: context.l10n.homeworkShort,
             selected: mode == _HomeworkMode.homework,
             onTap: () => onModeChanged(_HomeworkMode.homework),
           ),
           _ModeSegment(
-            label: 'Тема урока',
+            label: context.l10n.homeworkLessonTopic,
             selected: mode == _HomeworkMode.topic,
             onTap: () => onModeChanged(_HomeworkMode.topic),
           ),
@@ -1051,14 +1041,14 @@ class _HomeworkLessonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subject = lesson.subjectName.trim().isEmpty
-        ? 'Предмет не указан'
+        ? context.l10n.homeworkSubjectMissing
         : lesson.subjectName.trim();
     final content = mode == _HomeworkMode.homework
         ? lesson.homeworkText.trim()
         : lesson.topic.trim();
     final fallback = mode == _HomeworkMode.homework
-        ? 'Домашнее задание не задано'
-        : 'Тема урока не указана';
+        ? context.l10n.homeworkDescriptionMissing
+        : context.l10n.homeworkTopicMissing;
     final timeRange =
         (lesson.startTime.trim().isNotEmpty && lesson.endTime.trim().isNotEmpty)
             ? '${lesson.startTime.trim()} — ${lesson.endTime.trim()}'
@@ -1252,27 +1242,31 @@ class _HomeworkEmptyDayCard extends StatelessWidget {
         ),
         border: Border.all(color: const Color(0x7A392965)),
       ),
-      child: const Center(
+      child: Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 22),
+          padding: const EdgeInsets.symmetric(horizontal: 22),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.coffee_rounded, color: Color(0xFFB6A6E6), size: 34),
-              SizedBox(height: 8),
+              const Icon(
+                Icons.coffee_rounded,
+                color: Color(0xFFB6A6E6),
+                size: 34,
+              ),
+              const SizedBox(height: 8),
               Text(
-                'На этот день уроков нет',
-                style: TextStyle(
+                context.l10n.homeworkNoLessonsDay,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
-                'Можно отдохнуть или выбрать другой день.',
-                style: TextStyle(
+                context.l10n.homeworkRestHint,
+                style: const TextStyle(
                   color: Color(0xCCB8AEE2),
                   fontSize: 13.6,
                 ),
@@ -1375,7 +1369,7 @@ class _PhotoPreviewPage extends StatelessWidget {
         ? lesson.homeworkText.trim()
         : lesson.topic.trim();
     return Scaffold(
-      appBar: AppBar(title: const Text('Предпросмотр фото')),
+      appBar: AppBar(title: Text(context.l10n.homeworkPhotoPreview)),
       body: SafeArea(
         child: Column(
           children: [
@@ -1400,15 +1394,30 @@ class _PhotoPreviewPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Предмет: ${lesson.subjectName.trim().isEmpty ? 'Не указан' : lesson.subjectName.trim()}',
+                      context.l10n.homeworkSubjectLine(
+                        lesson.subjectName.trim().isEmpty
+                            ? context.l10n.commonNotSpecified
+                            : lesson.subjectName.trim(),
+                      ),
                     ),
                     const SizedBox(height: KundiSpace.xxs),
                     Text(
-                      '${mode == _HomeworkMode.homework ? 'Задание' : 'Тема'}: ${content.isEmpty ? 'Не указано' : content}',
+                      context.l10n.homeworkContentLine(
+                        mode == _HomeworkMode.homework
+                            ? context.l10n.homeworkAssignment
+                            : context.l10n.homeworkTopic,
+                        content.isEmpty
+                            ? context.l10n.commonNotSpecified
+                            : content,
+                      ),
                     ),
                     const SizedBox(height: KundiSpace.xxs),
                     Text(
-                      'Дата: ${lesson.date.trim().isEmpty ? 'Не указана' : lesson.date.trim()}',
+                      context.l10n.homeworkDateLine(
+                        lesson.date.trim().isEmpty
+                            ? context.l10n.homeworkDateMissing
+                            : lesson.date.trim(),
+                      ),
                     ),
                   ],
                 ),
@@ -1424,7 +1433,7 @@ class _PhotoPreviewPage extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () =>
                           Navigator.of(context).pop(_PhotoPreviewAction.cancel),
-                      child: const Text('Отмена'),
+                      child: Text(context.l10n.commonCancel),
                     ),
                   ),
                   const SizedBox(width: KundiSpace.xs),
@@ -1432,7 +1441,7 @@ class _PhotoPreviewPage extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () =>
                           Navigator.of(context).pop(_PhotoPreviewAction.retake),
-                      child: const Text('Повторить'),
+                      child: Text(context.l10n.commonRetry),
                     ),
                   ),
                   const SizedBox(width: KundiSpace.xs),
@@ -1440,7 +1449,7 @@ class _PhotoPreviewPage extends StatelessWidget {
                     child: FilledButton(
                       onPressed: () =>
                           Navigator.of(context).pop(_PhotoPreviewAction.send),
-                      child: const Text('Отправить'),
+                      child: Text(context.l10n.commonSend),
                     ),
                   ),
                 ],

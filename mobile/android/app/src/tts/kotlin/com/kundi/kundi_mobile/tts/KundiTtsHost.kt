@@ -105,6 +105,9 @@ private class TtsPlugin(private val activity: Activity, flutter: FlutterEngine) 
                                 (locale == "ru-RU" && voice == "ru-RU-SvetlanaNeural") ||
                                     (locale == "kk-KZ" && voice == "kk-KZ-AigulNeural")
                             )
+                            // Locale/voice-only acceptance evidence. Never log
+                            // synthesized text or authorization credentials.
+                            Log.i("KundiVoiceLocale", "tts_locale=$locale voice=$voice")
                             require(args["audio_format"] == "raw-24khz-16bit-mono-pcm")
                             val text = args["text"] as String
                             require(text.length <= SpeechLimits.maxContentChars)

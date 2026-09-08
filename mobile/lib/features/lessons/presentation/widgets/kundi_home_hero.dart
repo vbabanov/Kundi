@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../assistant/application/kundi_tts_coordinator.dart';
 import '../../../../runtimes/kundi_tts/kundi_tts_avatar_driver.dart';
+import '../../../../l10n/l10n.dart';
 
 import '../../../../runtimes/kundi_native_avatar/kundi_first_paint_notifier.dart';
 import '../../../../runtimes/kundi_native_avatar/kundi_avatar_animation_policy.dart';
@@ -453,7 +454,7 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
         fit: BoxFit.contain,
         alignment: Alignment.bottomRight,
         filterQuality: FilterQuality.high,
-        semanticLabel: 'Персонаж Kundi',
+        semanticLabel: context.l10n.homeKundiCharacter,
       );
     }
     return KundiHomeAvatarLayerStack(
@@ -473,7 +474,7 @@ class _KundiHomeAvatarState extends State<_KundiHomeAvatar> {
             )
           : null,
       staticLayer: Semantics(
-        label: 'Персонаж Kundi',
+        label: context.l10n.homeKundiCharacter,
         image: true,
         child: staticAvatar,
       ),

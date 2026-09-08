@@ -552,7 +552,13 @@ func (a *API) speechAuthorization(w http.ResponseWriter, r *http.Request) {
 		httpx.JSONError(w, err)
 		return
 	}
-	result, err := a.deps.AssistantService.SpeechAuthorization(r.Context(), studentID.String(), r.PathValue("sessionID"), r.PathValue("messageID"))
+	result, err := a.deps.AssistantService.SpeechAuthorizationForLocale(
+		r.Context(),
+		studentID.String(),
+		r.PathValue("sessionID"),
+		r.PathValue("messageID"),
+		r.Header.Get("X-Kundi-Voice-Locale"),
+	)
 	if err != nil {
 		httpx.JSONError(w, err)
 		return
@@ -928,7 +934,7 @@ func (a *API) updateLocalAppProfile(w http.ResponseWriter, r *http.Request) {
 		httpx.JSONError(w, apperrors.BadRequest("invalid_json", "request body is not valid JSON"))
 		return
 	}
-	if req.Shift == nil || (*req.Shift != 1 && *req.Shift != 2) {
+	if req.Shift != nil && *req.Shift != 1 && *req.Shift != 2 {
 		httpx.JSONError(w, apperrors.BadRequest("invalid_shift", "shift must be 1 or 2"))
 		return
 	}
@@ -942,28 +948,30 @@ func (a *API) updateLocalAppProfile(w http.ResponseWriter, r *http.Request) {
 		httpx.JSONError(w, err)
 		return
 	}
-	_, err = a.deps.Pool.Exec(
+	var savedShift *int
+	err = a.deps.Pool.QueryRow(
 		r.Context(),
 		`
 		INSERT INTO student_app_profiles(student_id, shift, parent_phone_1, parent_phone_2, updated_at)
 		VALUES ($1, $2, $3, $4, NOW())
 		ON CONFLICT (student_id) DO UPDATE
-		SET shift = EXCLUDED.shift,
+		SET shift = COALESCE(EXCLUDED.shift, student_app_profiles.shift),
 		    parent_phone_1 = EXCLUDED.parent_phone_1,
 		    parent_phone_2 = EXCLUDED.parent_phone_2,
 		    updated_at = NOW()
+		RETURNING shift
 		`,
 		studentID,
-		*req.Shift,
+		req.Shift,
 		normalizedParent1,
 		normalizedParent2,
-	)
+	).Scan(&savedShift)
 	if err != nil {
 		httpx.JSONError(w, apperrors.Internal("profile_local_update_failed", "failed to update local profile", err))
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{
-		"shift":          *req.Shift,
+		"shift":          savedShift,
 		"parent_phone_1": normalizedParent1,
 		"parent_phone_2": normalizedParent2,
 	})

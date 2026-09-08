@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme/kundi_tokens.dart';
 
 class KundiGradientBackground extends StatelessWidget {
@@ -140,7 +141,7 @@ class KundiStateBody extends StatelessWidget {
               const SizedBox(height: KundiSpace.sm),
               FilledButton.tonal(
                 onPressed: onRetry,
-                child: const Text('Retry'),
+                child: Text(context.l10n.commonRetry),
               ),
             ],
           ],

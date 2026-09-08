@@ -5,8 +5,34 @@ import 'package:kundi_mobile/features/grades/application/grades_controller.dart'
 import 'package:kundi_mobile/features/grades/domain/grades_entity.dart';
 import 'package:kundi_mobile/features/grades/domain/grades_repository.dart';
 import 'package:kundi_mobile/features/grades/presentation/grades_page.dart';
+import 'package:kundi_mobile/shared/widgets/student_pull_to_refresh.dart';
 
 void main() {
+  testWidgets('grades pull gesture uses shared refresh action', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          gradesRepositoryProvider
+              .overrideWithValue(_FakeGradesRepository(_v2DataMainEmpty())),
+          studentRefreshActionProvider.overrideWithValue(() async {
+            calls += 1;
+          }),
+        ],
+        child: const MaterialApp(home: GradesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const Key('grades-pull-scroll')),
+      const Offset(0, 320),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, 1);
+  });
+
   testWidgets('latest mode renders recent regular marks', (tester) async {
     final repository = _FakeGradesRepository(_v2Data());
     await tester.pumpWidget(

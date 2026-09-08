@@ -14,6 +14,8 @@ import 'package:kundi_mobile/features/profile/domain/profile_entity.dart';
 import 'package:kundi_mobile/features/summary/application/summary_controller.dart';
 import 'package:kundi_mobile/features/summary/domain/summary_entity.dart';
 import 'package:kundi_mobile/features/summary/domain/summary_repository.dart';
+import 'package:kundi_mobile/shared/theme/app_theme.dart';
+import 'package:kundi_mobile/shared/widgets/student_pull_to_refresh.dart';
 
 void main() {
   testWidgets('home header, gamification panel and hero use current data',
@@ -71,6 +73,25 @@ void main() {
     expect(find.byKey(const Key('home-action-grades')), findsOneWidget);
     expect(find.byKey(const Key('home-action-kundi')), findsOneWidget);
     _expectNoMojibake(tester);
+  });
+
+  testWidgets('light theme keeps Home title readable', (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    final theme = AppTheme.light;
+    await tester.pumpWidget(
+      _testApp(
+        lessons: _sixLessons,
+        summary: _summaryWithGrades,
+        studentName: 'Артем',
+        theme: theme,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final title = tester.widget<Text>(
+      find.byKey(const Key('home-header-title')),
+    );
+    expect(title.style?.color, theme.colorScheme.onSurface);
   });
 
   testWidgets('behavior flag false preserves the stable Home contract',
@@ -336,7 +357,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('home-summary-panel')), findsOneWidget);
-    expect(find.text('Нет уроков'), findsOneWidget);
     expect(find.text('Заданий на сегодня нет'), findsOneWidget);
     expect(find.text('Новых оценок нет'), findsOneWidget);
     expect(
@@ -344,6 +364,39 @@ void main() {
       findsOneWidget,
     );
     _expectNoMojibake(tester);
+  });
+
+  testWidgets(
+      'fitting Home has no empty scroll tail while pull refresh still runs',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    var refreshCalls = 0;
+    await tester.pumpWidget(
+      _testApp(
+        lessons: const <LessonsEntity>[],
+        summary: SummaryEntity.empty,
+        studentName: '',
+        refreshAction: () async {
+          refreshCalls += 1;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(const Key('home-main-scroll')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(scrollable.position.maxScrollExtent, 0);
+
+    await tester.drag(
+        find.byKey(const Key('home-main-scroll')), const Offset(0, 320));
+    await tester.pumpAndSettle();
+
+    expect(refreshCalls, 1);
+    expect(scrollable.position.pixels, 0);
   });
 
   testWidgets('narrow screen, long name and font scale 1.2 do not overflow',
@@ -403,6 +456,8 @@ Widget _testApp({
   bool withBottomNavigation = false,
   bool behaviorCoreEnabled = false,
   KundiBehaviorController? behaviorController,
+  Future<void> Function()? refreshAction,
+  ThemeData? theme,
 }) {
   final page = LessonsPage(
     now: DateTime(2026, 4, 5, 7, 45),
@@ -437,9 +492,11 @@ Widget _testApp({
         kundiBehaviorControllerProvider.overrideWith(
           (ref) => behaviorController,
         ),
+      if (refreshAction != null)
+        studentRefreshActionProvider.overrideWithValue(refreshAction),
     ],
     child: MaterialApp(
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: theme ?? ThemeData.dark(useMaterial3: true),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           textScaler: TextScaler.linear(textScale),

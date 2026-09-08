@@ -13,6 +13,8 @@ void main() {
         neutralTitle: 'Доброе утро, Артем',
         neutralMessage: 'План на сегодня.',
         neutralSemanticLabel: 'План доступен',
+        behaviorMessage: _behaviorMessage,
+        behaviorSemanticLabel: _behaviorSemanticLabel,
       );
 
       expect(
@@ -35,6 +37,8 @@ void main() {
       neutralTitle: 'Добрый день',
       neutralMessage: 'Текущий контекст Главной',
       neutralSemanticLabel: 'Текущая семантика',
+      behaviorMessage: _behaviorMessage,
+      behaviorSemanticLabel: _behaviorSemanticLabel,
     );
 
     expect(presentation.title, 'Добрый день');
@@ -56,6 +60,8 @@ void main() {
       neutralTitle: 'Привет',
       neutralMessage: 'Безопасный fallback',
       neutralSemanticLabel: 'Нейтральное состояние',
+      behaviorMessage: _behaviorMessage,
+      behaviorSemanticLabel: _behaviorSemanticLabel,
     );
 
     expect(presentation.message, 'Безопасный fallback');
@@ -71,6 +77,8 @@ void main() {
             neutralTitle: 'Привет',
             neutralMessage: 'План',
             neutralSemanticLabel: 'План',
+            behaviorMessage: _behaviorMessage,
+            behaviorSemanticLabel: _behaviorSemanticLabel,
           )
           .message,
       adapter
@@ -79,6 +87,8 @@ void main() {
             neutralTitle: 'Привет',
             neutralMessage: 'План',
             neutralSemanticLabel: 'План',
+            behaviorMessage: _behaviorMessage,
+            behaviorSemanticLabel: _behaviorSemanticLabel,
           )
           .message,
     ];
@@ -89,6 +99,11 @@ void main() {
     }
   });
 }
+
+String _behaviorMessage(KundiBehaviorKind kind) => 'message ${kind.name}';
+
+String _behaviorSemanticLabel(KundiBehaviorKind kind) =>
+    'semantic ${kind.name}';
 
 KundiBehaviorState _state(KundiBehaviorKind kind, DateTime enteredAt) {
   final cue = switch (kind) {

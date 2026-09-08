@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/l10n.dart';
 import '../../../shared/providers/providers.dart';
 import '../../../shared/widgets/kundi_surface.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../settings/application/settings_controller.dart';
+import '../../settings/domain/settings_entity.dart';
 import '../application/profile_controller.dart';
 import '../domain/profile_entity.dart';
+import '../domain/school_shift.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -19,7 +23,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _phone1Controller = TextEditingController();
   final _phone2Controller = TextEditingController();
 
-  int? _selectedShift;
   String _loadedProfileKey = '';
   ProfileEntity? _cachedProfile;
 
@@ -41,7 +44,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF09071B),
       body: KundiGradientBackground(
         child: Stack(
           children: [
@@ -63,29 +65,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           _syncForm(profile);
                           return _ProfileContent(
                             profile: profile,
-                            selectedShift: _selectedShift,
                             phone1Controller: _phone1Controller,
                             phone2Controller: _phone2Controller,
                             formKey: _formKey,
                             isSaving: state.isLoading,
-                            onShiftChanged: (value) {
-                              setState(() => _selectedShift = value);
-                            },
                             onSave: _saveProfile,
                             onAddPhoto: _showAddPhotoSoonMessage,
                           );
                         }
 
                         return state.when(
-                          data: (_) => const KundiStateBody.empty(
-                            label: 'Профиль ещё не загружен',
+                          data: (_) => KundiStateBody.empty(
+                            label: context.l10n.profileNotLoaded,
                             icon: Icons.person_search_outlined,
                           ),
-                          loading: () => const KundiStateBody.loading(
-                            label: 'Загружаю профиль...',
+                          loading: () => KundiStateBody.loading(
+                            label: context.l10n.profileLoading,
                           ),
                           error: (error, _) => KundiStateBody.error(
-                            label: 'Не удалось загрузить профиль',
+                            label: context.l10n.profileLoadFailed,
                             onRetry: () => ref
                                 .read(profileControllerProvider.notifier)
                                 .refreshFromCache(),
@@ -107,13 +105,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    if (_selectedShift != 1 && _selectedShift != 2) {
-      _showSnackBar('Выберите смену: 1 или 2');
-      return;
-    }
-
     await ref.read(profileControllerProvider.notifier).saveLocalAppProfile(
-          shift: _selectedShift!,
           parentPhone1: _normalizePhone(_phone1Controller.text),
           parentPhone2: _normalizePhone(_phone2Controller.text),
         );
@@ -124,49 +116,42 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     final nextState = ref.read(profileControllerProvider);
     nextState.whenOrNull(
-      data: (_) => _showSnackBar('Профиль сохранён'),
-      error: (error, _) => _showSnackBar('Ошибка сохранения: $error'),
+      data: (_) => _showSnackBar(context.l10n.profileSaved),
+      error: (_, __) => _showSnackBar(context.l10n.profileSaveFailed),
     );
   }
 
   void _syncForm(ProfileEntity profile) {
     final local = profile.localAppProfile;
     final nextKey =
-        '${profile.providerIdentity?.studentId}|${local?.shift}|${local?.parentPhone1}|${local?.parentPhone2}';
+        '${profile.providerIdentity?.studentId}|${local?.parentPhone1}|${local?.parentPhone2}';
     if (_loadedProfileKey == nextKey) {
       return;
     }
 
     _loadedProfileKey = nextKey;
-    _selectedShift = local?.shift;
     _phone1Controller.text = local?.parentPhone1 ?? '';
     _phone2Controller.text = local?.parentPhone2 ?? '';
   }
 
   void _showAddPhotoSoonMessage() {
-    _showSnackBar('Добавление фото появится позже');
-  }
-
-  void _showSettingsSoonMessage() {
-    _showSnackBar('Настройки профиля появятся позже');
+    _showSnackBar(context.l10n.profilePhotoSoon);
   }
 
   Future<void> _logout() async {
     final shouldLogout = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Выйти из аккаунта?'),
-            content: const Text(
-              'Вы выйдете из текущего профиля на этом устройстве.',
-            ),
+            title: Text(context.l10n.profileLogoutTitle),
+            content: Text(context.l10n.profileLogoutBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Отмена'),
+                child: Text(context.l10n.commonCancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Выйти'),
+                child: Text(context.l10n.profileLogout),
               ),
             ],
           ),
@@ -191,23 +176,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 class _ProfileContent extends StatelessWidget {
   const _ProfileContent({
     required this.profile,
-    required this.selectedShift,
     required this.phone1Controller,
     required this.phone2Controller,
     required this.formKey,
     required this.isSaving,
-    required this.onShiftChanged,
     required this.onSave,
     required this.onAddPhoto,
   });
 
   final ProfileEntity profile;
-  final int? selectedShift;
   final TextEditingController phone1Controller;
   final TextEditingController phone2Controller;
   final GlobalKey<FormState> formKey;
   final bool isSaving;
-  final ValueChanged<int?> onShiftChanged;
   final VoidCallback onSave;
   final VoidCallback onAddPhoto;
 
@@ -225,19 +206,18 @@ class _ProfileContent extends StatelessWidget {
           onAddPhoto: onAddPhoto,
         ),
         const SizedBox(height: 10),
-        const _SectionHeading(
-          title: 'Данные ученика',
+        _SectionHeading(
+          title: context.l10n.profileStudentData,
           icon: Icons.badge_outlined,
         ),
         const SizedBox(height: 4),
         _StudentDetailsCard(
           providerIdentity: providerIdentity,
-          selectedShift: selectedShift,
-          onShiftChanged: onShiftChanged,
+          automaticShift: profile.automaticShift,
         ),
         const SizedBox(height: 10),
-        const _SectionHeading(
-          title: 'Контакты родителей',
+        _SectionHeading(
+          title: context.l10n.profileParentContacts,
           icon: Icons.phone_iphone_outlined,
         ),
         const SizedBox(height: 4),
@@ -248,6 +228,13 @@ class _ProfileContent extends StatelessWidget {
           isSaving: isSaving,
           onSave: onSave,
         ),
+        const SizedBox(height: 10),
+        _SectionHeading(
+          title: context.l10n.settingsTitle,
+          icon: Icons.settings_outlined,
+        ),
+        const SizedBox(height: 4),
+        const _AppSettingsSection(),
         const SizedBox(height: 10),
         const _AchievementsSection(),
       ],
@@ -274,12 +261,12 @@ class _ProfileTopBar extends StatelessWidget {
             icon: Icons.arrow_back_ios_new_rounded,
             onTap: onBack,
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Профиль',
+              context.l10n.profileTitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
@@ -306,6 +293,8 @@ class _IconGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(19),
@@ -314,10 +303,16 @@ class _IconGlassButton extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: const Color(0x24191343),
-          border: Border.all(color: const Color(0x55392A69)),
+          color: isDark
+              ? const Color(0x24191343)
+              : scheme.surface.withValues(alpha: 0.92),
+          border: Border.all(
+            color: isDark
+                ? const Color(0x55392A69)
+                : scheme.primary.withValues(alpha: 0.45),
+          ),
         ),
-        child: Icon(icon, color: Colors.white, size: 17),
+        child: Icon(icon, color: scheme.onSurface, size: 17),
       ),
     );
   }
@@ -362,7 +357,10 @@ class _ProfileHeroCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          _orNotSet(providerIdentity?.studentFullName ?? ''),
+                          _orNotSet(
+                            context,
+                            providerIdentity?.studentFullName ?? '',
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -388,14 +386,17 @@ class _ProfileHeroCard extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        _orNotSet(providerIdentity?.classLabel ?? ''),
+                        _orNotSet(
+                          context,
+                          providerIdentity?.classLabel ?? '',
+                        ),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10.8,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const _PillTag(label: 'Ученик'),
+                      _PillTag(label: context.l10n.profileStudent),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -405,7 +406,7 @@ class _ProfileHeroCard extends StatelessWidget {
                         child: _GamificationStat(
                           icon: Icons.auto_awesome,
                           value: _pointsValue(providerIdentity),
-                          label: 'Баллы',
+                          label: context.l10n.profilePoints,
                           iconColor: const Color(0xFFB86DFF),
                         ),
                       ),
@@ -414,7 +415,7 @@ class _ProfileHeroCard extends StatelessWidget {
                         child: _GamificationStat(
                           icon: Icons.local_fire_department_outlined,
                           value: _streakValue(localProfile),
-                          label: 'Дней подряд',
+                          label: context.l10n.profileStreak,
                           iconColor: const Color(0xFFFF974A),
                         ),
                       ),
@@ -422,8 +423,8 @@ class _ProfileHeroCard extends StatelessWidget {
                       Expanded(
                         child: _GamificationStat(
                           icon: Icons.shield_moon_outlined,
-                          value: _levelValue(providerIdentity, localProfile),
-                          label: 'Уровень',
+                          value: _levelValue(providerIdentity),
+                          label: context.l10n.profileLevel,
                           iconColor: const Color(0xFFB86DFF),
                         ),
                       ),
@@ -483,7 +484,10 @@ class _AvatarSlot extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  _profileInitials(fullName),
+                  _profileInitials(
+                    fullName,
+                    context.l10n.profileInitials,
+                  ),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -626,8 +630,8 @@ class _SectionHeading extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
             ),
@@ -642,13 +646,11 @@ class _SectionHeading extends StatelessWidget {
 class _StudentDetailsCard extends StatelessWidget {
   const _StudentDetailsCard({
     required this.providerIdentity,
-    required this.selectedShift,
-    required this.onShiftChanged,
+    required this.automaticShift,
   });
 
   final ProviderIdentityProfileSection? providerIdentity;
-  final int? selectedShift;
-  final ValueChanged<int?> onShiftChanged;
+  final SchoolShift automaticShift;
 
   @override
   Widget build(BuildContext context) {
@@ -658,31 +660,31 @@ class _StudentDetailsCard extends StatelessWidget {
         children: [
           _InfoRow(
             icon: Icons.person_outline,
-            label: 'Ученик',
-            value: _orNotSet(providerIdentity?.studentFullName ?? ''),
+            label: context.l10n.profileStudent,
+            value: _orNotSet(context, providerIdentity?.studentFullName ?? ''),
           ),
           const _InfoDivider(),
           _InfoRow(
             icon: Icons.apartment_outlined,
-            label: 'Школа',
-            value: _orNotSet(providerIdentity?.schoolName ?? ''),
+            label: context.l10n.profileSchool,
+            value: _orNotSet(context, providerIdentity?.schoolName ?? ''),
             multiline: true,
           ),
           const _InfoDivider(),
           _InfoRow(
             icon: Icons.school_outlined,
-            label: 'Класс',
-            value: _orNotSet(providerIdentity?.classLabel ?? ''),
-            trailing: _ShiftDropdown(
-              selectedShift: selectedShift,
-              onChanged: onShiftChanged,
-            ),
+            label: context.l10n.profileClass,
+            value: _orNotSet(context, providerIdentity?.classLabel ?? ''),
+            trailing: _ShiftBadge(shift: automaticShift),
           ),
           const _InfoDivider(),
           _InfoRow(
             icon: Icons.support_agent_outlined,
-            label: 'Классный руководитель',
-            value: _orNotSet(providerIdentity?.classTeacherFullName ?? ''),
+            label: context.l10n.profileTeacher,
+            value: _orNotSet(
+              context,
+              providerIdentity?.classTeacherFullName ?? '',
+            ),
             multiline: true,
           ),
         ],
@@ -715,7 +717,7 @@ class _ParentContactsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Оставьте номера родителей, чтобы школа могла быстро связаться при необходимости.',
+              context.l10n.profileContactsHelp,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFFAFA4DA),
                     fontSize: 10,
@@ -728,16 +730,16 @@ class _ParentContactsCard extends StatelessWidget {
               keyboardType: TextInputType.phone,
               style: const TextStyle(color: Colors.white),
               decoration: _profileInputDecoration(
-                label: 'Номер родителя 1',
+                label: context.l10n.profileParentPhoneOne,
                 hint: '+7 771 256 25 25',
               ),
               validator: (value) {
                 final normalized = _normalizePhone(value ?? '');
                 if (normalized.isEmpty) {
-                  return 'Введите номер родителя 1';
+                  return context.l10n.profileParentPhoneOneRequired;
                 }
                 if (!_isValidPhone(normalized)) {
-                  return 'Номер должен быть длиной 10-15 цифр';
+                  return context.l10n.profilePhoneInvalid;
                 }
                 return null;
               },
@@ -748,8 +750,8 @@ class _ParentContactsCard extends StatelessWidget {
               keyboardType: TextInputType.phone,
               style: const TextStyle(color: Colors.white),
               decoration: _profileInputDecoration(
-                label: 'Номер родителя 2 (опционально)',
-                hint: 'Введите номер (необязательно)',
+                label: context.l10n.profileParentPhoneTwo,
+                hint: context.l10n.profilePhoneOptionalHint,
               ),
               validator: (value) {
                 final normalized = _normalizePhone(value ?? '');
@@ -757,7 +759,7 @@ class _ParentContactsCard extends StatelessWidget {
                   return null;
                 }
                 if (!_isValidPhone(normalized)) {
-                  return 'Номер должен быть длиной 10-15 цифр';
+                  return context.l10n.profilePhoneInvalid;
                 }
                 return null;
               },
@@ -773,7 +775,7 @@ class _ParentContactsCard extends StatelessWidget {
                       ),
                     )
                   : KundiPrimaryButton(
-                      label: 'Сохранить изменения',
+                      label: context.l10n.profileSaveChanges,
                       icon: Icons.save_outlined,
                       onPressed: onSave,
                     ),
@@ -790,43 +792,43 @@ class _AchievementsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const cards = <_AchievementCardData>[
+    final cards = <_AchievementCardData>[
       _AchievementCardData(
         icon: Icons.emoji_events_outlined,
-        title: 'Отличник',
-        subtitle: '10 отличных\nоценок',
-        glow: Color(0xFFCE6BFF),
-        outline: Color(0xFF8E46FF),
+        title: context.l10n.profileAchievementExcellent,
+        subtitle: context.l10n.profileAchievementExcellentHint,
+        glow: const Color(0xFFCE6BFF),
+        outline: const Color(0xFF8E46FF),
       ),
       _AchievementCardData(
         icon: Icons.local_fire_department_outlined,
-        title: 'Старательный',
-        subtitle: '7 дней подряд\nактивности',
-        glow: Color(0xFFFFB24A),
-        outline: Color(0xFFFF7B2C),
+        title: context.l10n.profileAchievementDiligent,
+        subtitle: context.l10n.profileAchievementDiligentHint,
+        glow: const Color(0xFFFFB24A),
+        outline: const Color(0xFFFF7B2C),
       ),
       _AchievementCardData(
         icon: Icons.menu_book_outlined,
-        title: 'Любознательный',
-        subtitle: '50 заданий\nвыполнено',
-        glow: Color(0xFF6AB2FF),
-        outline: Color(0xFF3B6DFF),
+        title: context.l10n.profileAchievementCurious,
+        subtitle: context.l10n.profileAchievementCuriousHint,
+        glow: const Color(0xFF6AB2FF),
+        outline: const Color(0xFF3B6DFF),
       ),
       _AchievementCardData(
         icon: Icons.star_outline_rounded,
-        title: 'Первая пятёрка',
-        subtitle: 'Получите 5 оценок\n«5»',
-        glow: Color(0xFFB8FF5D),
-        outline: Color(0xFF58D94C),
+        title: context.l10n.profileAchievementFirstFive,
+        subtitle: context.l10n.profileAchievementFirstFiveHint,
+        glow: const Color(0xFFB8FF5D),
+        outline: const Color(0xFF58D94C),
       ),
     ];
 
     return Column(
       children: [
-        const _SectionHeading(
-          title: 'Достижения',
+        _SectionHeading(
+          title: context.l10n.profileAchievements,
           icon: Icons.workspace_premium_outlined,
-          trailing: _MoreLink(),
+          trailing: const _MoreLink(),
         ),
         const SizedBox(height: 2),
         SizedBox(
@@ -851,17 +853,21 @@ class _MoreLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: const [
+      children: [
         Text(
-          'Все достижения',
-          style: TextStyle(
+          context.l10n.profileAllAchievements,
+          style: const TextStyle(
             color: Color(0xFFB56BFF),
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
           ),
         ),
-        SizedBox(width: 4),
-        Icon(Icons.chevron_right_rounded, color: Color(0xFFB56BFF), size: 18),
+        const SizedBox(width: 4),
+        const Icon(
+          Icons.chevron_right_rounded,
+          color: Color(0xFFB56BFF),
+          size: 18,
+        ),
       ],
     );
   }
@@ -1075,50 +1081,157 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _ShiftDropdown extends StatelessWidget {
-  const _ShiftDropdown({
-    required this.selectedShift,
+class _AppSettingsSection extends ConsumerWidget {
+  const _AppSettingsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsControllerProvider).valueOrNull ??
+        const AppSettings();
+    return _GlassCard(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Column(
+        children: [
+          _SettingsRow<AppThemePreference>(
+            icon: Icons.contrast_rounded,
+            label: context.l10n.settingsTheme,
+            value: settings.theme,
+            items: [
+              DropdownMenuItem(
+                value: AppThemePreference.dark,
+                child: Text(context.l10n.settingsThemeDark),
+              ),
+              DropdownMenuItem(
+                value: AppThemePreference.light,
+                child: Text(context.l10n.settingsThemeLight),
+              ),
+            ],
+            onChanged: (value) => _save(
+              context,
+              () =>
+                  ref.read(settingsControllerProvider.notifier).setTheme(value),
+            ),
+          ),
+          const _InfoDivider(),
+          _SettingsRow<AppLanguage>(
+            icon: Icons.translate_rounded,
+            label: context.l10n.settingsLanguage,
+            value: settings.language,
+            items: [
+              DropdownMenuItem(
+                value: AppLanguage.ru,
+                child: Text(context.l10n.settingsLanguageRussian),
+              ),
+              DropdownMenuItem(
+                value: AppLanguage.kk,
+                child: Text(context.l10n.settingsLanguageKazakh),
+              ),
+            ],
+            onChanged: (value) => _save(
+              context,
+              () => ref
+                  .read(settingsControllerProvider.notifier)
+                  .setLanguage(value),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.settingsSaveFailed)),
+      );
+    }
+  }
+}
+
+class _SettingsRow<T> extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.items,
     required this.onChanged,
   });
 
-  final int? selectedShift;
-  final ValueChanged<int?> onChanged;
+  final IconData icon;
+  final String label;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Theme.of(context).colorScheme.primary, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                ),
+          ),
+        ),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<T>(
+            value: value,
+            borderRadius: BorderRadius.circular(16),
+            dropdownColor: const Color(0xFF20174A),
+            iconEnabledColor: const Color(0xFFAFA4DA),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+            items: items,
+            onChanged: (next) {
+              if (next != null) onChanged(next);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShiftBadge extends StatelessWidget {
+  const _ShiftBadge({required this.shift});
+
+  final SchoolShift shift;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (shift) {
+      SchoolShift.first => context.l10n.profileShiftOne,
+      SchoolShift.second => context.l10n.profileShiftTwo,
+      SchoolShift.unknown => context.l10n.profileShiftUnknown,
+    };
     return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      key: const Key('profile-automatic-shift'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: const Color(0x221D1244),
-        border: Border.all(color: const Color(0x663B2D73)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: selectedShift,
-          hint: const Text(
-            'Смена',
-            style: TextStyle(
-              color: Color(0xFFAFA4DA),
-              fontSize: 8.1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          borderRadius: BorderRadius.circular(16),
-          dropdownColor: const Color(0xFF24154B),
-          iconEnabledColor: const Color(0xFFD5CBFF),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 8.1,
-            fontWeight: FontWeight.w700,
-          ),
-          items: const [
-            DropdownMenuItem(value: 1, child: Text('1 смена')),
-            DropdownMenuItem(value: 2, child: Text('2 смена')),
-          ],
-          onChanged: onChanged,
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
         ),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }
@@ -1229,19 +1342,19 @@ bool _isValidPhone(String value) {
   return digits.length >= 10 && digits.length <= 15;
 }
 
-String _orNotSet(String value) {
+String _orNotSet(BuildContext context, String value) {
   final trimmed = value.trim();
-  return trimmed.isEmpty ? 'Не указано' : trimmed;
+  return trimmed.isEmpty ? context.l10n.commonNotSpecified : trimmed;
 }
 
-String _profileInitials(String fullName) {
+String _profileInitials(String fullName, String fallback) {
   final parts = fullName
       .trim()
       .split(RegExp(r'\s+'))
       .where((part) => part.isNotEmpty)
       .toList(growable: false);
   if (parts.isEmpty) {
-    return 'ПР';
+    return fallback;
   }
   if (parts.length == 1) {
     final safe = parts.first;
@@ -1263,11 +1376,7 @@ String _streakValue(LocalAppProfileSection? localProfile) {
   return hasPhone ? '12' : '3';
 }
 
-String _levelValue(
-  ProviderIdentityProfileSection? identity,
-  LocalAppProfileSection? localProfile,
-) {
+String _levelValue(ProviderIdentityProfileSection? identity) {
   final base = (identity?.gradeLevel ?? 1) >= 7 ? 4 : 3;
-  final bonus = (localProfile?.shift == 2) ? 0 : 1;
-  return '${base + bonus}';
+  return '$base';
 }

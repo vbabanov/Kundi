@@ -199,7 +199,7 @@ void main() {
     expect(auth.loginCalls, 1);
     expect(observer.sheetPops, 11);
     expect(observer.otherPops, 0);
-    expect(find.text('Login successful'), findsOneWidget);
+    expect(find.text('Вход выполнен'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

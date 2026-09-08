@@ -30,6 +30,8 @@ class KundiHomePresentationAdapter {
     required String neutralTitle,
     required String neutralMessage,
     required String neutralSemanticLabel,
+    required String Function(KundiBehaviorKind kind) behaviorMessage,
+    required String Function(KundiBehaviorKind kind) behaviorSemanticLabel,
   }) {
     if (!_cueMatchesState(state)) {
       return _neutral(
@@ -49,48 +51,48 @@ class KundiHomePresentationAdapter {
       case KundiBehaviorKind.celebrating:
         return _presentation(
           title: neutralTitle,
-          message: 'Отличная работа!',
-          semanticLabel: 'Kundi радуется успеху',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'celebrate',
         );
       case KundiBehaviorKind.thinking:
         return _presentation(
           title: neutralTitle,
-          message: 'Думаю…',
-          semanticLabel: 'Kundi думает',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'think',
         );
       case KundiBehaviorKind.speaking:
         return _presentation(
           title: neutralTitle,
-          message: 'Ответ появится здесь позже.',
-          semanticLabel: 'Kundi готовит ответ',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'speak',
         );
       case KundiBehaviorKind.listening:
         return _presentation(
           title: neutralTitle,
-          message: 'Я слушаю',
-          semanticLabel: 'Kundi слушает',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.gentle,
           cueName: 'listen',
         );
       case KundiBehaviorKind.warning:
         return _presentation(
           title: neutralTitle,
-          message: 'Давай спокойно проверим, что требует внимания.',
-          semanticLabel: 'Kundi предлагает проверить важное',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.attention,
           cueName: 'warn',
         );
       case KundiBehaviorKind.error:
         return _presentation(
           title: neutralTitle,
-          message: 'Что-то пошло не так. Попробуем ещё раз позже.',
-          semanticLabel: 'Kundi временно недоступен',
+          message: behaviorMessage(state.kind),
+          semanticLabel: behaviorSemanticLabel(state.kind),
           emphasis: KundiVisualEmphasis.attention,
           cueName: 'error',
         );

@@ -24,4 +24,9 @@ class HomeworkController extends AsyncNotifier<List<HomeworkEntity>> {
     state = await AsyncValue.guard(
         () => ref.read(homeworkRepositoryProvider).list());
   }
+
+  Future<void> reloadFromCache() async {
+    final next = await ref.read(homeworkRepositoryProvider).list();
+    state = AsyncData(next);
+  }
 }

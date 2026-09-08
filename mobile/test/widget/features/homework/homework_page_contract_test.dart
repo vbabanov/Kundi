@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/homework/presentation/homework_page.dart';
 import 'package:kundi_mobile/features/lessons/application/lessons_controller.dart';
 import 'package:kundi_mobile/features/lessons/domain/lessons_entity.dart';
+import 'package:kundi_mobile/shared/theme/app_theme.dart';
+import 'package:kundi_mobile/shared/widgets/student_pull_to_refresh.dart';
 
 void main() {
   testWidgets('homework page renders header/selector/summary/mode/button',
@@ -101,6 +103,54 @@ void main() {
     for (final bad in ['Рђ', 'Рџ', 'вЂ', 'Ð', 'Ñ']) {
       expect(allTexts.contains(bad), isFalse);
     }
+  });
+
+  testWidgets('homework pull gesture uses shared refresh action',
+      (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider
+              .overrideWith(_FakeLessonsEmptyController.new),
+          studentRefreshActionProvider.overrideWithValue(() async {
+            calls += 1;
+          }),
+        ],
+        child: const MaterialApp(home: HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const Key('homework-pull-scroll')),
+      const Offset(0, 320),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, 1);
+  });
+
+  testWidgets('light theme keeps homework header controls readable',
+      (tester) async {
+    final theme = AppTheme.light;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
+        ],
+        child: MaterialApp(theme: theme, home: const HomeworkPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final title = tester
+        .widgetList<Text>(find.text('ДЗ'))
+        .firstWhere((text) => text.style?.fontSize == 24);
+    final menuIcon = tester.widget<Icon>(find.byIcon(Icons.menu_rounded));
+
+    expect(title.style?.color, theme.colorScheme.onSurface);
+    expect(menuIcon.color, theme.colorScheme.onSurface);
   });
 }
 

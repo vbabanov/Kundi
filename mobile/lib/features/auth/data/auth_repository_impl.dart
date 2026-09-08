@@ -47,6 +47,24 @@ class _RefreshCycleResult {
   final String errorMessage;
 }
 
+class AuthenticatedStudentRefreshResult {
+  const AuthenticatedStudentRefreshResult({
+    required this.session,
+    required this.traceId,
+    required this.provider,
+    required this.readMode,
+    required this.windowKey,
+    required this.snapshotAt,
+  });
+
+  final AuthSession session;
+  final String traceId;
+  final String provider;
+  final String readMode;
+  final String windowKey;
+  final String snapshotAt;
+}
+
 class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
     required ApiClient apiClient,
@@ -73,6 +91,9 @@ class AuthRepositoryImpl implements AuthRepository {
   final ReadSourcePolicy _readSourcePolicy;
   final RefreshRunGate<_RefreshCycleResult> _refreshRunGate =
       RefreshRunGate<_RefreshCycleResult>();
+  final RefreshRunGate<AuthenticatedStudentRefreshResult>
+      _authenticatedRefreshRunGate =
+      RefreshRunGate<AuthenticatedStudentRefreshResult>();
   final TypedV2RuntimeGate _typedV2RuntimeGate = const TypedV2RuntimeGate();
   TypedV2GateRuntimeState _typedV2GateState = TypedV2GateRuntimeState.empty();
   TypedV2CohortDecision? _typedV2CohortDecision;
@@ -81,6 +102,125 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Map<String, String>> loadSavedCredentials() async {
     return _secureStorage.loadDiaryCredentials();
+  }
+
+  Future<AuthenticatedStudentRefreshResult> refreshAuthenticatedStudent(
+    AuthSession session,
+  ) {
+    return _authenticatedRefreshRunGate.run(
+      () => _refreshAuthenticatedStudentInternal(session),
+      onCoalesced: () {
+        _logPostLoginStage(
+          stage: 'student_refresh_transaction_coalesced',
+          outcome: 'join_inflight',
+          details: {
+            'student_id_hash': _stableStudentHash(session.studentId),
+          },
+        );
+      },
+    );
+  }
+
+  Future<AuthenticatedStudentRefreshResult>
+      _refreshAuthenticatedStudentInternal(AuthSession session) async {
+    final saved = await _secureStorage.loadDiaryCredentials();
+    final source = (saved['source'] ?? '').trim();
+    final login = (saved['login'] ?? '').trim();
+    final password = (saved['password'] ?? '').trim();
+    if (source != 'kundelik' || login.isEmpty || password.isEmpty) {
+      throw const AppException(
+        'provider_credentials_unavailable',
+        'Saved Kundelik credentials are unavailable.',
+      );
+    }
+
+    var activeSession = session;
+    if (activeSession.expiresAt
+        .isBefore(DateTime.now().toUtc().add(const Duration(minutes: 2)))) {
+      final refreshed = await _tryRefreshSession(activeSession.refreshToken);
+      if (refreshed == null || refreshed.studentId != activeSession.studentId) {
+        throw const AppException(
+          'session_expired',
+          'The authenticated session could not be refreshed.',
+        );
+      }
+      activeSession = refreshed;
+    }
+
+    final traceId = _buildTraceId(activeSession.studentId);
+    _logPostLoginStage(
+      stage: 'student_refresh_transaction_start',
+      outcome: 'started',
+      details: {
+        'trace_id': traceId,
+        'provider': source,
+        'student_id_hash': _stableStudentHash(activeSession.studentId),
+      },
+    );
+    try {
+      await _ingestKundelikBundle(
+        session: activeSession,
+        credentials: DiaryAuthCredentials(
+          source: source,
+          login: login,
+          password: password,
+        ),
+        seedLocalCache: false,
+        queueOnUploadFailure: false,
+        forceV2Ingest: true,
+        traceId: traceId,
+      );
+      final typedResult = await _refreshCanonicalCacheV2(
+        accessToken: activeSession.accessToken,
+        studentId: activeSession.studentId,
+        traceId: traceId,
+      );
+      if (typedResult.status != _RefreshCycleStatus.success) {
+        throw const AppException(
+          'typed_read_refresh_failed',
+          'Typed-v2 refresh did not publish a complete snapshot.',
+        );
+      }
+      final context = await _canonicalCacheStore.getActiveReadContext();
+      if (context == null ||
+          context.studentId != activeSession.studentId ||
+          !context.hasCompleteV2Scope) {
+        throw const AppException(
+          'student_refresh_snapshot_unavailable',
+          'A complete typed-v2 snapshot was not published.',
+        );
+      }
+      _logPostLoginStage(
+        stage: 'student_refresh_transaction_result',
+        outcome: 'success',
+        details: {
+          'trace_id': traceId,
+          'provider': context.provider,
+          'read_mode': context.readMode,
+          'window_key': context.windowKey,
+          'snapshot_at': context.snapshotAt,
+        },
+      );
+      return AuthenticatedStudentRefreshResult(
+        session: activeSession,
+        traceId: traceId,
+        provider: context.provider,
+        readMode: context.readMode,
+        windowKey: context.windowKey,
+        snapshotAt: context.snapshotAt,
+      );
+    } catch (error) {
+      _logPostLoginStage(
+        stage: 'student_refresh_transaction_result',
+        outcome: 'failed_preserve_active_snapshot',
+        details: {
+          'trace_id': traceId,
+          'provider': source,
+          'error': _sanitizeError(error.toString()),
+        },
+      );
+      rethrow;
+    }
   }
 
   Future<AuthSession?> ensureSessionBaseline(AuthSession session) async {
@@ -459,6 +599,10 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> _ingestKundelikBundle({
     required AuthSession session,
     required DiaryAuthCredentials credentials,
+    bool seedLocalCache = true,
+    bool queueOnUploadFailure = true,
+    bool forceV2Ingest = false,
+    String traceId = '',
   }) async {
     final connector = _connectorRuntime.create('kundelik');
     await connector.authenticate(credentials);
@@ -479,18 +623,21 @@ class AuthRepositoryImpl implements AuthRepository {
       details: {
         'source': credentials.source,
         'login': _redactLogin(credentials.login),
+        if (traceId.isNotEmpty) 'trace_id': traceId,
         'has_person_id': (bundle.sourceIds['person_id'] ?? '').isNotEmpty,
         'has_school_id': (bundle.sourceIds['school_id'] ?? '').isNotEmpty,
         'has_group_id': (bundle.sourceIds['group_id'] ?? '').isNotEmpty,
       },
     );
-    await _seedCanonicalCacheFromBundle(
-      studentId: session.studentId,
-      bundle: bundle,
-    );
+    if (seedLocalCache) {
+      await _seedCanonicalCacheFromBundle(
+        studentId: session.studentId,
+        bundle: bundle,
+      );
+    }
 
     try {
-      final useV2Ingest =
+      final useV2Ingest = forceV2Ingest ||
           _resolvedReadMode(studentId: session.studentId) == ReadSourceMode.v2;
       final payload = useV2Ingest ? bundle.toV2Json() : bundle.toV1Json();
       final ingestEndpoint =
@@ -522,6 +669,7 @@ class AuthRepositoryImpl implements AuthRepository {
           'window_to': academicYearWindow.windowTo,
           'source': credentials.source,
           'login': _redactLogin(credentials.login),
+          if (traceId.isNotEmpty) 'trace_id': traceId,
           'bundle_version': useV2Ingest ? 2 : 1,
           'payload_keys': payloadKeys,
           'payload_lessons_count': lessons.length,
@@ -554,55 +702,67 @@ class AuthRepositoryImpl implements AuthRepository {
         details: {
           'source': credentials.source,
           'status': response.statusCode,
+          if (traceId.isNotEmpty) 'trace_id': traceId,
         },
       );
     } on DioException catch (error) {
-      final useV2Ingest =
+      final useV2Ingest = forceV2Ingest ||
           _resolvedReadMode(studentId: session.studentId) == ReadSourceMode.v2;
       final ingestEndpoint =
           useV2Ingest ? '/v2/ingest/bundle' : '/v1/ingest/bundle';
-      await _syncQueueService.enqueue(bundle, useV2Ingest: useV2Ingest);
-      await _syncQueueService.markFailure(
-        bundle.idempotencyKey,
-        SyncFailure(
-          type: SyncFailureType.transient,
-          message: error.message ?? 'ingest request failed',
-        ),
-        1,
-      );
+      if (queueOnUploadFailure) {
+        await _syncQueueService.enqueue(bundle, useV2Ingest: useV2Ingest);
+        await _syncQueueService.markFailure(
+          bundle.idempotencyKey,
+          SyncFailure(
+            type: SyncFailureType.transient,
+            message: error.message ?? 'ingest request failed',
+          ),
+          1,
+        );
+      }
       _logPostLoginStage(
         stage: 'ingest_result',
-        outcome: 'queued_after_failure',
+        outcome:
+            queueOnUploadFailure ? 'queued_after_failure' : 'failed_not_queued',
         details: {
           'endpoint': ingestEndpoint,
           'bundle_version': useV2Ingest ? 2 : 1,
           'source': credentials.source,
+          if (traceId.isNotEmpty) 'trace_id': traceId,
           'status': error.response?.statusCode,
           'response_sanitized': _sanitizeIngestResponse(error.response?.data),
         },
       );
       _logPostLoginStage(
         stage: 'sync_failed',
-        outcome: 'ingest_failed_queued',
+        outcome: queueOnUploadFailure
+            ? 'ingest_failed_queued'
+            : 'ingest_failed_not_queued',
         details: {
           'endpoint': ingestEndpoint,
           'status': error.response?.statusCode,
           'error': _sanitizeError(error.message ?? 'ingest request failed'),
         },
       );
+      if (!queueOnUploadFailure) {
+        rethrow;
+      }
     }
   }
 
   Future<void> _refreshCanonicalCache({
     required String accessToken,
     required String studentId,
+    String? traceId,
+    bool requirePublishedSuccess = false,
   }) async {
-    final traceId = _buildTraceId(studentId);
+    final resolvedTraceId = traceId ?? _buildTraceId(studentId);
     final result = await _refreshRunGate.run(
       () => _refreshCanonicalCacheInternal(
         accessToken: accessToken,
         studentId: studentId,
-        traceId: traceId,
+        traceId: resolvedTraceId,
       ),
       onCoalesced: () {
         _logPostLoginStage(
@@ -610,12 +770,14 @@ class AuthRepositoryImpl implements AuthRepository {
           outcome: 'join_inflight',
           details: {
             'read_mode': _resolvedReadMode(studentId: studentId).name,
-            'trace_id': traceId,
+            'trace_id': resolvedTraceId,
           },
         );
       },
     );
-    if (result.status == _RefreshCycleStatus.failed) {
+    if (result.status == _RefreshCycleStatus.failed ||
+        (requirePublishedSuccess &&
+            result.status != _RefreshCycleStatus.success)) {
       _logPostLoginStage(
         stage: 'sync_failed',
         outcome: 'typed_read_refresh_failed',

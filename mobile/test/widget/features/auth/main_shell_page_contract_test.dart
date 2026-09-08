@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/assistant/application/assistant_controller.dart';
 import 'package:kundi_mobile/features/assistant/application/kundi_voice_assistant_coordinator.dart';
 import 'package:kundi_mobile/features/assistant/assistant_feature.dart';
-import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
 import 'package:kundi_mobile/features/auth/presentation/main_shell_page.dart';
 import 'package:kundi_mobile/features/grades/application/grades_controller.dart';
 import 'package:kundi_mobile/features/grades/domain/grades_entity.dart';
@@ -17,6 +16,8 @@ import 'package:kundi_mobile/features/lessons/application/lessons_controller.dar
 import 'package:kundi_mobile/features/lessons/domain/lessons_entity.dart';
 import 'package:kundi_mobile/features/profile/application/profile_controller.dart';
 import 'package:kundi_mobile/features/profile/domain/profile_entity.dart';
+import 'package:kundi_mobile/features/settings/application/settings_controller.dart';
+import 'package:kundi_mobile/features/settings/domain/settings_entity.dart';
 import 'package:kundi_mobile/features/summary/application/summary_controller.dart';
 import 'package:kundi_mobile/features/summary/domain/summary_entity.dart';
 import 'package:kundi_mobile/runtimes/kundi_system_speech/kundi_system_speech_transport.dart';
@@ -185,26 +186,17 @@ void main() {
     expect(find.text('Спросите Kundi'), findsOneWidget);
   });
 
-  testWidgets('first hold waits for canonical kk-KZ session before STT',
-      (tester) async {
+  testWidgets('first hold uses kk-KZ from the app locale', (tester) async {
     final speech = _WidgetFakeSpeechTransport(
       permission: KundiSpeechPermission.granted,
     );
-    final ready = Completer<AssistantViewState>();
     await _pumpVoiceShell(
       tester,
       speech,
-      assistantController: () => _DeferredAssistantController(ready.future),
-      settle: false,
+      language: AppLanguage.kk,
     );
 
     _longPressStart(tester);
-    await tester.pump();
-    expect(find.text('Подготавливаю Kundi…'), findsOneWidget);
-    expect(speech.permissionStatusCalls, 0);
-    expect(speech.startCalls, 0);
-
-    ready.complete(_assistantView('kk-KZ'));
     await tester.pumpAndSettle();
     expect(speech.startCalls, 1);
     expect(speech.locales, <String>['kk-KZ']);
@@ -215,22 +207,14 @@ void main() {
     final speech = _WidgetFakeSpeechTransport(
       permission: KundiSpeechPermission.granted,
     );
-    final ready = Completer<AssistantViewState>();
-    final assistant = _DeferredAssistantController(ready.future);
     await _pumpVoiceShell(
       tester,
       speech,
-      assistantController: () => assistant,
-      settle: false,
+      language: AppLanguage.kk,
     );
 
     _longPressStart(tester);
     _longPressStart(tester);
-    await tester.pump();
-    expect(assistant.buildCount, 1);
-    expect(speech.startCalls, 0);
-
-    ready.complete(_assistantView('kk-KZ'));
     await tester.pumpAndSettle();
     expect(speech.startCalls, 1);
     expect(speech.locales, <String>['kk-KZ']);
@@ -241,19 +225,16 @@ void main() {
     final speech = _WidgetFakeSpeechTransport(
       permission: KundiSpeechPermission.granted,
     );
-    final ready = Completer<AssistantViewState>();
     await _pumpVoiceShell(
       tester,
       speech,
-      assistantController: () => _DeferredAssistantController(ready.future),
-      settle: false,
+      language: AppLanguage.kk,
     );
 
     final detector = _longPressStart(tester);
     detector.onLongPressEnd?.call(
       const LongPressEndDetails(globalPosition: Offset.zero),
     );
-    ready.complete(_assistantView('kk-KZ'));
     await tester.pumpAndSettle();
 
     expect(speech.startCalls, 0);
@@ -264,43 +245,34 @@ void main() {
     final speech = _WidgetFakeSpeechTransport(
       permission: KundiSpeechPermission.granted,
     );
-    final ready = Completer<AssistantViewState>();
-    final assistant = _DeferredAssistantController(ready.future);
     await _pumpVoiceShell(
       tester,
       speech,
-      assistantController: () => assistant,
-      settle: false,
     );
 
     _longPressStart(tester);
     await tester.binding.setSurfaceSize(const Size(380, 760));
-    await tester.pump();
-    ready.complete(_assistantView('ru-KZ'));
     await tester.pumpAndSettle();
 
-    expect(assistant.buildCount, 1);
     expect(speech.startCalls, 1);
-    expect(speech.locales, <String>['ru-KZ']);
+    expect(speech.locales, <String>['ru-RU']);
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('locale resolution error falls back once without hanging',
-      (tester) async {
+  testWidgets('default Russian app setting uses exact ru-RU', (tester) async {
     final speech = _WidgetFakeSpeechTransport(
       permission: KundiSpeechPermission.granted,
     );
     await _pumpVoiceShell(
       tester,
       speech,
-      assistantController: _FailingAssistantController.new,
     );
 
     _longPressStart(tester);
     await tester.pumpAndSettle();
 
     expect(speech.startCalls, 1);
-    expect(speech.locales, <String>['ru-KZ']);
+    expect(speech.locales, <String>['ru-RU']);
     expect(find.text('Подготавливаю Kundi…'), findsNothing);
   });
 }
@@ -310,6 +282,7 @@ Future<void> _pumpVoiceShell(
   _WidgetFakeSpeechTransport speech, {
   bool voiceEnabled = true,
   AssistantController Function()? assistantController,
+  AppLanguage language = AppLanguage.ru,
   bool settle = true,
 }) async {
   await tester.pumpWidget(
@@ -319,6 +292,9 @@ Future<void> _pumpVoiceShell(
         kundiVoiceInputEnabledProvider.overrideWithValue(voiceEnabled),
         assistantControllerProvider.overrideWith(
           assistantController ?? _FakeAssistantController.new,
+        ),
+        settingsControllerProvider.overrideWith(
+          () => _FakeSettingsController(language),
         ),
         kundiSystemSpeechTransportProvider.overrideWithValue(speech),
         lessonsControllerProvider.overrideWith(_FakeLessonsController.new),
@@ -362,23 +338,13 @@ class _FakeAssistantController extends AssistantController {
   Future<AssistantViewState> build() async => const AssistantViewState();
 }
 
-class _DeferredAssistantController extends AssistantController {
-  _DeferredAssistantController(this.result);
+class _FakeSettingsController extends SettingsController {
+  _FakeSettingsController(this.language);
 
-  final Future<AssistantViewState> result;
-  int buildCount = 0;
+  final AppLanguage language;
 
   @override
-  Future<AssistantViewState> build() {
-    buildCount++;
-    return result;
-  }
-}
-
-class _FailingAssistantController extends AssistantController {
-  @override
-  Future<AssistantViewState> build() =>
-      Future<AssistantViewState>.error(StateError('offline'));
+  Future<AppSettings> build() async => AppSettings(language: language);
 }
 
 class _WidgetFakeSpeechTransport implements KundiSystemSpeechTransport {
@@ -440,21 +406,6 @@ class _WidgetFakeSpeechTransport implements KundiSystemSpeechTransport {
 
   @override
   Future<void> dispose() => _events.close();
-}
-
-AssistantViewState _assistantView(String locale) {
-  final now = DateTime.utc(2026, 9, 5);
-  return AssistantViewState(
-    activeSession: AssistantSessionEntity(
-      id: 'session',
-      locale: locale,
-      gradeLevel: 7,
-      title: '',
-      createdAt: now,
-      updatedAt: now,
-      lastMessageAt: now,
-    ),
-  );
 }
 
 class _FakeLessonsController extends LessonsController {

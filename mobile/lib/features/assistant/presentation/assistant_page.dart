@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/l10n.dart';
 import '../application/assistant_controller.dart';
 import '../application/kundi_tts_coordinator.dart';
 import '../domain/assistant_entity.dart';
@@ -36,9 +37,12 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(assistantControllerProvider);
-    final speechError = ref.watch(kundiTtsEnabledProvider)
-        ? ref.watch(kundiTtsCoordinatorProvider.select((s) => s.errorMessage))
-        : '';
+    final speechError = ref.watch(kundiTtsEnabledProvider) &&
+        ref.watch(
+          kundiTtsCoordinatorProvider.select(
+            (state) => state.status == KundiTtsStatus.error,
+          ),
+        );
     ref.listen(assistantControllerProvider, (previous, next) {
       final before = previous?.valueOrNull?.messages.length ?? 0;
       final after = next.valueOrNull?.messages.length ?? 0;
@@ -57,19 +61,25 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Спросите Kundi'),
+        title: Text(context.l10n.assistantTitle),
         actions: [
           IconButton(
             key: const Key('assistant-history-button'),
-            tooltip: 'Прошлые диалоги',
+            tooltip: context.l10n.assistantPastChats,
             onPressed: state.hasValue ? _showSessions : null,
             icon: const Icon(Icons.history_rounded),
           ),
           PopupMenuButton<String>(
             onSelected: _handleMenu,
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'new', child: Text('Новый диалог')),
-              PopupMenuItem(value: 'delete', child: Text('Удалить диалог')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'new',
+                child: Text(context.l10n.assistantNewChat),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(context.l10n.assistantDeleteChat),
+              ),
             ],
           ),
         ],
@@ -90,8 +100,11 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
                     .read(assistantControllerProvider.notifier)
                     .retryHistoryRefresh(),
               ),
-            if (speechError.isNotEmpty)
-              _TransportError(message: speechError, onRetry: null),
+            if (speechError)
+              _TransportError(
+                message: context.l10n.voicePlaybackFailed,
+                onRetry: null,
+              ),
             if (view.errorMessage.isNotEmpty)
               _TransportError(
                 message: view.errorMessage,
@@ -130,7 +143,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
               onPressed: () => ref
                   .read(assistantControllerProvider.notifier)
                   .loadOlderMessages(),
-              child: const Text('Показать предыдущие сообщения'),
+              child: Text(context.l10n.assistantShowPrevious),
             );
           }
           offset = 1;
@@ -189,16 +202,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
                 minLines: 1,
                 maxLines: 5,
                 textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  hintText: 'Напишите вопрос…',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: context.l10n.assistantQuestionHint,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             IconButton.filled(
               key: const Key('assistant-send-button'),
-              tooltip: 'Отправить',
+              tooltip: context.l10n.commonSend,
               onPressed: view.isSending ? null : _sendMessage,
               icon: const Icon(Icons.send_rounded),
             ),
@@ -232,13 +245,15 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
             child: ListView(
               shrinkWrap: true,
               children: [
-                const ListTile(title: Text('Прошлые диалоги')),
+                ListTile(title: Text(context.l10n.assistantPastChats)),
                 ...view.sessions.map((session) => ListTile(
                       selected: session.id == view.activeSession?.id,
                       title: Text(session.title.isEmpty
-                          ? 'Новый диалог'
+                          ? context.l10n.assistantNewChat
                           : session.title),
-                      subtitle: Text('${session.gradeLevel} класс'),
+                      subtitle: Text(
+                        context.l10n.assistantGradeClass(session.gradeLevel),
+                      ),
                       onTap: () {
                         Navigator.of(context).pop();
                         sheetRef
@@ -251,7 +266,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
                     onPressed: () => sheetRef
                         .read(assistantControllerProvider.notifier)
                         .loadMoreSessions(),
-                    child: const Text('Показать ещё'),
+                    child: Text(context.l10n.assistantShowMore),
                   ),
               ],
             ),
@@ -269,16 +284,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить диалог?'),
-        content: const Text('Историю этого диалога нельзя будет восстановить.'),
+        title: Text(context.l10n.assistantDeleteTitle),
+        content: Text(context.l10n.assistantDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Удалить'),
+            child: Text(context.l10n.commonDelete),
           ),
         ],
       ),
@@ -314,13 +329,13 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (message.isUser && message.inputMode == 'voice') ...[
-              const Row(
-                key: Key('assistant-voice-message-badge'),
+              Row(
+                key: const Key('assistant-voice-message-badge'),
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.mic_rounded, size: 14),
-                  SizedBox(width: 4),
-                  Text('Голосом'),
+                  const Icon(Icons.mic_rounded, size: 14),
+                  const SizedBox(width: 4),
+                  Text(context.l10n.assistantVoice),
                 ],
               ),
               const SizedBox(height: 4),
@@ -352,12 +367,12 @@ class _PendingUserBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (inputMode == AssistantInputMode.voice) ...[
-                const Row(
+                Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.mic_rounded, size: 14),
-                    SizedBox(width: 4),
-                    Text('Голосом'),
+                    const Icon(Icons.mic_rounded, size: 14),
+                    const SizedBox(width: 4),
+                    Text(context.l10n.assistantVoice),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -373,20 +388,20 @@ class _ThinkingBubble extends StatelessWidget {
   const _ThinkingBubble();
 
   @override
-  Widget build(BuildContext context) => const Align(
+  Widget build(BuildContext context) => Align(
         alignment: Alignment.centerLeft,
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
+              const SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              SizedBox(width: 10),
-              Text('Kundi думает…'),
+              const SizedBox(width: 10),
+              Text(context.l10n.assistantThinking),
             ],
           ),
         ),
@@ -397,11 +412,11 @@ class _EmptyConversation extends StatelessWidget {
   const _EmptyConversation();
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
-            'Задайте вопрос — Kundi объяснит тему, даст подсказку или проверит ваш шаг.',
+            context.l10n.assistantEmpty,
             textAlign: TextAlign.center,
           ),
         ),
@@ -431,7 +446,7 @@ class _TransportError extends StatelessWidget {
             if (onRetry != null)
               TextButton(
                 onPressed: onRetry,
-                child: const Text('Повторить'),
+                child: Text(context.l10n.commonRetry),
               ),
           ],
         ),
@@ -449,9 +464,12 @@ class _LoadError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Не удалось загрузить диалог.'),
+            Text(context.l10n.assistantLoadFailed),
             const SizedBox(height: 8),
-            FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+            FilledButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.commonRetry),
+            ),
           ],
         ),
       );

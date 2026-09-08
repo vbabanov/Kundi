@@ -74,3 +74,57 @@ func TestSpeechAuthorizationOwnershipAndContent(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeRequestedVoiceLocale(t *testing.T) {
+	tests := []struct {
+		name      string
+		requested string
+		fallback  string
+		want      string
+	}{
+		{name: "russian app locale", requested: "ru-RU", fallback: "kk-KZ", want: "ru-RU"},
+		{name: "kazakh app locale", requested: "kk-KZ", fallback: "ru-KZ", want: "kk-KZ"},
+		{name: "legacy stored russian", fallback: "ru-KZ", want: "ru-RU"},
+		{name: "invalid requested locale", requested: "en-US", fallback: "ru-KZ", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeRequestedVoiceLocale(tt.requested, tt.fallback); got != tt.want {
+				t.Fatalf("got %q want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSpeechAuthorizationRejectsUnsupportedAppLocale(t *testing.T) {
+	student, session, message := uuid.New(), uuid.New(), uuid.New()
+	repo := &speechRepo{
+		memorySessionRepository: newMemorySessionRepository(student, session, 7),
+		message: SessionMessage{
+			ID:        message.String(),
+			SessionID: session.String(),
+			Role:      "assistant",
+			Content:   "Подсказка.",
+		},
+		inputMode: "voice",
+	}
+	enabled := true
+	service := NewServiceWithOptions(nil, nil, nil, Options{
+		CanaryGate:        AllowAllCanaryGate(),
+		Enabled:           &enabled,
+		VoiceInputEnabled: &enabled,
+		SessionRepository: repo,
+		SpeechBroker:      speechauth.New(speechauth.Config{Enabled: true}),
+	})
+
+	_, err := service.SpeechAuthorizationForLocale(
+		context.Background(),
+		student.String(),
+		session.String(),
+		message.String(),
+		"en-US",
+	)
+	if !apperrors.Is(err, "speech_locale_invalid") {
+		t.Fatalf("got %v want speech_locale_invalid", err)
+	}
+}

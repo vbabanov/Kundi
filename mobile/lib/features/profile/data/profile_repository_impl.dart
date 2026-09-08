@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../auth/domain/auth_session.dart';
 import '../domain/profile_entity.dart';
 import '../domain/profile_repository.dart';
+import '../domain/school_shift.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl(
@@ -43,6 +44,16 @@ class ProfileRepositoryImpl implements ProfileRepository {
         readMode: 'v2',
         providerIdentity: providerSection,
         localAppProfile: localSection,
+        automaticShift: deriveSchoolShift(
+          (await _cacheStore.listV2Lessons(context: context)).map(
+            (row) => ShiftLesson(
+              date: (row['lesson_date'] ?? '').toString(),
+              lessonNumber:
+                  int.tryParse((row['lesson_number'] ?? '').toString()) ?? 0,
+              startTime: (row['start_time'] ?? '').toString(),
+            ),
+          ),
+        ),
       );
     }
 
@@ -59,12 +70,21 @@ class ProfileRepositoryImpl implements ProfileRepository {
       readMode: 'v1',
       providerIdentity: providerSection,
       localAppProfile: null,
+      automaticShift: deriveSchoolShift(
+        (await _cacheStore.listLessons()).map(
+          (lesson) => ShiftLesson(
+            date: (lesson['lesson_date'] ?? '').toString(),
+            lessonNumber:
+                int.tryParse((lesson['lesson_number'] ?? '').toString()) ?? 0,
+            startTime: (lesson['start_time'] ?? '').toString(),
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Future<void> saveLocalAppProfile({
-    required int shift,
     required String parentPhone1,
     required String parentPhone2,
   }) async {
@@ -81,7 +101,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
         'Authorization': 'Bearer ${session.accessToken}',
       }),
       data: {
-        'shift': shift,
         'parent_phone_1': parentPhone1,
         'parent_phone_2': parentPhone2,
       },
@@ -97,8 +116,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
             (response.data as Map)['data'] as Map? ?? response.data as Map,
           )
         : <String, dynamic>{};
-    final resolvedShift =
-        int.tryParse((payload['shift'] ?? '').toString()) ?? shift;
+    final resolvedShift = int.tryParse((payload['shift'] ?? '').toString());
     final resolvedPhone1 =
         (payload['parent_phone_1'] ?? parentPhone1).toString();
     final resolvedPhone2 =

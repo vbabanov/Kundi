@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/l10n.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../../../shared/widgets/kundi_surface.dart';
+import '../../../shared/widgets/student_pull_to_refresh.dart';
 import '../application/grades_controller.dart';
 import '../domain/grades_entity.dart';
 
@@ -28,13 +30,13 @@ class _GradesPageState extends ConsumerState<GradesPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(gradesControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Оценки')),
+      appBar: AppBar(title: Text(context.l10n.gradesTitle)),
       body: KundiGradientBackground(
         child: state.when(
           data: (data) => _buildData(context, data),
           loading: () => const KundiStateBody.loading(),
           error: (error, _) => KundiStateBody.error(
-            label: 'Не удалось загрузить оценки',
+            label: context.l10n.gradesLoadFailed,
             onRetry: () =>
                 ref.read(gradesControllerProvider.notifier).refreshFromCache(),
           ),
@@ -45,7 +47,21 @@ class _GradesPageState extends ConsumerState<GradesPage> {
 
   Widget _buildData(BuildContext context, GradesScreenData data) {
     if (data.isEmpty) {
-      return const KundiStateBody.empty(label: 'Оценки пока не загружены');
+      return RefreshIndicator(
+        onRefresh: () => refreshStudentFromGesture(context, ref),
+        child: ListView(
+          key: const Key('grades-pull-scroll'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height - kToolbarHeight,
+              child: KundiStateBody.empty(
+                label: context.l10n.gradesNotLoaded,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     _selectedWeekKey ??= data.availableWeeks.isNotEmpty
@@ -79,22 +95,41 @@ class _GradesPageState extends ConsumerState<GradesPage> {
             ),
             child: Row(
               children: [
-                _tabChip('Главная', _GradesTab.main, 'grades-tab-main'),
+                _tabChip(
+                  context.l10n.gradesTabMain,
+                  _GradesTab.main,
+                  'grades-tab-main',
+                ),
                 const SizedBox(width: KundiSpace.xs),
-                _tabChip('За неделю', _GradesTab.week, 'grades-tab-week'),
+                _tabChip(
+                  context.l10n.gradesTabWeek,
+                  _GradesTab.week,
+                  'grades-tab-week',
+                ),
                 const SizedBox(width: KundiSpace.xs),
-                _tabChip('Итоговые', _GradesTab.totals, 'grades-tab-totals'),
+                _tabChip(
+                  context.l10n.gradesTabTotals,
+                  _GradesTab.totals,
+                  'grades-tab-totals',
+                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: KundiSpace.xs),
         Expanded(
-          child: switch (_tab) {
-            _GradesTab.main => _mainTab(context, data),
-            _GradesTab.week => _weekTab(context, data),
-            _GradesTab.totals => _totalsTab(context, data),
-          },
+          child: RefreshIndicator(
+            notificationPredicate: studentRefreshNotification,
+            onRefresh: () => refreshStudentFromGesture(context, ref),
+            child: KeyedSubtree(
+              key: const Key('grades-pull-scroll'),
+              child: switch (_tab) {
+                _GradesTab.main => _mainTab(context, data),
+                _GradesTab.week => _weekTab(context, data),
+                _GradesTab.totals => _totalsTab(context, data),
+              },
+            ),
+          ),
         ),
       ],
     );
@@ -153,6 +188,7 @@ class _GradesPageState extends ConsumerState<GradesPage> {
 
     return ListView(
       key: const Key('grades-main-scroll'),
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
           KundiSpace.sm, KundiSpace.xs, KundiSpace.sm, KundiSpace.sm),
       children: [
@@ -160,13 +196,13 @@ class _GradesPageState extends ConsumerState<GradesPage> {
           key: const Key('grades-main-latest-card'),
           header: _MainCardHeader(
             icon: Icons.star_outline_rounded,
-            title: 'Последние оценки',
-            actionLabel: 'Все оценки',
+            title: context.l10n.gradesLatest,
+            actionLabel: context.l10n.gradesAll,
             actionKey: 'latest',
             onActionTap: () => setState(() => _tab = _GradesTab.week),
           ),
           child: latestGrades.isEmpty
-              ? const _MainCardEmpty(label: 'Оценок пока нет')
+              ? _MainCardEmpty(label: context.l10n.gradesNone)
               : Column(
                   children: [
                     for (var i = 0; i < latestGrades.length; i++)
@@ -182,13 +218,13 @@ class _GradesPageState extends ConsumerState<GradesPage> {
           key: const Key('grades-main-summative-card'),
           header: _MainCardHeader(
             icon: Icons.assignment_rounded,
-            title: 'Последние СОР и СОЧ',
-            actionLabel: 'Все работы',
+            title: context.l10n.gradesLatestSummative,
+            actionLabel: context.l10n.gradesAllWorks,
             actionKey: 'works',
             onActionTap: () => setState(() => _tab = _GradesTab.totals),
           ),
           child: latestSummative.isEmpty
-              ? const _MainCardEmpty(label: 'СОР и СОЧ пока нет')
+              ? _MainCardEmpty(label: context.l10n.gradesNoSummative)
               : Column(
                   children: [
                     for (var i = 0; i < latestSummative.length; i++)
@@ -210,7 +246,7 @@ class _GradesPageState extends ConsumerState<GradesPage> {
         .map(
           (item) => _MainLatestGradeEntry(
             subjectName: item.subjectName,
-            typeLabel: 'Оценка',
+            typeLabel: context.l10n.gradesMark,
             dateLabel: _formatMainDate(item.recordedOn),
             displayValue: _mainGradeValue(item.value),
             mood: item.mood,
@@ -236,7 +272,7 @@ class _GradesPageState extends ConsumerState<GradesPage> {
                 '${section.subjectName} • ${_formatMainDate(item.recordedOn)}',
             displayValue: _mainRawGradeValue(item.value),
             mood: item.mood,
-            accentColor: kindLabel == 'СОР'
+            accentColor: item.kind.trim().toLowerCase() == 'sor'
                 ? const Color(0xFFA66BFF)
                 : const Color(0xFFFFB14A),
             sortKey: item.recordedOn,
@@ -398,17 +434,21 @@ class _GradesPageState extends ConsumerState<GradesPage> {
 
   String _normalizeSummativeKind(String kind) {
     final normalized = kind.trim().toLowerCase();
-    if (normalized == 'sor') return 'СОР';
-    if (normalized == 'soch') return 'СОЧ';
-    return normalized.isEmpty ? 'СОР/СОЧ' : kind.toUpperCase();
+    if (normalized == 'sor') return context.l10n.gradesSor;
+    if (normalized == 'soch') return context.l10n.gradesSoch;
+    return normalized.isEmpty ? context.l10n.gradesSorSoch : kind.toUpperCase();
   }
 
   String _normalizeSummativeTitle(String raw) {
     final value = raw.trim();
-    if (value.isEmpty || value.toLowerCase() == 'unknown') return 'Работа';
+    if (value.isEmpty || value.toLowerCase() == 'unknown') {
+      return context.l10n.gradesWork;
+    }
     if (value.toLowerCase().contains('term')) {
       final digits = RegExp(r'\d+').firstMatch(value)?.group(0);
-      if (digits != null) return '$digits четверть';
+      if (digits != null) {
+        return context.l10n.gradesQuarter(int.parse(digits));
+      }
     }
     return value;
   }
@@ -416,53 +456,26 @@ class _GradesPageState extends ConsumerState<GradesPage> {
   String _formatMainDate(String raw) {
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;
-    const monthShort = <int, String>{
-      1: 'янв',
-      2: 'фев',
-      3: 'мар',
-      4: 'апр',
-      5: 'май',
-      6: 'июн',
-      7: 'июл',
-      8: 'авг',
-      9: 'сен',
-      10: 'окт',
-      11: 'ноя',
-      12: 'дек',
-    };
-    return '${parsed.day} ${monthShort[parsed.month] ?? ''}'.trim();
+    return context.formatDayMonth(parsed);
   }
 
   String _monthLabelFromSnapshot(String snapshotAt) {
     final parsed = DateTime.tryParse(snapshotAt);
     if (parsed == null) return '—';
-    const monthLabel = <int, String>{
-      1: 'январь',
-      2: 'февраль',
-      3: 'март',
-      4: 'апрель',
-      5: 'май',
-      6: 'июнь',
-      7: 'июль',
-      8: 'август',
-      9: 'сентябрь',
-      10: 'октябрь',
-      11: 'ноябрь',
-      12: 'декабрь',
-    };
-    return monthLabel[parsed.month] ?? '—';
+    return context.formatMonth(parsed);
   }
 
   Widget _weekTab(BuildContext context, GradesScreenData data) {
     final weeks = data.availableWeeks;
     if (weeks.isEmpty) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
             KundiSpace.sm, KundiSpace.xs, KundiSpace.sm, KundiSpace.md),
-        children: const [
+        children: [
           _WeekEmptyStateCard(
-            title: 'За неделю оценок пока нет',
-            subtitle: 'Когда появятся новые оценки, я покажу их здесь.',
+            title: context.l10n.gradesWeekEmpty,
+            subtitle: context.l10n.gradesWeekEmptyHint,
           ),
         ],
       );
@@ -557,17 +570,18 @@ class _GradesPageState extends ConsumerState<GradesPage> {
         Expanded(
           child: !hasWeeklySignals || tableRows.isEmpty
               ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(
                       KundiSpace.sm, 0, KundiSpace.sm, KundiSpace.md),
-                  children: const [
+                  children: [
                     _WeekEmptyStateCard(
-                      title: 'За неделю оценок пока нет',
-                      subtitle:
-                          'Когда появятся новые оценки, я покажу их здесь.',
+                      title: context.l10n.gradesWeekEmpty,
+                      subtitle: context.l10n.gradesWeekEmptyHint,
                     ),
                   ],
                 )
               : ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   key: const Key('grades-week-rows-scroll'),
                   padding: const EdgeInsets.fromLTRB(
                       KundiSpace.sm, 0, KundiSpace.sm, KundiSpace.sm),
@@ -797,24 +811,10 @@ class _GradesPageState extends ConsumerState<GradesPage> {
     final start = DateTime.tryParse(week.weekStartDate);
     final end = DateTime.tryParse(week.weekEndDate);
     if (start == null || end == null) return week.label;
-    const months = <int, String>{
-      1: 'января',
-      2: 'февраля',
-      3: 'марта',
-      4: 'апреля',
-      5: 'мая',
-      6: 'июня',
-      7: 'июля',
-      8: 'августа',
-      9: 'сентября',
-      10: 'октября',
-      11: 'ноября',
-      12: 'декабря',
-    };
-    final month = start.month == end.month
-        ? (months[start.month] ?? '')
-        : '${months[start.month]} — ${months[end.month]}';
-    return '${start.day} — ${end.day} $month'.trim();
+    if (start.month == end.month) {
+      return '${start.day} — ${context.formatDayMonth(end)}';
+    }
+    return '${context.formatDayMonth(start)} — ${context.formatDayMonth(end)}';
   }
 
   _WeekSummaryData _computeWeekSummary(
@@ -866,9 +866,10 @@ class _GradesPageState extends ConsumerState<GradesPage> {
   Widget _totalsTab(BuildContext context, GradesScreenData data) {
     final sections = data.aggregatesBySubject;
     if (sections.isEmpty) {
-      return const KundiEmptyState(
-          icon: Icons.table_chart_outlined,
-          label: 'Итоговые данные пока недоступны');
+      return KundiEmptyState(
+        icon: Icons.table_chart_outlined,
+        label: context.l10n.gradesTotalsUnavailable,
+      );
     }
 
     return LayoutBuilder(
@@ -877,6 +878,7 @@ class _GradesPageState extends ConsumerState<GradesPage> {
         final selectedTerm = _selectedTermNo(_totalsPeriod);
         final periodAverage = _computePeriodAverage(sections, selectedTerm);
         return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
               KundiSpace.sm, 0, KundiSpace.sm, KundiSpace.md),
           children: [
@@ -886,8 +888,9 @@ class _GradesPageState extends ConsumerState<GradesPage> {
             ),
             const SizedBox(height: 10),
             _YearAverageHeroCard(
-              title:
-                  selectedTerm == null ? 'Средний балл за год' : 'Средний балл',
+              title: selectedTerm == null
+                  ? context.l10n.gradesYearAverage
+                  : context.l10n.gradesAverage,
               average: periodAverage,
             ),
             const SizedBox(height: 6),
@@ -1487,8 +1490,8 @@ class _MainStatsCard extends StatelessWidget {
                   ? '—'
                   : stats.monthAverage!.toStringAsFixed(1),
               valueColor: Colors.white,
-              title: 'Средний балл',
-              subtitle: 'за ${stats.monthLabel}',
+              title: context.l10n.gradesAverage,
+              subtitle: context.l10n.gradesForMonth(stats.monthLabel),
             ),
           ),
           _mainStatsDivider(),
@@ -1499,8 +1502,8 @@ class _MainStatsCard extends StatelessWidget {
                   ? '—'
                   : '${stats.knowledgePercent}%',
               valueColor: const Color(0xFF66E36E),
-              title: 'Качество знаний',
-              subtitle: 'за неделю',
+              title: context.l10n.gradesKnowledgeQuality,
+              subtitle: context.l10n.gradesForWeek,
             ),
           ),
           _mainStatsDivider(),
@@ -1511,8 +1514,8 @@ class _MainStatsCard extends StatelessWidget {
                   ? '—'
                   : '${stats.trend! >= 0 ? '+' : ''}${stats.trend!.toStringAsFixed(1)}',
               valueColor: trendColor,
-              title: 'Динамика',
-              subtitle: 'за неделю',
+              title: context.l10n.gradesDynamics,
+              subtitle: context.l10n.gradesForWeek,
             ),
           ),
         ],
@@ -1600,12 +1603,12 @@ class _TotalsPeriodSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = <(_TotalsPeriod, String)>[
+    final items = <(_TotalsPeriod, String)>[
       (_TotalsPeriod.q1, '1'),
       (_TotalsPeriod.q2, '2'),
       (_TotalsPeriod.q3, '3'),
       (_TotalsPeriod.q4, '4'),
-      (_TotalsPeriod.year, 'Год'),
+      (_TotalsPeriod.year, context.l10n.commonYear),
     ];
 
     return Container(
@@ -1641,7 +1644,7 @@ class _TotalsPeriodSelector extends StatelessWidget {
             children: items.map((entry) {
               final active = entry.$1 == selected;
               final isYear = entry.$1 == _TotalsPeriod.year;
-              final periodLabel = entry.$2 == 'Год' ? 'year' : entry.$2;
+              final periodLabel = isYear ? 'year' : entry.$2;
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1707,7 +1710,7 @@ class _YearAverageHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatted = average == null ? '—' : average!.toStringAsFixed(2);
-    final quality = _yearQuality(average);
+    final quality = _yearQuality(context, average);
     final isNoData = average == null;
     final isWarning = !isNoData && average! < 4.0;
     return Container(
@@ -2016,7 +2019,7 @@ class _WeekTableHeader extends StatelessWidget {
           SizedBox(
             width: geometry.subjectColumnWidth,
             child: Text(
-              'Предмет',
+              context.l10n.gradesSubject,
               key: const Key('grades-week-header-subject'),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -2040,16 +2043,7 @@ class _WeekTableHeader extends StatelessWidget {
                   children: [
                     Text(
                       key: Key('grades-week-header-day-$weekday'),
-                      switch (weekday) {
-                        1 => 'Пн',
-                        2 => 'Вт',
-                        3 => 'Ср',
-                        4 => 'Чт',
-                        5 => 'Пт',
-                        6 => 'Сб',
-                        7 => 'Вс',
-                        _ => '',
-                      },
+                      context.formatShortWeekdayNumber(weekday),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                             color: weekday >= 6
                                 ? const Color(0xFFFF7AA6)
@@ -2169,16 +2163,7 @@ class _WeekDayChip extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              switch (weekday) {
-                1 => 'Пн',
-                2 => 'Вт',
-                3 => 'Ср',
-                4 => 'Чт',
-                5 => 'Пт',
-                6 => 'Сб',
-                7 => 'Вс',
-                _ => '',
-              },
+              context.formatShortWeekdayNumber(weekday),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: weekend
@@ -2227,21 +2212,31 @@ class _WeekLegendCard extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: const [
+          children: [
             _WeekLegendItem(
-                value: '5', label: 'Отлично', color: Color(0xFF66E36E)),
-            SizedBox(width: 7),
+                value: '5',
+                label: context.l10n.gradesExcellent,
+                color: const Color(0xFF66E36E)),
+            const SizedBox(width: 7),
             _WeekLegendItem(
-                value: '4', label: 'Хорошо', color: Color(0xFFFF9F18)),
-            SizedBox(width: 7),
+                value: '4',
+                label: context.l10n.gradesGood,
+                color: const Color(0xFFFF9F18)),
+            const SizedBox(width: 7),
             _WeekLegendItem(
-                value: '3', label: 'Удовл.', color: Color(0xFFFF4B55)),
-            SizedBox(width: 7),
+                value: '3',
+                label: context.l10n.gradesSatisfactoryShort,
+                color: const Color(0xFFFF4B55)),
+            const SizedBox(width: 7),
             _WeekLegendItem(
-                value: 'Н', label: 'Не был', color: Color(0xFF9A92BF)),
-            SizedBox(width: 7),
+                value: 'Н',
+                label: context.l10n.gradesAbsent,
+                color: const Color(0xFF9A92BF)),
+            const SizedBox(width: 7),
             _WeekLegendItem(
-                value: '•', label: 'Нет оценки', color: Color(0xFF8177A8)),
+                value: '•',
+                label: context.l10n.gradesNoMark,
+                color: const Color(0xFF8177A8)),
           ],
         ),
       ),
@@ -2312,15 +2307,6 @@ class _WeekSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String marksLabel(int count) {
-      final rem10 = count % 10;
-      final rem100 = count % 100;
-      if (rem10 == 1 && rem100 != 11) return 'оценка';
-      if (rem10 >= 2 && rem10 <= 4 && (rem100 < 12 || rem100 > 14))
-        return 'оценки';
-      return 'оценок';
-    }
-
     return Container(
       key: const Key('grades-week-summary-card'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2350,7 +2336,7 @@ class _WeekSummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Итоги недели',
+                Text(context.l10n.gradesWeekSummary,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 13.8)),
               ],
@@ -2358,14 +2344,14 @@ class _WeekSummaryCard extends StatelessWidget {
           ),
           _WeekMetric(
               value: '${summary.marksCount}',
-              label: marksLabel(summary.marksCount),
+              label: context.l10n.gradesCountLabel(summary.marksCount),
               valueColor: Colors.white),
           _weekDivider(),
           _WeekMetric(
               value: summary.average == null
                   ? '—'
                   : summary.average!.toStringAsFixed(1),
-              label: 'средний балл',
+              label: context.l10n.gradesAverageLower,
               valueColor: summary.average == null
                   ? Colors.white
                   : const Color(0xFF66E36E)),
@@ -2374,7 +2360,7 @@ class _WeekSummaryCard extends StatelessWidget {
               value: summary.attendancePercent == null
                   ? '—'
                   : '${summary.attendancePercent}%',
-              label: 'посещаемость',
+              label: context.l10n.gradesAttendance,
               valueColor: summary.attendancePercent == null
                   ? Colors.white
                   : const Color(0xFFB985FF)),
@@ -2480,7 +2466,7 @@ class _WeekTableRow extends StatelessWidget {
                             ),
                       ),
                       Text(
-                        '${_markCountLabel(row)}',
+                        _markCountLabel(context, row),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: const Color(0xCCAAA0D2),
                               fontSize: 10.4,
@@ -2520,19 +2506,12 @@ class _WeekTableRow extends StatelessWidget {
     );
   }
 
-  String _markCountLabel(_WeekTableRowData row) {
+  String _markCountLabel(BuildContext context, _WeekTableRowData row) {
     var count = 0;
     for (final cell in row.cells.values) {
       count += cell.marks.length;
     }
-    if (count == 0) return '0 оценок';
-    final rem10 = count % 10;
-    final rem100 = count % 100;
-    if (rem10 == 1 && rem100 != 11) return '$count оценка';
-    if (rem10 >= 2 && rem10 <= 4 && (rem100 < 12 || rem100 > 14)) {
-      return '$count оценки';
-    }
-    return '$count оценок';
+    return context.l10n.gradesCount(count);
   }
 }
 
@@ -2717,7 +2696,7 @@ class _TotalsHeaderRow extends StatelessWidget {
     return Row(
       children: [
         const Expanded(child: SizedBox()),
-        ...const ['1', '2', '3', '4', 'Год'].map(
+        ...['1', '2', '3', '4', context.l10n.commonYear].map(
           (label) => SizedBox(
             width: geometry.gradeColumnWidth,
             child: Text(label, textAlign: TextAlign.center, style: labelStyle),
@@ -2822,8 +2801,8 @@ class _TermHeaderRow extends StatelessWidget {
         );
     return Row(
       children: [
-        Expanded(child: Text('Предмет', style: style)),
-        Text('Оценка', style: style),
+        Expanded(child: Text(context.l10n.gradesSubject, style: style)),
+        Text(context.l10n.gradesMark, style: style),
         const SizedBox(width: 20),
       ],
     );
@@ -2852,7 +2831,7 @@ class _QuarterDetailRow extends StatelessWidget {
         Expanded(
           child: _ExpandedWorkTile(
             key: const Key('grades_totals_expanded_work_tile_sor_1'),
-            label: 'СОР',
+            label: context.l10n.gradesSor,
             vm: sorSlots[0],
           ),
         ),
@@ -2860,7 +2839,7 @@ class _QuarterDetailRow extends StatelessWidget {
         Expanded(
           child: _ExpandedWorkTile(
             key: const Key('grades_totals_expanded_work_tile_sor_2'),
-            label: 'СОР',
+            label: context.l10n.gradesSor,
             vm: sorSlots[1],
           ),
         ),
@@ -2868,7 +2847,7 @@ class _QuarterDetailRow extends StatelessWidget {
         Expanded(
           child: _ExpandedWorkTile(
             key: const Key('grades_totals_expanded_work_tile_sor_3'),
-            label: 'СОР',
+            label: context.l10n.gradesSor,
             vm: sorSlots[2],
           ),
         ),
@@ -2876,7 +2855,7 @@ class _QuarterDetailRow extends StatelessWidget {
         Expanded(
           child: _ExpandedWorkTile(
             key: const Key('grades_totals_expanded_work_tile_soch'),
-            label: 'СОЧ',
+            label: context.l10n.gradesSoch,
             vm: sochSlot,
           ),
         ),
@@ -2939,9 +2918,9 @@ class _YearSummaryDetail extends StatelessWidget {
 
     return Column(
       children: [
-        section('СОР', sorAt),
+        section(context.l10n.gradesSor, sorAt),
         const SizedBox(height: 8),
-        section('СОЧ', sochAt),
+        section(context.l10n.gradesSoch, sochAt),
       ],
     );
   }
@@ -3101,11 +3080,17 @@ class _GradePalette {
   final bool muted;
 }
 
-(String, Color) _yearQuality(double? average) {
-  if (average == null) return ('Нет данных', const Color(0xFF8F73C9));
-  if (average >= 4.5) return ('Отлично', const Color(0xFFB985FF));
-  if (average >= 4.0) return ('Хорошо', const Color(0xFFB777FF));
-  return ('Нужно подтянуть', const Color(0xCCFF4B8B));
+(String, Color) _yearQuality(BuildContext context, double? average) {
+  if (average == null) {
+    return (context.l10n.commonNoData, const Color(0xFF8F73C9));
+  }
+  if (average >= 4.5) {
+    return (context.l10n.gradesExcellent, const Color(0xFFB985FF));
+  }
+  if (average >= 4.0) {
+    return (context.l10n.gradesGood, const Color(0xFFB777FF));
+  }
+  return (context.l10n.gradesNeedImprove, const Color(0xCCFF4B8B));
 }
 
 IconData _subjectIcon(String key, String name) {

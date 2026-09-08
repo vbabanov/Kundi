@@ -74,6 +74,10 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     return restored;
   }
 
+  void adoptRefreshedSession(AuthSession session) {
+    state = AsyncData<AuthSession?>(session);
+  }
+
   String _redactLogin(String login) {
     final normalized = login.trim();
     if (normalized.isEmpty) {

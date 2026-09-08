@@ -909,15 +909,11 @@ class KundelikConnector implements DiaryConnector {
     }
 
     if (_latestMarksHtml.trim().isEmpty) {
-      try {
-        final marksResponse = await _requestWithRetry(
-          operation: 'kundelik_fetch_marks_for_period_ids',
-          execute: () => _client.get('https://kundelik.kz/marks'),
-        );
-        _latestMarksHtml = marksResponse.data.toString();
-      } catch (_) {
-        _latestMarksHtml = '';
-      }
+      final marksResponse = await _requestWithRetry(
+        operation: 'kundelik_fetch_marks_for_period_ids',
+        execute: () => _client.get('https://kundelik.kz/marks'),
+      );
+      _latestMarksHtml = marksResponse.data.toString();
     }
 
     final finalResponse = await _requestWithRetry(
@@ -930,6 +926,7 @@ class KundelikConnector implements DiaryConnector {
         },
       ),
     );
+    _requireAcademicResponseSuccess(finalResponse, periodId: 'final');
 
     final periodIdsFromMarks = extractPeriodIdsFromMarksHtml(_latestMarksHtml);
     final periodIdsFromFinal = extractPeriodIdsFromMarksPayload(
@@ -937,8 +934,12 @@ class KundelikConnector implements DiaryConnector {
     );
     final requestedPeriodIds = <String>[
       '',
-      ...periodIdsFromMarks.where((id) => id.trim().isNotEmpty),
-      ...periodIdsFromFinal.where((id) => id.trim().isNotEmpty),
+      ...periodIdsFromMarks.where(
+        (id) => id.trim().isNotEmpty && id.trim().toLowerCase() != 'final',
+      ),
+      ...periodIdsFromFinal.where(
+        (id) => id.trim().isNotEmpty && id.trim().toLowerCase() != 'final',
+      ),
     ];
     final seenPeriodIds = <String>{};
     final normalizedRequestedPeriodIds = <String>[];
@@ -966,6 +967,10 @@ class KundelikConnector implements DiaryConnector {
             },
           ),
         );
+        _requireAcademicResponseSuccess(
+          periodResponse,
+          periodId: periodId.isEmpty ? '<current>' : periodId,
+        );
         periodPayloads.add(
           parsePeriodAcademicPayload(
             periodResponse.data,
@@ -982,35 +987,15 @@ class KundelikConnector implements DiaryConnector {
         );
         loadedPeriodIds.add(periodId.isEmpty ? '<current>' : periodId);
       } catch (error) {
-        if (periodId.isEmpty) {
-          if (error is ConnectorException) {
-            rethrow;
-          }
-          throw ConnectorException(
-            code: 'kundelik_fetch_period_marks_failed',
-            message: 'Failed to fetch Kundelik period marks',
-            details: <String, dynamic>{
-              'period_id': periodId,
-              'error': error.toString(),
-            },
-          );
+        if (error is ConnectorException) {
+          rethrow;
         }
-        final errorCode =
-            error is ConnectorException ? error.code : 'period_fetch_error';
-        _diagnostics.record(
-          'kundelik.fetchAcademic period fetch skipped',
-          code: 'kundelik_fetch_period_marks_skipped',
-          level: ConnectorDiagnosticLevel.warning,
+        throw ConnectorException(
+          code: 'kundelik_fetch_period_marks_failed',
+          message: 'Failed to fetch all required Kundelik period marks',
           details: <String, dynamic>{
-            'period_id': periodId,
-            'error_code': errorCode,
-          },
-        );
-        _emitSafeLiveLog(
-          code: 'kundelik_period_request_skipped',
-          details: <String, dynamic>{
-            'period_id': periodId,
-            'error_code': errorCode,
+            'period_id': periodId.isEmpty ? '<current>' : periodId,
+            'error': error.toString(),
           },
         );
       }
@@ -1121,6 +1106,25 @@ class KundelikConnector implements DiaryConnector {
       results: results,
       aggregates: aggregates,
       attendance: attendance,
+    );
+  }
+
+  void _requireAcademicResponseSuccess(
+    ConnectorHttpResponse response, {
+    required String periodId,
+  }) {
+    final outcome = _classifyDiaryOutcome(response);
+    if (outcome == _KundelikDiaryOutcome.ok) {
+      return;
+    }
+    throw ConnectorException(
+      code: 'kundelik_fetch_academic_failed',
+      message: 'Kundelik academic endpoint did not return a complete payload',
+      details: <String, dynamic>{
+        'period_id': periodId,
+        'status': response.statusCode,
+        'outcome': outcome.name,
+      },
     );
   }
 

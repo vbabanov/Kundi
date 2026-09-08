@@ -1,5 +1,9 @@
 import 'settings_entity.dart';
 
 abstract class SettingsRepository {
-  Future<List<SettingsEntity>> list();
+  Future<AppSettings> load();
+
+  Future<void> saveTheme(AppThemePreference theme);
+
+  Future<void> saveLanguage(AppLanguage language);
 }

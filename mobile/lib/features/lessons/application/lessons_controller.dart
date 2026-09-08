@@ -25,4 +25,9 @@ class LessonsController extends AsyncNotifier<List<LessonsEntity>> {
     state = await AsyncValue.guard(
         () => ref.read(lessonsRepositoryProvider).list());
   }
+
+  Future<void> reloadFromCache() async {
+    final next = await ref.read(lessonsRepositoryProvider).list();
+    state = AsyncData(next);
+  }
 }

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/l10n.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../application/auth_controller.dart';
 import '../domain/auth_session.dart';
@@ -198,7 +199,7 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
       if (!_loginPending) return;
       setState(() {
         _loginPending = false;
-        _errorMessage = 'Не удалось войти. Попробуйте ещё раз.';
+        _errorMessage = context.l10n.authLoginFailed;
       });
       _logPostLoginStage(stage: 'final_post_login_error', outcome: 'ui_error');
       return;
@@ -222,7 +223,9 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
     } else {
       navigator.removeRoute(route);
     }
-    messenger.showSnackBar(const SnackBar(content: Text('Login successful')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(context.l10n.authLoginSuccess)),
+    );
     _logPostLoginStage(
       stage: 'route_transition_result',
       outcome: 'handled_by_root_auth_state',
@@ -253,7 +256,7 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Вход через ${_sourceLabel(source)}',
+                        context.l10n.authViaProvider(_sourceLabel(source)),
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -261,7 +264,7 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Логин и пароль от электронного дневника',
+                        context.l10n.authDiaryCredentials,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.62),
                           height: 1.25,
@@ -275,14 +278,14 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
             const SizedBox(height: 16),
             _SheetField(
               controller: _loginController,
-              label: 'Логин',
+              label: context.l10n.authLogin,
               icon: Icons.person_outline_rounded,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 10),
             _SheetField(
               controller: _passwordController,
-              label: 'Пароль',
+              label: context.l10n.authPassword,
               icon: Icons.lock_outline_rounded,
               obscureText: true,
               textInputAction: TextInputAction.done,
@@ -321,7 +324,7 @@ class _SourceLoginSheetState extends ConsumerState<_SourceLoginSheet> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('Продолжить'),
+                    : Text(context.l10n.authContinue),
               ),
             ),
           ],
@@ -479,7 +482,7 @@ class _LogoBlock extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Ваш электронный дневник',
+            context.l10n.authYourDiary,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium?.copyWith(
               color: const Color(0xFFC8C3F0),
@@ -498,11 +501,11 @@ class _LogoBlock extends StatelessWidget {
                 fontSize: 15.0,
                 height: 0.98,
               ),
-              children: const [
-                TextSpan(text: 'с '),
+              children: [
+                TextSpan(text: context.l10n.authWith),
                 TextSpan(
-                  text: 'ИИ-репетитором',
-                  style: TextStyle(
+                  text: context.l10n.authAiTutor,
+                  style: const TextStyle(
                     color: Color(0xFFA46BFF),
                     fontWeight: FontWeight.w600,
                   ),
@@ -542,7 +545,7 @@ class _SpeechBubble extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Привет!',
+                      context.l10n.authHello,
                       style: theme.textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -563,16 +566,16 @@ class _SpeechBubble extends StatelessWidget {
                     height: 1.26,
                     fontWeight: FontWeight.w500,
                   ),
-                  children: const [
-                    TextSpan(text: 'Я '),
-                    TextSpan(
+                  children: [
+                    TextSpan(text: context.l10n.authIAm),
+                    const TextSpan(
                       text: 'Kundi',
                       style: TextStyle(
                         color: Color(0xFFA46BFF),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    TextSpan(text: ', ваш\nИИ-репетитор'),
+                    TextSpan(text: context.l10n.authTutorSuffix),
                   ],
                 ),
               ),
@@ -743,11 +746,11 @@ class _AuthSelectionCard extends StatelessWidget {
                             fontSize: 15.9,
                             height: 1.0,
                           ),
-                          children: const [
-                            TextSpan(text: 'Войдите через ваш\n'),
+                          children: [
+                            TextSpan(text: context.l10n.authSignInPrefix),
                             TextSpan(
-                              text: 'электронный дневник',
-                              style: TextStyle(
+                              text: context.l10n.authElectronicDiary,
+                              style: const TextStyle(
                                 color: Color(0xFFA46BFF),
                               ),
                             ),
@@ -756,7 +759,7 @@ class _AuthSelectionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Выберите сервис для входа',
+                        context.l10n.authChooseService,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFFB6B0DF),
                           fontSize: 10.9,
@@ -771,19 +774,19 @@ class _AuthSelectionCard extends StatelessWidget {
             const SizedBox(height: 12),
             _ProviderButton(
               source: 'kundelik',
-              title: 'Войти через Kundelik.kz',
+              title: context.l10n.authKundelik,
               onTap: isLoading ? null : () => onSelectSource('kundelik'),
             ),
             const SizedBox(height: 9),
             _ProviderButton(
               source: 'dnevnikru',
-              title: 'Войти через Dnevnik.ru',
+              title: context.l10n.authDnevnik,
               onTap: isLoading ? null : () => onSelectSource('dnevnikru'),
             ),
             const SizedBox(height: 9),
             _ProviderButton(
               source: 'edupage',
-              title: 'Войти через EduPage',
+              title: context.l10n.authEduPage,
               onTap: isLoading ? null : () => onSelectSource('edupage'),
             ),
             const SizedBox(height: 12),
@@ -815,7 +818,7 @@ class _AuthSelectionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Безопасно и надежно',
+                        context.l10n.authSecure,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: const Color(0xFFA46BFF),
                           fontWeight: FontWeight.w600,
@@ -824,7 +827,7 @@ class _AuthSelectionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Мы не храним пароль от дневника',
+                        context.l10n.authPasswordNotStored,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: const Color(0xFFA8A2CE),
                           fontSize: 10.4,

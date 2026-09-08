@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/generated/app_localizations.dart';
+import '../../../l10n/l10n.dart';
 import '../../../runtimes/kundi_native_avatar/kundi_home_avatar_loading_frame.dart';
 import '../../../shared/widgets/kundi_surface.dart';
+import '../../../shared/widgets/student_pull_to_refresh.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
+import '../../kundi_behavior/domain/kundi_behavior_state.dart';
 import '../../kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
 import '../../profile/domain/profile_entity.dart';
 import '../../profile/application/profile_controller.dart';
@@ -13,7 +17,6 @@ import '../../summary/domain/summary_entity.dart';
 import '../application/lessons_controller.dart';
 import '../application/home_gamification_provider.dart';
 import '../domain/home_gamification_metrics.dart';
-import '../domain/home_greeting.dart';
 import '../domain/lessons_entity.dart';
 import 'widgets/kundi_home_hero.dart';
 import '../../assistant/application/kundi_tts_coordinator.dart';
@@ -73,24 +76,34 @@ class LessonsPage extends ConsumerWidget {
         behaviorCoreEnabled ? ref.watch(kundiBehaviorControllerProvider) : null;
     final lessons = lessonsState.valueOrNull ?? const <LessonsEntity>[];
     final summary = summaryState.valueOrNull;
+    final l10n = context.l10n;
     final today = _TodaySnapshot.from(
       lessons: lessons,
       summary: summary,
       now: currentTime,
+      l10n: l10n,
     );
     final identity = profileState.valueOrNull?.providerIdentity;
     final studentName = resolveStudentFirstName(
       explicitFirstName: identity?.studentFirstName ?? '',
       fullName: identity?.studentFullName ?? '',
     );
-    final greeting = homeGreetingFor(currentTime, studentName);
+    final greetingPrefix = switch (currentTime.hour) {
+      >= 5 && < 12 => l10n.homeGoodMorning,
+      >= 12 && < 18 => l10n.homeGoodAfternoon,
+      >= 18 && < 23 => l10n.homeGoodEvening,
+      _ => l10n.homeGoodNight,
+    };
+    final greeting = studentName.trim().isEmpty
+        ? '$greetingPrefix!'
+        : l10n.homeGreeting(greetingPrefix, studentName.trim());
     final heroMessage = _heroMessage(
       lessonsState: lessonsState,
       snapshot: today,
+      l10n: l10n,
     );
-    final semanticState = today.hasData
-        ? 'План на сегодня доступен'
-        : 'План на сегодня пока пуст';
+    final semanticState =
+        today.hasData ? l10n.homePlanAvailable : l10n.homePlanEmpty;
     KundiHomePresentation? behaviorPresentation;
     if (behaviorState != null) {
       try {
@@ -99,6 +112,24 @@ class LessonsPage extends ConsumerWidget {
           neutralTitle: greeting,
           neutralMessage: heroMessage,
           neutralSemanticLabel: semanticState,
+          behaviorMessage: (kind) => switch (kind) {
+            KundiBehaviorKind.celebrating => l10n.homeKundiCelebrating,
+            KundiBehaviorKind.thinking => l10n.homeKundiThinking,
+            KundiBehaviorKind.speaking => l10n.homeKundiSpeaking,
+            KundiBehaviorKind.listening => l10n.homeKundiListening,
+            KundiBehaviorKind.warning => l10n.homeKundiWarning,
+            KundiBehaviorKind.error => l10n.homeKundiError,
+            KundiBehaviorKind.neutral => heroMessage,
+          },
+          behaviorSemanticLabel: (kind) => switch (kind) {
+            KundiBehaviorKind.celebrating => l10n.homeKundiCelebratingSemantic,
+            KundiBehaviorKind.thinking => l10n.homeKundiThinkingSemantic,
+            KundiBehaviorKind.speaking => l10n.homeKundiSpeakingSemantic,
+            KundiBehaviorKind.listening => l10n.homeKundiListeningSemantic,
+            KundiBehaviorKind.warning => l10n.homeKundiWarningSemantic,
+            KundiBehaviorKind.error => l10n.homeKundiErrorSemantic,
+            KundiBehaviorKind.neutral => semanticState,
+          },
         );
       } catch (_) {
         behaviorPresentation = null;
@@ -115,68 +146,72 @@ class LessonsPage extends ConsumerWidget {
       body: KundiGradientBackground(
         child: SafeArea(
           bottom: false,
-          child: ListView(
-            key: const Key('home-main-scroll'),
-            clipBehavior: Clip.none,
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 76),
-            children: [
-              _HomeHeader(
-                onProfileTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ProfilePage(),
+          child: RefreshIndicator(
+            onRefresh: () => refreshStudentFromGesture(context, ref),
+            child: ListView(
+              key: const Key('home-main-scroll'),
+              clipBehavior: Clip.none,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+              children: [
+                _HomeHeader(
+                  onProfileTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ProfilePage(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              RepaintBoundary(
-                key: const Key('home-summary-panel'),
-                child: KeyedSubtree(
-                  key: const Key('home-today-cards'),
-                  child: _DailySummaryPanel(
-                    metricsState: metricsState,
+                const SizedBox(height: 12),
+                RepaintBoundary(
+                  key: const Key('home-summary-panel'),
+                  child: KeyedSubtree(
+                    key: const Key('home-today-cards'),
+                    child: _DailySummaryPanel(
+                      metricsState: metricsState,
+                    ),
                   ),
                 ),
-              ),
-              if (lessonsState.hasError) ...[
-                const SizedBox(height: 8),
-                _InlineLoadError(
-                  onRetry: () => ref
-                      .read(lessonsControllerProvider.notifier)
-                      .refreshFromCache(),
+                if (lessonsState.hasError) ...[
+                  const SizedBox(height: 8),
+                  _InlineLoadError(
+                    onRetry: () => ref
+                        .read(lessonsControllerProvider.notifier)
+                        .refreshFromCache(),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _HeroActionStack(
+                  greeting: behaviorPresentation?.title ?? greeting,
+                  dateLabel: context.formatFullDate(currentTime),
+                  heroMessage: behaviorPresentation?.message ?? heroMessage,
+                  semanticState:
+                      behaviorPresentation?.semanticLabel ?? semanticState,
+                  heroAssetPath: behaviorPresentation?.assetPath ??
+                      LessonsPage._heroAssetPath,
+                  realtimeAvatarEnabled: realtimeAvatarEnabled,
+                  realtimeAvatarPreparing: realtimeAvatarPreparing,
+                  realtimeAvatarLoadingFrame: realtimeAvatarLoadingFrame,
+                  isHomeVisible: isHomeVisible,
+                  animationCueName: animationCueName,
+                  animationIdentity: animationIdentity,
+                  homeworkText: _homeworkActionText(today.homeworkCount, l10n),
+                  gradesTitle: _recentResultsTitle(summary, l10n),
+                  gradesText: _latestGradesText(summary, l10n),
+                  onHomeworkTap: onHomeworkTap,
+                  onGradesTap: onGradesTap,
+                  onAssistantTap: onAssistantTap,
+                  onAssistantPointerDown: onAssistantPointerDown,
+                  onAssistantPointerUp: onAssistantPointerUp,
+                  onAssistantPointerCancel: onAssistantPointerCancel,
+                  onAssistantLongPressStart: onAssistantLongPressStart,
+                  onAssistantLongPressEnd: onAssistantLongPressEnd,
+                  onAssistantLongPressCancel: onAssistantLongPressCancel,
+                  assistantEnabled: assistantEnabled,
+                  voiceStatusText: voiceStatusText,
+                  voiceListening: voiceListening,
                 ),
               ],
-              const SizedBox(height: 14),
-              _HeroActionStack(
-                greeting: behaviorPresentation?.title ?? greeting,
-                dateLabel: russianDateLabel(currentTime),
-                heroMessage: behaviorPresentation?.message ?? heroMessage,
-                semanticState:
-                    behaviorPresentation?.semanticLabel ?? semanticState,
-                heroAssetPath: behaviorPresentation?.assetPath ??
-                    LessonsPage._heroAssetPath,
-                realtimeAvatarEnabled: realtimeAvatarEnabled,
-                realtimeAvatarPreparing: realtimeAvatarPreparing,
-                realtimeAvatarLoadingFrame: realtimeAvatarLoadingFrame,
-                isHomeVisible: isHomeVisible,
-                animationCueName: animationCueName,
-                animationIdentity: animationIdentity,
-                homeworkText: _homeworkActionText(today.homeworkCount),
-                gradesTitle: _recentResultsTitle(summary),
-                gradesText: _latestGradesText(summary),
-                onHomeworkTap: onHomeworkTap,
-                onGradesTap: onGradesTap,
-                onAssistantTap: onAssistantTap,
-                onAssistantPointerDown: onAssistantPointerDown,
-                onAssistantPointerUp: onAssistantPointerUp,
-                onAssistantPointerCancel: onAssistantPointerCancel,
-                onAssistantLongPressStart: onAssistantLongPressStart,
-                onAssistantLongPressEnd: onAssistantLongPressEnd,
-                onAssistantLongPressCancel: onAssistantLongPressCancel,
-                assistantEnabled: assistantEnabled,
-                voiceStatusText: voiceStatusText,
-                voiceListening: voiceListening,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -195,12 +230,12 @@ class _HomeHeader extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Главная',
+            context.l10n.homeTitle,
             key: const Key('home-header-title'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   height: 1.1,
@@ -210,7 +245,7 @@ class _HomeHeader extends StatelessWidget {
         const SizedBox(width: 12),
         IconButton(
           key: const Key('home-profile-action'),
-          tooltip: 'Профиль',
+          tooltip: context.l10n.homeProfileTooltip,
           onPressed: onProfileTap,
           style: IconButton.styleFrom(
             fixedSize: const Size(46, 46),
@@ -254,7 +289,7 @@ class _DailySummaryPanel extends StatelessWidget {
           Expanded(
             child: _GamificationMetric(
               icon: Icons.task_alt_rounded,
-              label: 'ДЗ сегодня',
+              label: context.l10n.homeHomeworkToday,
               accent: const Color(0xFF63D6A7),
               metric: metrics?.homeworkToday,
               loading: loading,
@@ -265,7 +300,7 @@ class _DailySummaryPanel extends StatelessWidget {
           Expanded(
             child: _GamificationMetric(
               icon: Icons.calendar_view_week_rounded,
-              label: 'ДЗ за неделю',
+              label: context.l10n.homeHomeworkWeek,
               accent: const Color(0xFFFFB84D),
               metric: metrics?.homeworkWeek,
               loading: loading,
@@ -276,7 +311,7 @@ class _DailySummaryPanel extends StatelessWidget {
           Expanded(
             child: _GamificationMetric(
               icon: Icons.verified_user_outlined,
-              label: 'Посещаемость',
+              label: context.l10n.homeAttendance,
               accent: const Color(0xFF5EA3FF),
               metric: metrics?.attendance,
               loading: loading,
@@ -363,7 +398,12 @@ class _GamificationMetric extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _supportingLabel(metric, loading: loading, hasError: hasError),
+            _supportingLabel(
+              context,
+              metric,
+              loading: loading,
+              hasError: hasError,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -390,18 +430,19 @@ String _valueLabel(
 }
 
 String _supportingLabel(
+  BuildContext context,
   HomeProgressMetric? metric, {
   required bool loading,
   required bool hasError,
 }) {
   if (loading) {
-    return 'Загрузка';
+    return context.l10n.commonLoading;
   }
   if (hasError) {
-    return 'Нет данных';
+    return context.l10n.commonNoData;
   }
   if (metric?.percent == null) {
-    return metric?.emptyLabel ?? 'Нет данных';
+    return context.l10n.commonNoData;
   }
   return '${metric!.completed}/${metric.total}';
 }
@@ -432,14 +473,14 @@ class _InlineLoadError extends StatelessWidget {
         const SizedBox(width: 7),
         Expanded(
           child: Text(
-            'Показываем доступные данные',
+            context.l10n.homeAvailableData,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: const Color(0xFFC6BCE5),
                 ),
           ),
         ),
         IconButton(
-          tooltip: 'Обновить',
+          tooltip: context.l10n.commonRefresh,
           visualDensity: VisualDensity.compact,
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded, size: 19),
@@ -527,7 +568,7 @@ class _HeroActionStack extends ConsumerWidget {
                     key: const Key('home-action-homework'),
                     legacyKey: const Key('home-quick-action-homework'),
                     icon: Icons.menu_book_rounded,
-                    title: 'ДЗ сегодня',
+                    title: context.l10n.homeHomeworkToday,
                     secondary: homeworkText,
                     accent: const Color(0xFFB05CFF),
                     overlapInset: 96,
@@ -547,12 +588,13 @@ class _HeroActionStack extends ConsumerWidget {
                   _InformationActionRow(
                     key: const Key('home-action-kundi'),
                     icon: Icons.chat_bubble_outline_rounded,
-                    title: 'Спросите Kundi...',
+                    title: context.l10n.homeAskKundi,
                     secondary: assistantEnabled
-                        ? 'Объяснит тему и поможет сделать первый шаг'
-                        : 'Персональный помощник появится позже',
+                        ? context.l10n.homeAssistantDescription
+                        : context.l10n.homeAssistantSoon,
                     accent: const Color(0xFF9E7BFF),
-                    trailingLabel: assistantEnabled ? '' : 'Скоро',
+                    trailingLabel:
+                        assistantEnabled ? '' : context.l10n.commonSoon,
                     onTap: assistantEnabled ? onAssistantTap : null,
                   ),
                 ],
@@ -580,8 +622,8 @@ class _HeroActionStack extends ConsumerWidget {
           onAvatarLongPressStart: onAssistantLongPressStart,
           onAvatarLongPressEnd: onAssistantLongPressEnd,
           onAvatarLongPressCancel: onAssistantLongPressCancel,
-          voiceStatusText: ttsState.errorMessage.isNotEmpty
-              ? ttsState.errorMessage
+          voiceStatusText: ttsState.status == KundiTtsStatus.error
+              ? context.l10n.voicePlaybackFailed
               : voiceStatusText,
           voiceListening: voiceListening,
         ),
@@ -733,6 +775,7 @@ class _TodaySnapshot {
     required List<LessonsEntity> lessons,
     required SummaryEntity? summary,
     required DateTime now,
+    required AppLocalizations l10n,
   }) {
     final dateKey = _isoDate(now);
     final todayLessons = lessons
@@ -759,7 +802,7 @@ class _TodaySnapshot {
         nextLessonTime:
             nextLesson.startTime.trim().isEmpty ? '—' : nextLesson.startTime,
         nextLessonSubject: nextLesson.subjectName.trim().isEmpty
-            ? 'Ближайший урок'
+            ? l10n.homeNearestLesson
             : nextLesson.subjectName,
       );
     }
@@ -778,7 +821,7 @@ class _TodaySnapshot {
       nextLessonTime: upcoming == null ? '—' : '№${upcoming.lessonNumber}',
       nextLessonSubject: upcoming?.subjectName.trim().isNotEmpty == true
           ? upcoming!.subjectName
-          : 'Нет уроков',
+          : l10n.homeNoLessons,
     );
   }
 }
@@ -786,51 +829,43 @@ class _TodaySnapshot {
 String _heroMessage({
   required AsyncValue<List<LessonsEntity>> lessonsState,
   required _TodaySnapshot snapshot,
+  required AppLocalizations l10n,
 }) {
   if (lessonsState.isLoading && !snapshot.hasData) {
-    return 'Собираю твой план на сегодня.';
+    return l10n.homeBuildingPlan;
   }
   if (lessonsState.hasError && !snapshot.hasData) {
-    return 'Расписание временно недоступно. Попробуем обновить ещё раз.';
+    return l10n.homeScheduleUnavailable;
   }
   if (!snapshot.hasData) {
-    return 'Давай посмотрим, что запланировано на сегодня.';
+    return l10n.homeSeeTodayPlan;
   }
-
-  final lessonWord = _pluralize(
-    snapshot.lessonCount,
-    'урок',
-    'урока',
-    'уроков',
-  );
   if (snapshot.homeworkCount == 0) {
-    return 'Сегодня у тебя ${snapshot.lessonCount} $lessonWord. '
-        'Ближайший — ${snapshot.nextLessonSubject}.';
+    return '${l10n.homeTodayLessons(snapshot.lessonCount)} '
+        '${l10n.homeNearestSubject(snapshot.nextLessonSubject)}';
   }
-  return 'Сегодня у тебя ${snapshot.lessonCount} $lessonWord. '
-      'На сегодня ${snapshot.homeworkCount} '
-      '${_pluralize(snapshot.homeworkCount, 'задание', 'задания', 'заданий')}.';
+  return '${l10n.homeTodayLessons(snapshot.lessonCount)} '
+      '${l10n.homeTodayHomework(snapshot.homeworkCount)}';
 }
 
-String _homeworkActionText(int homeworkCount) {
+String _homeworkActionText(int homeworkCount, AppLocalizations l10n) {
   if (homeworkCount == 0) {
-    return 'Заданий на сегодня нет';
+    return l10n.homeNoHomeworkToday;
   }
-  return '$homeworkCount '
-      '${_pluralize(homeworkCount, 'задание', 'задания', 'заданий')} на сегодня';
+  return l10n.homeHomeworkTodayCount(homeworkCount);
 }
 
-String _latestGradesText(SummaryEntity? summary) {
+String _latestGradesText(SummaryEntity? summary, AppLocalizations l10n) {
   final values =
       (summary?.recentResults ?? const <SummaryResultHighlightEntity>[])
           .map((result) => result.valueText.trim())
           .where((value) => value.isNotEmpty)
           .take(3)
           .toList(growable: false);
-  return values.isEmpty ? 'Новых оценок нет' : values.join(' • ');
+  return values.isEmpty ? l10n.homeNoNewGrades : values.join(' • ');
 }
 
-String _recentResultsTitle(SummaryEntity? summary) {
+String _recentResultsTitle(SummaryEntity? summary, AppLocalizations l10n) {
   final kinds =
       (summary?.recentResults ?? const <SummaryResultHighlightEntity>[])
           .map((result) => result.resultKind.trim().toLowerCase())
@@ -838,20 +873,8 @@ String _recentResultsTitle(SummaryEntity? summary) {
           .toSet();
   const nonRegularKinds = <String>{'sor', 'soch', 'term', 'year', 'aggregate'};
   return kinds.any(nonRegularKinds.contains)
-      ? 'Последние результаты'
-      : 'Последние оценки';
-}
-
-String _pluralize(int value, String one, String few, String many) {
-  final mod10 = value % 10;
-  final mod100 = value % 100;
-  if (mod10 == 1 && mod100 != 11) {
-    return one;
-  }
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return few;
-  }
-  return many;
+      ? l10n.homeLatestResults
+      : l10n.homeLatestGrades;
 }
 
 bool _lessonHasFinished(LessonsEntity lesson, DateTime now) {

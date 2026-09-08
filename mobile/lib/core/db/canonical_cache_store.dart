@@ -688,7 +688,7 @@ class CanonicalCacheStore {
     required String studentId,
     required String provider,
     required String providerPersonId,
-    required int shift,
+    required int? shift,
     required String parentPhone1,
     required String parentPhone2,
   }) async {

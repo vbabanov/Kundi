@@ -1,13 +1,17 @@
+import 'school_shift.dart';
+
 class ProfileEntity {
   const ProfileEntity({
     required this.readMode,
     required this.providerIdentity,
     required this.localAppProfile,
+    this.automaticShift = SchoolShift.unknown,
   });
 
   final String readMode;
   final ProviderIdentityProfileSection? providerIdentity;
   final LocalAppProfileSection? localAppProfile;
+  final SchoolShift automaticShift;
 
   bool get hasData => providerIdentity != null || localAppProfile != null;
 }

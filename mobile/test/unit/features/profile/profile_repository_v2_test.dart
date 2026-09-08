@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/core/db/app_database.dart';
 import 'package:kundi_mobile/core/db/canonical_cache_store.dart';
 import 'package:kundi_mobile/core/network/api_client.dart';
 import 'package:kundi_mobile/features/profile/data/profile_repository_impl.dart';
+import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -205,8 +207,68 @@ void main() {
     expect(profile.providerIdentity!.gradeLevel, 9);
     expect(profile.localAppProfile, isNull);
   });
+
+  test('contact save neither sends nor requires a shift', () async {
+    final store = CanonicalCacheStore();
+    final api = _RecordingApiClient();
+    final repository = ProfileRepositoryImpl(
+      store,
+      api,
+      () => AuthSession(
+        studentId: 'student-contact-save',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresAt: DateTime.utc(2030),
+      ),
+    );
+
+    await repository.saveLocalAppProfile(
+      parentPhone1: '+77010000001',
+      parentPhone2: '',
+    );
+
+    expect(api.path, '/v1/profile/local');
+    expect(api.data, <String, Object>{
+      'parent_phone_1': '+77010000001',
+      'parent_phone_2': '',
+    });
+    expect(api.data, isNot(contains('shift')));
+    final cached = await store.getLocalAppProfile(
+      studentId: 'student-contact-save',
+      provider: 'kundelik',
+    );
+    expect(cached?['shift'], isNull);
+    expect(cached?['parent_phone_1'], '+77010000001');
+  });
 }
 
 class _NoopApiClient extends ApiClient {
   _NoopApiClient() : super(baseUrl: 'http://127.0.0.1:1');
+}
+
+class _RecordingApiClient extends ApiClient {
+  _RecordingApiClient() : super(baseUrl: 'http://127.0.0.1:1');
+
+  String path = '';
+  Map<String, dynamic> data = <String, dynamic>{};
+
+  @override
+  Future<Response<dynamic>> put(
+    String path, {
+    Object? data,
+    Options? options,
+  }) async {
+    this.path = path;
+    this.data = Map<String, dynamic>.from(data! as Map);
+    return Response<dynamic>(
+      requestOptions: RequestOptions(path: path),
+      statusCode: 200,
+      data: <String, Object>{
+        'data': <String, Object>{
+          'parent_phone_1': this.data['parent_phone_1']!,
+          'parent_phone_2': this.data['parent_phone_2']!,
+        },
+      },
+    );
+  }
 }

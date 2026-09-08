@@ -26,4 +26,9 @@ class SummaryController extends AsyncNotifier<SummaryEntity> {
       () => ref.read(summaryRepositoryProvider).get(),
     );
   }
+
+  Future<void> reloadFromCache() async {
+    final next = await ref.read(summaryRepositoryProvider).get();
+    state = AsyncData(next);
+  }
 }

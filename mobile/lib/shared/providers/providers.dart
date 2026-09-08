@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -91,16 +90,3 @@ final avatarBridgeProvider = Provider<AvatarBridge>((ref) {
 final avatarFacadeProvider = Provider<AvatarFacade>((ref) {
   return AvatarFacade(ref.watch(avatarBridgeProvider));
 });
-
-final appThemeModeProvider = NotifierProvider<AppThemeModeNotifier, ThemeMode>(
-  AppThemeModeNotifier.new,
-);
-
-class AppThemeModeNotifier extends Notifier<ThemeMode> {
-  @override
-  ThemeMode build() => ThemeMode.dark;
-
-  void toggle() {
-    state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-  }
-}

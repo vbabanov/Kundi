@@ -31,15 +31,18 @@ class ProfileController extends AsyncNotifier<ProfileEntity?> {
         await AsyncValue.guard(() => ref.read(profileRepositoryProvider).get());
   }
 
+  Future<void> reloadFromCache() async {
+    final next = await ref.read(profileRepositoryProvider).get();
+    state = AsyncData(next);
+  }
+
   Future<void> saveLocalAppProfile({
-    required int shift,
     required String parentPhone1,
     required String parentPhone2,
   }) async {
     state = const AsyncLoading<ProfileEntity?>();
     state = await AsyncValue.guard(() async {
       await ref.read(profileRepositoryProvider).saveLocalAppProfile(
-            shift: shift,
             parentPhone1: parentPhone1,
             parentPhone2: parentPhone2,
           );

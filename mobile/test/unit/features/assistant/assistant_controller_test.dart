@@ -78,7 +78,9 @@ void main() {
     addTearDown(container.dispose);
 
     var state = await container.read(assistantControllerProvider.future);
-    expect(state.suggestions.first, 'Тақырыпты түсіндір');
+    // Stored session locale is intentionally ignored: app locale is the
+    // source of truth, and this container uses the Russian default.
+    expect(state.suggestions.first, 'Объясни тему');
     await container
         .read(assistantControllerProvider.notifier)
         .sendMessage('Бөлшектерді түсіндір');

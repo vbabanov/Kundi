@@ -88,4 +88,16 @@ void main() {
     expect(secondResult['snapshot_at'], firstResult['snapshot_at']);
     expect(thirdResult['snapshot_at'], firstResult['snapshot_at']);
   });
+
+  test('failed refresh is observed once and releases the gate', () async {
+    final gate = RefreshRunGate<int>();
+
+    final failed = gate.run(() async {
+      throw StateError('provider failed');
+    });
+
+    await expectLater(failed, throwsStateError);
+    expect(gate.isRunning, isFalse);
+    expect(await gate.run(() async => 9), 9);
+  });
 }

@@ -11,8 +11,9 @@ import 'source_adapters/edupage/edupage_connector.dart';
 import 'source_adapters/kundelik/kundelik_connector.dart';
 
 class ConnectorRuntime {
-  ConnectorRuntime()
-      : _sessionStore = ConnectorSessionStore(),
+  ConnectorRuntime({DiaryConnector Function(String source)? connectorFactory})
+      : _connectorFactory = connectorFactory,
+        _sessionStore = ConnectorSessionStore(),
         _payloadRepository = RawPayloadRepository(),
         _diagnostics = ConnectorDiagnostics(),
         _mapper = const CanonicalBundleMapper(),
@@ -28,6 +29,7 @@ class ConnectorRuntime {
           ),
         );
 
+  final DiaryConnector Function(String source)? _connectorFactory;
   final ConnectorSessionStore _sessionStore;
   final RawPayloadRepository _payloadRepository;
   final ConnectorDiagnostics _diagnostics;
@@ -35,6 +37,10 @@ class ConnectorRuntime {
   final BrowserLikeClient _client;
 
   DiaryConnector create(String source) {
+    final injectedFactory = _connectorFactory;
+    if (injectedFactory != null) {
+      return injectedFactory(source);
+    }
     switch (source.trim().toLowerCase()) {
       case 'kundelik':
         return KundelikConnector(

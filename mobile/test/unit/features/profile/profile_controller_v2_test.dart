@@ -73,7 +73,6 @@ class _FakeProfileRepository implements ProfileRepository {
 
   @override
   Future<void> saveLocalAppProfile({
-    required int shift,
     required String parentPhone1,
     required String parentPhone2,
   }) async {}

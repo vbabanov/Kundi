@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/core/db/app_database.dart';
 import 'package:kundi_mobile/core/network/api_client.dart';
@@ -8,7 +9,10 @@ import 'package:kundi_mobile/core/network/read_source_policy.dart';
 import 'package:kundi_mobile/core/db/sync_queue_repository.dart';
 import 'package:kundi_mobile/features/auth/data/auth_repository_impl.dart';
 import 'package:kundi_mobile/features/auth/data/academic_year_window.dart';
+import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
 import 'package:kundi_mobile/runtimes/connector_runtime/connector_runtime.dart';
+import 'package:kundi_mobile/runtimes/connector_runtime/contracts/diary_connector.dart';
+import 'package:kundi_mobile/runtimes/connector_runtime/contracts/errors.dart';
 import 'package:kundi_mobile/runtimes/connector_runtime/sync_queue/ingest_uploader.dart';
 import 'package:kundi_mobile/runtimes/connector_runtime/sync_queue/sync_orchestrator.dart';
 import 'package:kundi_mobile/runtimes/connector_runtime/sync_queue/sync_queue_service.dart';
@@ -40,6 +44,93 @@ class _FakeUploader implements IngestUploader {
   }) async {}
 }
 
+class _FakeKundelikConnector implements DiaryConnector {
+  _FakeKundelikConnector({this.bundleError});
+
+  final Object? bundleError;
+  int authenticateCalls = 0;
+  int bundleCalls = 0;
+
+  @override
+  Future<void> authenticate(DiaryAuthCredentials credentials) async {
+    authenticateCalls += 1;
+    expect(credentials.source, 'kundelik');
+    expect(credentials.login, 'saved-login');
+    expect(credentials.password, 'saved-password');
+  }
+
+  @override
+  Future<CanonicalBundle> buildCanonicalBundle(
+    DiarySyncRequest syncRequest,
+  ) async {
+    bundleCalls += 1;
+    final error = bundleError;
+    if (error != null) {
+      throw error;
+    }
+    return CanonicalBundle(
+      source: 'kundelik',
+      sourceAccount: 'account-1',
+      idempotencyKey: syncRequest.idempotencyKey,
+      syncedAt: DateTime.now().toUtc(),
+      sourceIds: const {
+        'person_id': 'person-1',
+        'school_id': 'school-1',
+        'group_id': 'group-1',
+      },
+      profile: const SourceProfile(
+        firstName: 'Student',
+        lastName: 'One',
+        gradeLevel: 7,
+        classLabel: '7zh',
+        schoolName: 'School',
+        classTeacherFullName: 'Teacher',
+      ),
+      lessons: const [
+        SourceLesson(
+          sourceLessonKey: 'lesson-1',
+          date: '2026-09-08',
+          lessonNumber: 1,
+          subjectName: 'Math',
+          lessonPlace: '101',
+          startTime: '08:00',
+          endTime: '08:45',
+          topicTitle: 'Topic',
+          homeworkText: 'Exercise 1',
+          requiresPhoto: false,
+          grades: [],
+        ),
+      ],
+      attendance: const [],
+    );
+  }
+
+  @override
+  Future<Map<String, String>> bootstrapSourceIds() async => const {};
+
+  @override
+  Future<List<SourceGrade>> fetchGrades(DateTimeRange weekWindow) async =>
+      const [];
+
+  @override
+  Future<List<SourceLesson>> fetchHomework(DateTimeRange window) async =>
+      const [];
+
+  @override
+  Future<List<SourceLesson>> fetchLessons(DateTimeRange window) async =>
+      const [];
+
+  @override
+  Future<SourceProfile> fetchProfile() async => const SourceProfile(
+        firstName: 'Student',
+        lastName: 'One',
+        gradeLevel: 7,
+        classLabel: '7zh',
+        schoolName: 'School',
+        classTeacherFullName: 'Teacher',
+      );
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -68,11 +159,15 @@ void main() {
     await db.delete('canonical_grades_cache');
   }
 
-  AuthRepositoryImpl buildRepository(String baseUrl) {
+  AuthRepositoryImpl buildRepository(
+    String baseUrl, {
+    FakeSecureStorageService? secureStorage,
+    ConnectorRuntime? connectorRuntime,
+  }) {
     return AuthRepositoryImpl(
       apiClient: ApiClient(baseUrl: baseUrl),
-      secureStorage: FakeSecureStorageService(),
-      connectorRuntime: ConnectorRuntime(),
+      secureStorage: secureStorage ?? FakeSecureStorageService(),
+      connectorRuntime: connectorRuntime ?? ConnectorRuntime(),
       canonicalCacheStore: CanonicalCacheStore(),
       syncQueueService: SyncQueueService(),
       syncOrchestrator: SyncOrchestrator(
@@ -690,5 +785,176 @@ void main() {
     expect(v2ProfileCalls, 1);
     expect(v2ResultsCalls, 1);
     expect(v2OverviewCalls, 1);
+  });
+
+  test(
+      'student pull pipeline refreshes expired session, ingests once, and publishes one typed-v2 snapshot',
+      () async {
+    await clearCacheTables();
+    final secureStorage = FakeSecureStorageService();
+    await secureStorage.saveDiaryCredentials(
+      source: 'kundelik',
+      login: 'saved-login',
+      password: 'saved-password',
+    );
+    final connector = _FakeKundelikConnector();
+    var refreshCalls = 0;
+    var ingestCalls = 0;
+    var profileCalls = 0;
+    var resultsCalls = 0;
+    var overviewCalls = 0;
+    final snapshots = <String>[];
+
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      final path = request.uri.path;
+      if (path == '/v1/auth/refresh') {
+        refreshCalls += 1;
+        request.response.statusCode = 200;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({
+          'data': {
+            'student_id': 'student-1',
+            'access_token': 'refreshed-token',
+            'refresh_token': 'refreshed-refresh-token',
+            'expires_at': DateTime.now()
+                .toUtc()
+                .add(const Duration(hours: 1))
+                .toIso8601String(),
+          }
+        }));
+        await request.response.close();
+        return;
+      }
+      if (path == '/v2/ingest/bundle') {
+        ingestCalls += 1;
+        expect(request.headers.value(HttpHeaders.authorizationHeader),
+            'Bearer refreshed-token');
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = 200;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({
+          'data': {'accepted': true}
+        }));
+        await request.response.close();
+        return;
+      }
+      if (path == '/v2/profile' ||
+          path == '/v2/results' ||
+          path == '/v2/academic/overview') {
+        expect(request.headers.value(HttpHeaders.authorizationHeader),
+            'Bearer refreshed-token');
+        final snapshot = request.uri.queryParameters['snapshot_at'] ?? '';
+        snapshots.add(snapshot);
+        request.response.statusCode = 200;
+        request.response.headers.contentType = ContentType.json;
+        if (path == '/v2/profile') {
+          profileCalls += 1;
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          request.response.write(jsonEncode(_v2ProfilePayload(snapshot)));
+        } else if (path == '/v2/results') {
+          resultsCalls += 1;
+          request.response.write(jsonEncode(_v2ResultsPayload(snapshot)));
+        } else {
+          overviewCalls += 1;
+          request.response.write(jsonEncode(_v2OverviewPayload(snapshot)));
+        }
+        await request.response.close();
+        return;
+      }
+      request.response.statusCode = 404;
+      await request.response.close();
+    });
+
+    final repository = buildRepository(
+      'http://127.0.0.1:${server.port}',
+      secureStorage: secureStorage,
+      connectorRuntime: ConnectorRuntime(
+        connectorFactory: (_) => connector,
+      ),
+    );
+    final expiredSession = AuthSession(
+      studentId: 'student-1',
+      accessToken: 'expired-token',
+      refreshToken: 'refresh-token',
+      expiresAt: DateTime.now().toUtc().subtract(const Duration(minutes: 1)),
+    );
+
+    final first = repository.refreshAuthenticatedStudent(expiredSession);
+    final second = repository.refreshAuthenticatedStudent(expiredSession);
+    final results = await Future.wait([first, second]);
+    await server.close(force: true);
+
+    expect(refreshCalls, 1);
+    expect(connector.authenticateCalls, 1);
+    expect(connector.bundleCalls, 1);
+    expect(ingestCalls, 1);
+    expect(profileCalls, 1);
+    expect(resultsCalls, 1);
+    expect(overviewCalls, 1);
+    expect(snapshots.where((value) => value.isNotEmpty).toSet().length, 1);
+    expect(results[0].snapshotAt, results[1].snapshotAt);
+    expect(results[0].session.accessToken, 'refreshed-token');
+    expect(results[0].readMode, 'v2');
+
+    final metadata = await readRefreshMetadata('student-1');
+    expect(metadata['active_snapshot_at'], results[0].snapshotAt);
+    expect(metadata['last_refresh_status'], 'success');
+  });
+
+  test(
+      'provider fetch failure aborts student refresh before an empty bundle can be ingested',
+      () async {
+    await clearCacheTables();
+    final secureStorage = FakeSecureStorageService();
+    await secureStorage.saveDiaryCredentials(
+      source: 'kundelik',
+      login: 'saved-login',
+      password: 'saved-password',
+    );
+    final connector = _FakeKundelikConnector(
+      bundleError: const ConnectorException(
+        code: 'kundelik_fetch_period_marks_failed',
+        message: 'required provider fetch failed',
+      ),
+    );
+    var backendCalls = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      backendCalls += 1;
+      request.response.statusCode = 500;
+      await request.response.close();
+    });
+
+    final repository = buildRepository(
+      'http://127.0.0.1:${server.port}',
+      secureStorage: secureStorage,
+      connectorRuntime: ConnectorRuntime(
+        connectorFactory: (_) => connector,
+      ),
+    );
+    final activeSession = AuthSession(
+      studentId: 'student-1',
+      accessToken: 'active-token',
+      refreshToken: 'refresh-token',
+      expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+    );
+
+    await expectLater(
+      () => repository.refreshAuthenticatedStudent(activeSession),
+      throwsA(
+        isA<ConnectorException>().having(
+          (error) => error.code,
+          'code',
+          'kundelik_fetch_period_marks_failed',
+        ),
+      ),
+    );
+    await server.close(force: true);
+
+    expect(connector.authenticateCalls, 1);
+    expect(connector.bundleCalls, 1);
+    expect(backendCalls, 0,
+        reason: 'provider failure must not reach ingest or typed-v2 reads');
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -8,9 +9,12 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import '../../../shared/providers/providers.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../runtimes/kundi_system_speech/kundi_voice_qa_telemetry.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/domain/kundi_behavior_event.dart';
+import '../../settings/application/settings_controller.dart';
+import '../../settings/domain/settings_entity.dart';
 import '../assistant_feature.dart';
 import '../data/assistant_repository_impl.dart';
 import '../domain/assistant_entity.dart';
@@ -115,6 +119,13 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
 
   @override
   Future<AssistantViewState> build() async {
+    // Rebuild presentation-owned suggestions and errors when the app locale
+    // changes. Messages are reloaded; language switching never deletes them.
+    ref.watch(
+      settingsControllerProvider.select(
+        (value) => value.valueOrNull?.language ?? AppLanguage.ru,
+      ),
+    );
     if (!ref.watch(kundiAssistantEnabledProvider)) {
       return const AssistantViewState();
     }
@@ -139,7 +150,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
       ),
       sessionCursor: page.nextCursor,
       messageCursor: messages.nextCursor,
-      suggestions: _genericSuggestionsForLocale(active.locale),
+      suggestions: _genericSuggestions(),
     );
   }
 
@@ -156,7 +167,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         activeSession: session,
         messages: const <AssistantMessageEntity>[],
         messageCursor: '',
-        suggestions: _genericSuggestionsForLocale(session.locale),
+        suggestions: _genericSuggestions(),
         errorMessage: '',
         retryText: '',
         retryClientMessageId: '',
@@ -189,7 +200,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
             page.items,
           ),
           messageCursor: page.nextCursor,
-          suggestions: _genericSuggestionsForLocale(session.locale),
+          suggestions: _genericSuggestions(),
           errorMessage: '',
           isRefreshing: false,
           refreshErrorMessage: '',
@@ -199,7 +210,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         final latest = state.valueOrNull ?? previous;
         state = AsyncData(latest.copyWith(
           isRefreshing: false,
-          refreshErrorMessage: 'Не удалось обновить историю',
+          refreshErrorMessage: _l10n().assistantHistoryRefreshFailed,
         ));
       }
     }();
@@ -442,48 +453,42 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
     return out;
   }
 
-  static List<String> _genericSuggestionsForLocale(String locale) {
-    if (locale.trim().toLowerCase().startsWith('kk')) {
-      return const <String>[
-        'Тақырыпты түсіндір',
-        'Бірінші қадамды жасауға көмектес',
-        'Жауабымды тексер',
-      ];
-    }
-    return const <String>[
-      'Объясни тему',
-      'Помоги сделать первый шаг',
-      'Проверь мой ответ',
+  List<String> _genericSuggestions() {
+    final l10n = _l10n();
+    return <String>[
+      l10n.assistantSuggestionExplain,
+      l10n.assistantSuggestionFirstStep,
+      l10n.assistantSuggestionCheck,
     ];
   }
 
-  static _AssistantSendFailure _sendFailure(Object error) {
+  _AssistantSendFailure _sendFailure(Object error) {
+    final l10n = _l10n();
     if (error is AppException) {
       switch (error.code) {
         case 'assistant_rate_limited':
         case 'assistant_provider_rate_limited':
-          return const _AssistantSendFailure(
-            message:
-                'Слишком много запросов. Немного подождите и попробуйте снова.',
+          return _AssistantSendFailure(
+            message: l10n.assistantRateLimited,
             canRetry: true,
           );
         case 'assistant_disabled':
-          return const _AssistantSendFailure(
-            message: 'Kundi пока недоступна.',
+          return _AssistantSendFailure(
+            message: l10n.assistantUnavailable,
           );
         case 'assistant_provider_unavailable':
         case 'assistant_request_timeout':
         case 'assistant_safety_unavailable':
-          return const _AssistantSendFailure(
-            message: 'Kundi временно не смогла ответить. Попробуйте ещё раз.',
+          return _AssistantSendFailure(
+            message: l10n.assistantTemporaryFailure,
             canRetry: true,
           );
         case 'unauthorized':
         case 'assistant_auth_required':
           return const _AssistantSendFailure(refreshAuthorization: true);
         case 'assistant_network_error':
-          return const _AssistantSendFailure(
-            message: 'Не удалось отправить сообщение. Проверьте соединение.',
+          return _AssistantSendFailure(
+            message: l10n.assistantSendFailed,
             canRetry: true,
           );
       }
@@ -491,9 +496,16 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
         return _AssistantSendFailure(message: error.message);
       }
     }
-    return const _AssistantSendFailure(
-      message: 'Не удалось отправить сообщение. Проверьте соединение.',
+    return _AssistantSendFailure(
+      message: l10n.assistantSendFailed,
     );
+  }
+
+  AppLocalizations _l10n() {
+    final language =
+        ref.read(settingsControllerProvider).valueOrNull?.language ??
+            AppLanguage.ru;
+    return lookupAppLocalizations(Locale(language.name));
   }
 
   static bool _isValidationCode(String code) {

@@ -21,7 +21,7 @@ class RefreshRunGate<T> {
       if (identical(_inFlight, future)) {
         _inFlight = null;
       }
-    });
+    }).ignore();
     return future;
   }
 }

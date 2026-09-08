@@ -192,6 +192,9 @@ internal class KundiSystemSpeechPlugin(
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, command.maxResults)
         }
         return runCatching {
+            // Locale-only acceptance evidence: deliberately excludes request
+            // identifiers, recognized text, credentials, and student data.
+            Log.i("KundiVoiceLocale", "recognition_locale=${command.locale}")
             speechRecognizer.startListening(intent)
             emit("listeningStarted", requestPayload(command.requestId))
             scheduleTimeout(command.requestId)

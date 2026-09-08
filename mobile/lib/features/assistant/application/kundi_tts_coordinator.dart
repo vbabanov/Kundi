@@ -8,6 +8,8 @@ import '../../../runtimes/kundi_system_speech/terminal_request_cache.dart';
 import '../../../runtimes/kundi_tts/kundi_tts_transport.dart';
 import '../../../shared/providers/providers.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../settings/application/settings_controller.dart';
+import '../../settings/domain/settings_entity.dart';
 import '../assistant_feature.dart';
 import '../domain/assistant_entity.dart';
 
@@ -24,6 +26,15 @@ final kundiTtsCoordinatorProvider =
     StateNotifierProvider<KundiTtsCoordinator, KundiTtsState>((ref) {
   final token = ref.watch(
       authControllerProvider.select((value) => value.valueOrNull?.accessToken));
+  final language = ref.watch(
+    settingsControllerProvider.select(
+      (value) => value.valueOrNull?.language ?? AppLanguage.ru,
+    ),
+  );
+  final voiceLocale = switch (language) {
+    AppLanguage.ru => 'ru-RU',
+    AppLanguage.kk => 'kk-KZ',
+  };
   return KundiTtsCoordinator(
     enabled: ref.watch(kundiTtsEnabledProvider),
     transport: ref.watch(kundiTtsTransportProvider),
@@ -36,12 +47,20 @@ final kundiTtsCoordinatorProvider =
               '/v1/assistant/sessions/${Uri.encodeComponent(message.sessionId)}/messages/${Uri.encodeComponent(message.id)}/speech-authorization',
               data: const <String, Object>{},
               options: Options(
-                  headers: {'Authorization': 'Bearer $token'},
+                  headers: {
+                    'Authorization': 'Bearer $token',
+                    'X-Kundi-Voice-Locale': voiceLocale,
+                  },
                   sendTimeout: const Duration(seconds: 8),
                   receiveTimeout: const Duration(seconds: 8)),
             );
         final root = Map<String, dynamic>.from(response.data as Map);
-        return Map<String, dynamic>.from((root['data'] ?? root) as Map);
+        final authorization =
+            Map<String, dynamic>.from((root['data'] ?? root) as Map);
+        if ((authorization['locale'] ?? '').toString() != voiceLocale) {
+          throw StateError('Speech locale contract mismatch');
+        }
+        return authorization;
       } catch (_) {
         throw StateError('Speech unavailable');
       }
