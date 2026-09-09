@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/kundi_behavior/application/kundi_behavior_clock.dart';
@@ -43,6 +44,45 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Home hero does not truncate a reviewed primary insight',
+      (tester) async {
+    await _setSurface(tester, const Size(430, 1000));
+    const text =
+        'Прочитай условие дважды, а потом отметь, что уже известно и что нужно найти.';
+    const insight = HomeInsight(
+      text: text,
+      kind: HomeInsightKind.studyTip,
+      locale: 'ru',
+      contentId: 'primary_read_then_mark_v1',
+      catalogVersion: 1,
+      gradeBand: HomeInsightGradeBand.primary,
+      rephrased: false,
+      isLocalFallback: false,
+    );
+    await tester.pumpWidget(
+      _testApp(
+        lessons: const <LessonsEntity>[],
+        summary: SummaryEntity.empty,
+        studentName: 'Артем',
+        insight: insight,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final message = find.text(text);
+    expect(message, findsOneWidget);
+    expect(tester.widget<Text>(message).maxLines, 8);
+    expect(
+      tester.renderObject<RenderParagraph>(message).didExceedMaxLines,
+      isFalse,
+    );
+    expect(
+      tester.getBottomRight(message).dy,
+      lessThan(tester.getBottomRight(find.byKey(KundiHomeHero.heroKey)).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('home header, gamification panel and hero use current data',
       (tester) async {

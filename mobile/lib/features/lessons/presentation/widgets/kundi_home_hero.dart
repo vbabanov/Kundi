@@ -199,7 +199,7 @@ class KundiHomeHero extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     message,
-                    maxLines: 4,
+                    maxLines: 8,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFFE5DFFF),
