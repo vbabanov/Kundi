@@ -14,7 +14,8 @@ import 'package:kundi_mobile/features/settings/domain/settings_entity.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('new Kazakh sessions use localized suggestions', () async {
+  test('Kazakh suggestions follow app locale before and after a response',
+      () async {
     final repository = _FakeAssistantRepository(
       sessions: <AssistantSessionEntity>[
         _session(
@@ -24,7 +25,9 @@ void main() {
           lastMessageAt: DateTime.utc(2026, 9, 9),
         ),
       ],
-      result: _result(),
+      result: _result(suggestions: const <String>[
+        'Повторить: русская тема',
+      ]),
     );
     final container = ProviderContainer(overrides: <Override>[
       kundiAssistantEnabledProvider.overrideWithValue(true),
@@ -39,6 +42,15 @@ void main() {
     final state = await container.read(assistantControllerProvider.future);
 
     expect(state.suggestions, <String>[
+      'Тақырыпты түсіндір',
+      'Алғашқы қадамды жасауға көмектес',
+      'Жауабымды тексер',
+    ]);
+
+    final controller = container.read(assistantControllerProvider.notifier);
+    await controller.sendMessage('Тақырыпты түсіндір');
+    final updated = container.read(assistantControllerProvider).requireValue;
+    expect(updated.suggestions, <String>[
       'Тақырыпты түсіндір',
       'Алғашқы қадамды жасауға көмектес',
       'Жауабымды тексер',
@@ -485,7 +497,10 @@ class _FakeAssistantRepository implements AssistantRepository {
       throw UnimplementedError();
 }
 
-AssistantMessageResult _result({AssistantSessionEntity? session}) {
+AssistantMessageResult _result({
+  AssistantSessionEntity? session,
+  List<String> suggestions = const <String>[],
+}) {
   final now = DateTime.utc(2026, 9, 4, 12);
   return AssistantMessageResult(
     userMessage: _message('user', 'user', now),
@@ -494,7 +509,7 @@ AssistantMessageResult _result({AssistantSessionEntity? session}) {
     helpLevel: 'guided',
     emotion: 'neutral',
     animationCue: 'standing',
-    suggestions: const <String>[],
+    suggestions: suggestions,
     session: session,
   );
 }

@@ -314,9 +314,7 @@ class AssistantController extends AsyncNotifier<AssistantViewState> {
             result.assistantMessage,
           ],
         ),
-        suggestions: result.suggestions.isEmpty
-            ? latest.suggestions
-            : result.suggestions,
+        suggestions: _genericSuggestions(),
         activeSession: updatedSession ?? latest.activeSession,
         sessions: updatedSession == null
             ? latest.sessions
