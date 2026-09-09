@@ -184,12 +184,21 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final text = view.suggestions[index];
+          final scheme = Theme.of(context).colorScheme;
           return ActionChip(
             key: Key('assistant-suggestion-$index'),
-            avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
-            label: Text(text),
+            avatar: Icon(
+              Icons.auto_awesome_rounded,
+              size: 16,
+              color: scheme.primary,
+            ),
+            label: Text(
+              text,
+              style: TextStyle(color: scheme.onSurface),
+            ),
+            backgroundColor: scheme.kundiElevated,
             side: BorderSide(
-              color: Theme.of(context).colorScheme.kundiBorder,
+              color: scheme.kundiBorder,
             ),
             onPressed: () {
               _messageController

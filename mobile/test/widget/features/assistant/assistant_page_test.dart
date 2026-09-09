@@ -10,6 +10,7 @@ import 'package:kundi_mobile/features/auth/application/auth_controller.dart';
 import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
 import 'package:kundi_mobile/l10n/generated/app_localizations.dart';
 import 'package:kundi_mobile/shared/theme/app_theme.dart';
+import 'package:kundi_mobile/shared/theme/kundi_tokens.dart';
 
 void main() {
   for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
@@ -57,6 +58,14 @@ void main() {
                 : 'Помощник по учёбе'),
             findsOneWidget,
           );
+          final suggestion = tester.widget<ActionChip>(
+            find.byKey(const Key('assistant-suggestion-0')),
+          );
+          final suggestionLabel = suggestion.label as Text;
+          final suggestionIcon = suggestion.avatar as Icon;
+          expect(suggestion.backgroundColor, theme.colorScheme.kundiElevated);
+          expect(suggestionLabel.style?.color, theme.colorScheme.onSurface);
+          expect(suggestionIcon.color, theme.colorScheme.primary);
           final send = tester.widget<IconButton>(
             find.byKey(const Key('assistant-send-button')),
           );
