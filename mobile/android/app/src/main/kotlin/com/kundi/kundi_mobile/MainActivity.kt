@@ -1,9 +1,11 @@
 package com.kundi.kundi_mobile
 
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -17,6 +19,9 @@ import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterActivity() {
     private val imeVisibilityTracker = ImeVisibilityTracker()
+    private var insetsImeVisible = false
+    private var legacyFrameImeVisible = false
+    private var legacyImeLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private val restoreAfterIme = Runnable {
         if (window.decorView.hasWindowFocus() && !imeVisibilityTracker.isVisible) {
             applyImmersiveMode("ime-hidden")
@@ -77,8 +82,15 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
-        window.decorView.removeCallbacks(restoreAfterIme)
-        ViewCompat.setOnApplyWindowInsetsListener(window.decorView, null)
+        val decorView = window.decorView
+        decorView.removeCallbacks(restoreAfterIme)
+        ViewCompat.setOnApplyWindowInsetsListener(decorView, null)
+        legacyImeLayoutListener?.let { listener ->
+            if (decorView.viewTreeObserver.isAlive) {
+                decorView.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+            }
+        }
+        legacyImeLayoutListener = null
         KundiTtsHost.onDestroy()
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.onActivityDestroy(this)
@@ -117,30 +129,49 @@ class MainActivity : FlutterActivity() {
     private fun installImeVisibilityTracking() {
         val decorView = window.decorView
         ViewCompat.setOnApplyWindowInsetsListener(decorView) { _, insets ->
-            val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-            val imeWasVisible = imeVisibilityTracker.isVisible
-            val enableLegacyImeResize = shouldEnableLegacyImeResize(
-                sdkInt = Build.VERSION.SDK_INT,
-                wasVisible = imeWasVisible,
-                isVisible = imeVisible,
-            )
-            val shouldRestoreAfterIme =
-                imeVisibilityTracker.onVisibilityChanged(imeVisible)
-            if (imeVisible) {
-                decorView.removeCallbacks(restoreAfterIme)
-                // On Android 8-10, edge-to-edge decor does not resize the
-                // Flutter surface for adjustResize. Temporarily let the
-                // platform fit the decor so the composer stays above the IME.
-                if (enableLegacyImeResize) {
-                    WindowCompat.setDecorFitsSystemWindows(window, true)
-                }
-            } else if (shouldRestoreAfterIme) {
-                decorView.removeCallbacks(restoreAfterIme)
-                decorView.postDelayed(restoreAfterIme, IME_SYSTEM_UI_COOLDOWN_MILLIS)
-            }
+            insetsImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            updateImeVisibility()
             insets
         }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            val visibleFrame = Rect()
+            val listener = ViewTreeObserver.OnGlobalLayoutListener {
+                decorView.getWindowVisibleDisplayFrame(visibleFrame)
+                legacyFrameImeVisible = isLegacyImeLikelyVisible(
+                    screenHeight = resources.displayMetrics.heightPixels,
+                    visibleBottom = visibleFrame.bottom,
+                )
+                updateImeVisibility()
+            }
+            legacyImeLayoutListener = listener
+            decorView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        }
         ViewCompat.requestApplyInsets(decorView)
+    }
+
+    private fun updateImeVisibility() {
+        val decorView = window.decorView
+        val imeVisible = insetsImeVisible || legacyFrameImeVisible
+        val imeWasVisible = imeVisibilityTracker.isVisible
+        val enableLegacyImeResize = shouldEnableLegacyImeResize(
+            sdkInt = Build.VERSION.SDK_INT,
+            wasVisible = imeWasVisible,
+            isVisible = imeVisible,
+        )
+        val shouldRestoreAfterIme =
+            imeVisibilityTracker.onVisibilityChanged(imeVisible)
+        if (imeVisible) {
+            decorView.removeCallbacks(restoreAfterIme)
+            // On Android 8-10, edge-to-edge decor does not resize the
+            // Flutter surface for adjustResize. Temporarily let the platform
+            // fit the decor so the composer stays above the IME.
+            if (enableLegacyImeResize) {
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+            }
+        } else if (shouldRestoreAfterIme) {
+            decorView.removeCallbacks(restoreAfterIme)
+            decorView.postDelayed(restoreAfterIme, IME_SYSTEM_UI_COOLDOWN_MILLIS)
+        }
     }
 
     private fun applyImmersiveMode(reason: String) {

@@ -61,4 +61,35 @@ class ImeVisibilityTrackerTest {
             ),
         )
     }
+
+    @Test
+    fun legacyVisibleFrameDetectsKeyboardOcclusion() {
+        assertTrue(
+            isLegacyImeLikelyVisible(
+                screenHeight = 2340,
+                visibleBottom = 1320,
+            ),
+        )
+    }
+
+    @Test
+    fun legacyVisibleFrameIgnoresSystemBarInsets() {
+        assertFalse(
+            isLegacyImeLikelyVisible(
+                screenHeight = 2340,
+                visibleBottom = 2208,
+            ),
+        )
+    }
+
+    @Test
+    fun legacyVisibleFrameRejectsInvalidMeasurements() {
+        assertFalse(isLegacyImeLikelyVisible(screenHeight = 0, visibleBottom = 0))
+        assertFalse(
+            isLegacyImeLikelyVisible(
+                screenHeight = 2208,
+                visibleBottom = 2340,
+            ),
+        )
+    }
 }
