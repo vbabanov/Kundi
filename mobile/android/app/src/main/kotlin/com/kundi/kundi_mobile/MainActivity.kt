@@ -22,7 +22,9 @@ class MainActivity : FlutterActivity() {
     private val imeVisibilityTracker = ImeVisibilityTracker()
     private var insetsImeVisible = false
     private var legacyFrameImeVisible = false
+    private var lastLegacyImeInsetPixels = -1
     private var legacyImeLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var legacyImeLayoutChannel: MethodChannel? = null
     private val restoreAfterIme = Runnable {
         if (window.decorView.hasWindowFocus() && !imeVisibilityTracker.isVisible) {
             applyImmersiveMode("ime-hidden")
@@ -43,22 +45,24 @@ class MainActivity : FlutterActivity() {
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.register(this, flutterEngine)
         }
-        MethodChannel(
+        legacyImeLayoutChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             LEGACY_IME_LAYOUT_CHANNEL,
-        ).setMethodCallHandler { call, result ->
-            if (call.method != PREPARE_LEGACY_IME_LAYOUT_METHOD) {
-                result.notImplemented()
-                return@setMethodCallHandler
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                if (call.method != PREPARE_LEGACY_IME_LAYOUT_METHOD) {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                if (shouldPrepareLegacyImeLayout(Build.VERSION.SDK_INT)) {
+                    // This must happen before Flutter asks Android to show the
+                    // keyboard. MIUI 12 does not report IME insets while the
+                    // existing edge-to-edge layout is active.
+                    WindowCompat.setDecorFitsSystemWindows(window, true)
+                    Log.d(IMMERSIVE_LOG_TAG, "legacy IME layout prepared")
+                }
+                result.success(null)
             }
-            if (shouldPrepareLegacyImeLayout(Build.VERSION.SDK_INT)) {
-                // This must happen before Flutter asks Android to show the
-                // keyboard. MIUI 12 does not report IME insets while the
-                // existing edge-to-edge layout is active.
-                WindowCompat.setDecorFitsSystemWindows(window, true)
-                Log.d(IMMERSIVE_LOG_TAG, "legacy IME layout prepared")
-            }
-            result.success(null)
         }
     }
 
@@ -109,6 +113,8 @@ class MainActivity : FlutterActivity() {
             }
         }
         legacyImeLayoutListener = null
+        legacyImeLayoutChannel?.setMethodCallHandler(null)
+        legacyImeLayoutChannel = null
         KundiTtsHost.onDestroy()
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.onActivityDestroy(this)
@@ -155,9 +161,20 @@ class MainActivity : FlutterActivity() {
             val visibleFrame = Rect()
             val listener = ViewTreeObserver.OnGlobalLayoutListener {
                 decorView.getWindowVisibleDisplayFrame(visibleFrame)
+                val screenHeight = maxOf(
+                    resources.displayMetrics.heightPixels,
+                    decorView.rootView.height,
+                )
                 legacyFrameImeVisible = isLegacyImeLikelyVisible(
-                    screenHeight = resources.displayMetrics.heightPixels,
+                    screenHeight = screenHeight,
                     visibleBottom = visibleFrame.bottom,
+                )
+                publishLegacyImeInset(
+                    if (legacyFrameImeVisible) {
+                        (screenHeight - visibleFrame.bottom).coerceAtLeast(0)
+                    } else {
+                        0
+                    },
                 )
                 updateImeVisibility()
             }
@@ -165,6 +182,16 @@ class MainActivity : FlutterActivity() {
             decorView.viewTreeObserver.addOnGlobalLayoutListener(listener)
         }
         ViewCompat.requestApplyInsets(decorView)
+    }
+
+    private fun publishLegacyImeInset(bottomInsetPixels: Int) {
+        if (bottomInsetPixels == lastLegacyImeInsetPixels) return
+        lastLegacyImeInsetPixels = bottomInsetPixels
+        legacyImeLayoutChannel?.invokeMethod(
+            LEGACY_IME_INSET_CHANGED_METHOD,
+            bottomInsetPixels,
+        )
+        Log.d(IMMERSIVE_LOG_TAG, "legacy IME inset: $bottomInsetPixels")
     }
 
     private fun updateImeVisibility() {
@@ -208,6 +235,7 @@ class MainActivity : FlutterActivity() {
         const val LEGACY_IME_LAYOUT_CHANNEL =
             "com.kundi.kundi_mobile/legacy_ime_layout"
         const val PREPARE_LEGACY_IME_LAYOUT_METHOD = "prepareForIme"
+        const val LEGACY_IME_INSET_CHANGED_METHOD = "legacyImeInsetChanged"
         const val IME_SYSTEM_UI_COOLDOWN_MILLIS = 1_100L
         const val IMMERSIVE_LOG_TAG = "KundiImmersive"
     }

@@ -118,6 +118,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('composer compensates for a host-only legacy keyboard inset',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(errorMessage: '')),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final initialBottom = tester.getBottomRight(
+      find.byKey(const Key('assistant-text-field')),
+    );
+    final nativePixels = 240 * tester.view.devicePixelRatio;
+    final message = const StandardMethodCodec().encodeMethodCall(
+      MethodCall('legacyImeInsetChanged', nativePixels),
+    );
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'com.kundi.kundi_mobile/legacy_ime_layout',
+      message,
+      (_) {},
+    );
+    await tester.pump();
+    final keyboardBottom = tester.getBottomRight(
+      find.byKey(const Key('assistant-text-field')),
+    );
+
+    expect(initialBottom.dy - keyboardBottom.dy, closeTo(240, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('prepares the legacy Android layout before suggestion focus',
       (tester) async {
     const channel = MethodChannel(

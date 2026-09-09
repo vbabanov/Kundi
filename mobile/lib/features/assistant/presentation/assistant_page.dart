@@ -25,12 +25,14 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _messageFocus = FocusNode();
   final ScrollController _scrollController = ScrollController();
+  double _legacyImeInset = 0;
 
   @override
   void initState() {
     super.initState();
     _messageController.addListener(_onDraftChanged);
     _messageFocus.addListener(_onMessageFocusChanged);
+    _legacyImeLayoutChannel.setMethodCallHandler(_handleLegacyImeMethod);
     unawaited(
       ref.read(assistantControllerProvider.notifier).revalidateOnPageOpen(),
     );
@@ -38,6 +40,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   @override
   void dispose() {
+    _legacyImeLayoutChannel.setMethodCallHandler(null);
     _messageController
       ..removeListener(_onDraftChanged)
       ..dispose();
@@ -56,6 +59,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     if (_messageFocus.hasFocus) {
       unawaited(_prepareLegacyImeLayout());
     }
+  }
+
+  Future<void> _handleLegacyImeMethod(MethodCall call) async {
+    if (call.method != 'legacyImeInsetChanged' || !mounted) return;
+    final pixels = call.arguments;
+    if (pixels is! num) return;
+    final logicalInset =
+        (pixels / View.of(context).devicePixelRatio).clamp(0, double.infinity);
+    if ((_legacyImeInset - logicalInset).abs() < 0.5) return;
+    setState(() => _legacyImeInset = logicalInset.toDouble());
   }
 
   Future<void> _prepareLegacyImeLayout() async {
@@ -94,57 +107,66 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       if (visualItems(next) > visualItems(previous)) _scrollToLatest();
     });
 
+    final frameworkImeInset = MediaQuery.viewInsetsOf(context).bottom;
+    final additionalLegacyImeInset =
+        (_legacyImeInset - frameworkImeInset).clamp(0, double.infinity);
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: KundiGradientBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              _AssistantTopBar(
-                enabled: state.hasValue,
-                onBack: () => Navigator.of(context).maybePop(),
-                onHistory: _showSessions,
-                onMenu: _handleMenu,
-              ),
-              Expanded(
-                child: state.when(
-                  loading: () => const _AssistantLoading(),
-                  error: (_, __) => _LoadError(
-                    onRetry: () => ref.invalidate(assistantControllerProvider),
-                  ),
-                  data: (view) => Column(
-                    children: [
-                      if (view.isRefreshing)
-                        const LinearProgressIndicator(minHeight: 2),
-                      Expanded(child: _messageList(view)),
-                      if (view.refreshErrorMessage.isNotEmpty)
-                        _TransportError(
-                          message: view.refreshErrorMessage,
-                          onRetry: () => ref
-                              .read(assistantControllerProvider.notifier)
-                              .retryHistoryRefresh(),
-                        ),
-                      if (speechError)
-                        _TransportError(
-                          message: context.l10n.voicePlaybackFailed,
-                          onRetry: null,
-                        ),
-                      if (view.errorMessage.isNotEmpty)
-                        _TransportError(
-                          message: view.errorMessage,
-                          onRetry: view.retryText.isEmpty
-                              ? null
-                              : () => ref
-                                  .read(assistantControllerProvider.notifier)
-                                  .retryLastMessage(),
-                        ),
-                      _suggestions(view),
-                      _composer(view),
-                    ],
+      body: Padding(
+        padding: EdgeInsets.only(
+          bottom: additionalLegacyImeInset.toDouble(),
+        ),
+        child: KundiGradientBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                _AssistantTopBar(
+                  enabled: state.hasValue,
+                  onBack: () => Navigator.of(context).maybePop(),
+                  onHistory: _showSessions,
+                  onMenu: _handleMenu,
+                ),
+                Expanded(
+                  child: state.when(
+                    loading: () => const _AssistantLoading(),
+                    error: (_, __) => _LoadError(
+                      onRetry: () =>
+                          ref.invalidate(assistantControllerProvider),
+                    ),
+                    data: (view) => Column(
+                      children: [
+                        if (view.isRefreshing)
+                          const LinearProgressIndicator(minHeight: 2),
+                        Expanded(child: _messageList(view)),
+                        if (view.refreshErrorMessage.isNotEmpty)
+                          _TransportError(
+                            message: view.refreshErrorMessage,
+                            onRetry: () => ref
+                                .read(assistantControllerProvider.notifier)
+                                .retryHistoryRefresh(),
+                          ),
+                        if (speechError)
+                          _TransportError(
+                            message: context.l10n.voicePlaybackFailed,
+                            onRetry: null,
+                          ),
+                        if (view.errorMessage.isNotEmpty)
+                          _TransportError(
+                            message: view.errorMessage,
+                            onRetry: view.retryText.isEmpty
+                                ? null
+                                : () => ref
+                                    .read(assistantControllerProvider.notifier)
+                                    .retryLastMessage(),
+                          ),
+                        _suggestions(view),
+                        _composer(view),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
