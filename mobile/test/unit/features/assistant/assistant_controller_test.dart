@@ -9,9 +9,42 @@ import 'package:kundi_mobile/features/assistant/domain/assistant_entity.dart';
 import 'package:kundi_mobile/features/assistant/domain/assistant_repository.dart';
 import 'package:kundi_mobile/features/auth/application/auth_controller.dart';
 import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
+import 'package:kundi_mobile/features/settings/application/settings_controller.dart';
+import 'package:kundi_mobile/features/settings/domain/settings_entity.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('new Kazakh sessions use localized suggestions', () async {
+    final repository = _FakeAssistantRepository(
+      sessions: <AssistantSessionEntity>[
+        _session(
+          id: 'kk',
+          locale: 'ru-KZ',
+          title: '',
+          lastMessageAt: DateTime.utc(2026, 9, 9),
+        ),
+      ],
+      result: _result(),
+    );
+    final container = ProviderContainer(overrides: <Override>[
+      kundiAssistantEnabledProvider.overrideWithValue(true),
+      assistantRepositoryProvider.overrideWithValue(repository),
+      authControllerProvider.overrideWith(_FakeAuthController.new),
+      settingsControllerProvider.overrideWith(_KkSettingsController.new),
+    ]);
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.future);
+    await container.read(settingsControllerProvider.future);
+
+    final state = await container.read(assistantControllerProvider.future);
+
+    expect(state.suggestions, <String>[
+      'Тақырыпты түсіндір',
+      'Алғашқы қадамды жасауға көмектес',
+      'Жауабымды тексер',
+    ]);
+  });
+
   test(
       'only foreground voice send triggers TTS; history and failure preserve text',
       () async {
@@ -363,6 +396,13 @@ class _FakeAuthController extends AuthController {
       expiresAt: DateTime.utc(2030),
     );
   }
+}
+
+class _KkSettingsController extends SettingsController {
+  @override
+  Future<AppSettings> build() async => const AppSettings(
+        language: AppLanguage.kk,
+      );
 }
 
 class _FakeAssistantRepository implements AssistantRepository {

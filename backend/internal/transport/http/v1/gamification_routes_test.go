@@ -25,6 +25,7 @@ func TestGamificationRoutesRequireAuthentication(t *testing.T) {
 		{http.MethodGet, "/v1/gamification/achievements"},
 		{http.MethodPost, "/v1/gamification/activity"},
 		{http.MethodPost, "/v1/gamification/achievements/ack"},
+		{http.MethodGet, "/v1/home/insight?locale=kk"},
 	} {
 		t.Run(testCase.method+" "+testCase.path, func(t *testing.T) {
 			response := httptest.NewRecorder()

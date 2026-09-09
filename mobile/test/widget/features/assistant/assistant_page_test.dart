@@ -8,8 +8,75 @@ import 'package:kundi_mobile/features/assistant/domain/assistant_repository.dart
 import 'package:kundi_mobile/features/assistant/presentation/assistant_page.dart';
 import 'package:kundi_mobile/features/auth/application/auth_controller.dart';
 import 'package:kundi_mobile/features/auth/domain/auth_session.dart';
+import 'package:kundi_mobile/l10n/generated/app_localizations.dart';
+import 'package:kundi_mobile/shared/theme/app_theme.dart';
 
 void main() {
+  for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
+    for (final locale in const <Locale>[Locale('ru'), Locale('kk')]) {
+      testWidgets(
+        'assistant chrome and composer fit ${theme.brightness} ${locale.languageCode}',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(360, 640));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final view = _viewState(errorMessage: '').copyWith(
+            suggestions: const <String>[
+              'Объясни тему очень простыми словами и с примером',
+              'Проверь мой ответ',
+              'Помоги сделать первый шаг',
+            ],
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                assistantControllerProvider.overrideWith(
+                  () => _FakeAssistantController(view),
+                ),
+              ],
+              child: MaterialApp(
+                theme: theme,
+                locale: locale,
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                home: const AssistantPage(),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byKey(const Key('assistant-top-bar')), findsOneWidget);
+          expect(
+            find.text(locale.languageCode == 'kk'
+                ? 'Kundi-ден сұраңыз'
+                : 'Спросите Kundi'),
+            findsOneWidget,
+          );
+          expect(
+            find.text(locale.languageCode == 'kk'
+                ? 'Оқу бойынша көмекші'
+                : 'Помощник по учёбе'),
+            findsOneWidget,
+          );
+          final send = tester.widget<IconButton>(
+            find.byKey(const Key('assistant-send-button')),
+          );
+          expect(send.onPressed, isNull);
+          await tester.tap(find.byKey(const Key('assistant-suggestion-0')));
+          await tester.pump();
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const Key('assistant-send-button')),
+                )
+                .onPressed,
+            isNotNull,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets(
       'renders text-only conversation without microphone or provider data',
       (tester) async {

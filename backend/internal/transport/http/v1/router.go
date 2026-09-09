@@ -30,6 +30,7 @@ import (
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
 	ingestmodule "github.com/kundi/kundi/backend/internal/modules/diary_ingest"
 	"github.com/kundi/kundi/backend/internal/modules/gamification"
+	"github.com/kundi/kundi/backend/internal/modules/homeinsight"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
 	platformauth "github.com/kundi/kundi/backend/internal/platform/auth"
 	httpx "github.com/kundi/kundi/backend/internal/platform/http"
@@ -69,6 +70,7 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/gamification/achievements", withAuth(api.gamificationAchievements))
 	mux.Handle("POST /v1/gamification/activity", withAuth(api.gamificationActivity))
 	mux.Handle("POST /v1/gamification/achievements/ack", withAuth(api.ackGamificationAchievements))
+	mux.Handle("GET /v1/home/insight", withAuth(api.homeInsight))
 	mux.Handle("PUT /v1/profile/local", withAuth(api.updateLocalAppProfile))
 	mux.Handle("POST /v1/assistant/message", withAuth(api.assistantMessage))
 	mux.Handle("POST /v1/assistant/sessions", withAuth(api.createAssistantSession))
@@ -82,6 +84,28 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/whatsapp/jobs/{jobID}", withAuth(api.whatsappJobStatus))
 
 	return mux
+}
+
+func (a *API) homeInsight(w http.ResponseWriter, r *http.Request) {
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	if locale == "" {
+		locale = "ru"
+	}
+	result, err := a.deps.HomeInsight.Get(r.Context(), studentID, locale)
+	if err != nil {
+		if errors.Is(err, homeinsight.ErrLocaleInvalid) {
+			httpx.JSONError(w, apperrors.BadRequest("home_insight_locale_invalid", "locale must be ru or kk"))
+			return
+		}
+		httpx.JSONError(w, apperrors.Internal("home_insight_load_failed", "failed to load home insight", err))
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
 }
 
 func (a *API) gamificationProfile(w http.ResponseWriter, r *http.Request) {

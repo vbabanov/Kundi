@@ -1406,6 +1406,12 @@ abstract class AppLocalizations {
   /// **'Спросите Kundi'**
   String get assistantTitle;
 
+  /// No description provided for @assistantSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Помощник по учёбе'**
+  String get assistantSubtitle;
+
   /// No description provided for @assistantPastChats.
   ///
   /// In ru, this message translates to:

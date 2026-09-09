@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/l10n.dart';
+import '../../../shared/theme/kundi_tokens.dart';
+import '../../../shared/widgets/kundi_surface.dart';
 import '../application/assistant_controller.dart';
 import '../application/kundi_tts_coordinator.dart';
 import '../domain/assistant_entity.dart';
@@ -17,11 +19,13 @@ class AssistantPage extends ConsumerStatefulWidget {
 
 class _AssistantPageState extends ConsumerState<AssistantPage> {
   final TextEditingController _messageController = TextEditingController();
+  final FocusNode _messageFocus = FocusNode();
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(_onDraftChanged);
     unawaited(
       ref.read(assistantControllerProvider.notifier).revalidateOnPageOpen(),
     );
@@ -29,9 +33,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   @override
   void dispose() {
-    _messageController.dispose();
+    _messageController
+      ..removeListener(_onDraftChanged)
+      ..dispose();
+    _messageFocus.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onDraftChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -44,79 +55,69 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
           ),
         );
     ref.listen(assistantControllerProvider, (previous, next) {
-      final before = previous?.valueOrNull?.messages.length ?? 0;
-      final after = next.valueOrNull?.messages.length ?? 0;
-      if (after > before) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-            );
-          }
-        });
+      int visualItems(AsyncValue<AssistantViewState>? value) {
+        final view = value?.valueOrNull;
+        if (view == null) return 0;
+        return view.messages.length +
+            (view.pendingText.isNotEmpty ? 1 : 0) +
+            (view.isSending ? 1 : 0);
       }
+
+      if (visualItems(next) > visualItems(previous)) _scrollToLatest();
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.l10n.assistantTitle),
-        actions: [
-          IconButton(
-            key: const Key('assistant-history-button'),
-            tooltip: context.l10n.assistantPastChats,
-            onPressed: state.hasValue ? _showSessions : null,
-            icon: const Icon(Icons.history_rounded),
-          ),
-          PopupMenuButton<String>(
-            onSelected: _handleMenu,
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'new',
-                child: Text(context.l10n.assistantNewChat),
+      resizeToAvoidBottomInset: true,
+      body: KundiGradientBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              _AssistantTopBar(
+                enabled: state.hasValue,
+                onBack: () => Navigator.of(context).maybePop(),
+                onHistory: _showSessions,
+                onMenu: _handleMenu,
               ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text(context.l10n.assistantDeleteChat),
+              Expanded(
+                child: state.when(
+                  loading: () => const _AssistantLoading(),
+                  error: (_, __) => _LoadError(
+                    onRetry: () => ref.invalidate(assistantControllerProvider),
+                  ),
+                  data: (view) => Column(
+                    children: [
+                      if (view.isRefreshing)
+                        const LinearProgressIndicator(minHeight: 2),
+                      Expanded(child: _messageList(view)),
+                      if (view.refreshErrorMessage.isNotEmpty)
+                        _TransportError(
+                          message: view.refreshErrorMessage,
+                          onRetry: () => ref
+                              .read(assistantControllerProvider.notifier)
+                              .retryHistoryRefresh(),
+                        ),
+                      if (speechError)
+                        _TransportError(
+                          message: context.l10n.voicePlaybackFailed,
+                          onRetry: null,
+                        ),
+                      if (view.errorMessage.isNotEmpty)
+                        _TransportError(
+                          message: view.errorMessage,
+                          onRetry: view.retryText.isEmpty
+                              ? null
+                              : () => ref
+                                  .read(assistantControllerProvider.notifier)
+                                  .retryLastMessage(),
+                        ),
+                      _suggestions(view),
+                      _composer(view),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
-        ],
-      ),
-      body: state.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => _LoadError(
-          onRetry: () => ref.invalidate(assistantControllerProvider),
-        ),
-        data: (view) => Column(
-          children: [
-            if (view.isRefreshing) const LinearProgressIndicator(minHeight: 2),
-            Expanded(child: _messageList(view)),
-            if (view.refreshErrorMessage.isNotEmpty)
-              _TransportError(
-                message: view.refreshErrorMessage,
-                onRetry: () => ref
-                    .read(assistantControllerProvider.notifier)
-                    .retryHistoryRefresh(),
-              ),
-            if (speechError)
-              _TransportError(
-                message: context.l10n.voicePlaybackFailed,
-                onRetry: null,
-              ),
-            if (view.errorMessage.isNotEmpty)
-              _TransportError(
-                message: view.errorMessage,
-                onRetry: view.retryText.isEmpty
-                    ? null
-                    : () => ref
-                        .read(assistantControllerProvider.notifier)
-                        .retryLastMessage(),
-              ),
-            _suggestions(view),
-            _composer(view),
-          ],
         ),
       ),
     );
@@ -133,17 +134,21 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     return ListView.builder(
       key: const Key('assistant-message-list'),
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
       itemCount: view.messages.length + extra,
       itemBuilder: (context, index) {
         var offset = 0;
         if (view.messageCursor.isNotEmpty) {
           if (index == 0) {
-            return TextButton(
-              onPressed: () => ref
-                  .read(assistantControllerProvider.notifier)
-                  .loadOlderMessages(),
-              child: Text(context.l10n.assistantShowPrevious),
+            return Center(
+              child: TextButton.icon(
+                onPressed: () => ref
+                    .read(assistantControllerProvider.notifier)
+                    .loadOlderMessages(),
+                icon: const Icon(Icons.expand_less_rounded, size: 18),
+                label: Text(context.l10n.assistantShowPrevious),
+              ),
             );
           }
           offset = 1;
@@ -168,52 +173,102 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     if (view.suggestions.isEmpty || view.isSending) {
       return const SizedBox.shrink();
     }
-    return SingleChildScrollView(
-      key: const Key('assistant-suggestions'),
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-      child: Row(
-        children: view.suggestions.take(3).map((text) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(
-              label: Text(text),
-              onPressed: () => _messageController.text = text,
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        key: const Key('assistant-suggestions'),
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        itemCount: view.suggestions.take(3).length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final text = view.suggestions[index];
+          return ActionChip(
+            key: Key('assistant-suggestion-$index'),
+            avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+            label: Text(text),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.kundiBorder,
             ),
+            onPressed: () {
+              _messageController
+                ..text = text
+                ..selection = TextSelection.collapsed(offset: text.length);
+              _messageFocus.requestFocus();
+            },
           );
-        }).toList(growable: false),
+        },
       ),
     );
   }
 
   Widget _composer(AssistantViewState view) {
-    return SafeArea(
-      top: false,
+    final canSend =
+        !view.isSending && _messageController.text.trim().isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.kundiSurface.withValues(alpha: 0.97),
+        border: Border(top: BorderSide(color: scheme.kundiBorder)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: TextField(
-                key: const Key('assistant-text-field'),
-                controller: _messageController,
-                enabled: !view.isSending,
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: context.l10n.assistantQuestionHint,
-                  border: const OutlineInputBorder(),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.kundiElevated,
+                  borderRadius: KundiRadius.lg,
+                  border: Border.all(color: scheme.kundiBorder),
+                ),
+                child: TextField(
+                  key: const Key('assistant-text-field'),
+                  controller: _messageController,
+                  focusNode: _messageFocus,
+                  enabled: !view.isSending,
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.newline,
+                  decoration: InputDecoration(
+                    hintText: context.l10n.assistantQuestionHint,
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 9),
             IconButton.filled(
               key: const Key('assistant-send-button'),
               tooltip: context.l10n.commonSend,
-              onPressed: view.isSending ? null : _sendMessage,
-              icon: const Icon(Icons.send_rounded),
+              onPressed: canSend ? _sendMessage : null,
+              style: IconButton.styleFrom(
+                fixedSize: const Size(48, 48),
+              ),
+              icon: view.isSending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded),
             ),
           ],
         ),
@@ -223,53 +278,51 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   void _sendMessage() {
     final message = _messageController.text.trim();
-    if (message.isEmpty) return;
+    final view = ref.read(assistantControllerProvider).valueOrNull;
+    if (message.isEmpty || view?.isSending != false) return;
     _messageController.clear();
-    ref.read(assistantControllerProvider.notifier).sendMessage(message);
+    _messageFocus.requestFocus();
+    unawaited(
+      ref.read(assistantControllerProvider.notifier).sendMessage(message),
+    );
+    _scrollToLatest();
+  }
+
+  void _scrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<void> _showSessions() async {
     if (!ref.read(assistantControllerProvider).hasValue) return;
     await showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => Consumer(
         builder: (context, sheetRef, _) {
           final view = sheetRef.watch(assistantControllerProvider).valueOrNull;
-          if (view == null) {
-            return const SafeArea(
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          return SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                ListTile(title: Text(context.l10n.assistantPastChats)),
-                ...view.sessions.map((session) => ListTile(
-                      selected: session.id == view.activeSession?.id,
-                      title: Text(session.title.isEmpty
-                          ? context.l10n.assistantNewChat
-                          : session.title),
-                      subtitle: Text(
-                        context.l10n.assistantGradeClass(session.gradeLevel),
-                      ),
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        sheetRef
-                            .read(assistantControllerProvider.notifier)
-                            .openSession(session);
-                      },
-                    )),
-                if (view.sessionCursor.isNotEmpty)
-                  TextButton(
-                    onPressed: () => sheetRef
-                        .read(assistantControllerProvider.notifier)
-                        .loadMoreSessions(),
-                    child: Text(context.l10n.assistantShowMore),
-                  ),
-              ],
-            ),
+          if (view == null) return const _AssistantLoading();
+          return _SessionsSheet(
+            view: view,
+            onOpen: (session) {
+              Navigator.of(context).pop();
+              sheetRef
+                  .read(assistantControllerProvider.notifier)
+                  .openSession(session);
+            },
+            onLoadMore: view.sessionCursor.isEmpty
+                ? null
+                : () => sheetRef
+                    .read(assistantControllerProvider.notifier)
+                    .loadMoreSessions(),
           );
         },
       ),
@@ -284,6 +337,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        icon: const Icon(Icons.delete_outline_rounded),
         title: Text(context.l10n.assistantDeleteTitle),
         content: Text(context.l10n.assistantDeleteBody),
         actions: [
@@ -298,11 +352,125 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       await ref
           .read(assistantControllerProvider.notifier)
           .deleteCurrentSession();
     }
+  }
+}
+
+class _AssistantTopBar extends StatelessWidget {
+  const _AssistantTopBar({
+    required this.enabled,
+    required this.onBack,
+    required this.onHistory,
+    required this.onMenu,
+  });
+
+  final bool enabled;
+  final VoidCallback onBack;
+  final VoidCallback onHistory;
+  final ValueChanged<String> onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('assistant-top-bar'),
+      height: 66,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: scheme.kundiSurface.withValues(alpha: 0.9),
+        border: Border(bottom: BorderSide(color: scheme.kundiBorder)),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primary, scheme.secondary],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              'K',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: scheme.onPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.assistantTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                Text(
+                  context.l10n.assistantSubtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.kundiTextSecondary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const Key('assistant-history-button'),
+            tooltip: context.l10n.assistantPastChats,
+            onPressed: enabled ? onHistory : null,
+            icon: const Icon(Icons.history_rounded),
+          ),
+          PopupMenuButton<String>(
+            key: const Key('assistant-menu-button'),
+            enabled: enabled,
+            tooltip: MaterialLocalizations.of(context).showMenuTooltip,
+            onSelected: onMenu,
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                key: const Key('assistant-new-chat-action'),
+                value: 'new',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.add_comment_outlined),
+                  title: Text(context.l10n.assistantNewChat),
+                ),
+              ),
+              PopupMenuItem(
+                key: const Key('assistant-delete-chat-action'),
+                value: 'delete',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(context.l10n.assistantDeleteChat),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -313,36 +481,17 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 560),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: message.isUser
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (message.isUser && message.inputMode == 'voice') ...[
-              Row(
-                key: const Key('assistant-voice-message-badge'),
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.mic_rounded, size: 14),
-                  const SizedBox(width: 4),
-                  Text(context.l10n.assistantVoice),
-                ],
-              ),
-              const SizedBox(height: 4),
-            ],
-            SelectableText(message.content),
+    return _ConversationRow(
+      isUser: message.isUser,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (message.isUser && message.inputMode == 'voice') ...[
+            const _VoiceBadge(),
+            const SizedBox(height: 5),
           ],
-        ),
+          SelectableText(message.content),
+        ],
       ),
     );
   }
@@ -354,33 +503,122 @@ class _PendingUserBubble extends StatelessWidget {
   final AssistantInputMode inputMode;
 
   @override
-  Widget build(BuildContext context) => Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (inputMode == AssistantInputMode.voice) ...[
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.mic_rounded, size: 14),
-                    const SizedBox(width: 4),
-                    Text(context.l10n.assistantVoice),
+  Widget build(BuildContext context) => _ConversationRow(
+        isUser: true,
+        pending: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (inputMode == AssistantInputMode.voice) ...[
+              const _VoiceBadge(),
+              const SizedBox(height: 5),
+            ],
+            Text(text),
+          ],
+        ),
+      );
+}
+
+class _ConversationRow extends StatelessWidget {
+  const _ConversationRow({
+    required this.isUser,
+    required this.child,
+    this.pending = false,
+  });
+
+  final bool isUser;
+  final Widget child;
+  final bool pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Flexible(
+            child: AnimatedOpacity(
+              opacity: pending ? 0.76 : 1,
+              duration: const Duration(milliseconds: 150),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 560),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: isUser ? scheme.primary : scheme.kundiSurface,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(18),
+                    topRight: const Radius.circular(18),
+                    bottomLeft: Radius.circular(isUser ? 18 : 5),
+                    bottomRight: Radius.circular(isUser ? 5 : 18),
+                  ),
+                  border: isUser ? null : Border.all(color: scheme.kundiBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-              ],
-              Text(text),
-            ],
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(
+                    color: isUser ? scheme.onPrimary : scheme.onSurface,
+                    height: 1.38,
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KundiMark extends StatelessWidget {
+  const _KundiMark({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          shape: BoxShape.circle,
+          border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
+        child: Text(
+          'K',
+          style: TextStyle(color: color, fontWeight: FontWeight.w900),
+        ),
+      );
+}
+
+class _VoiceBadge extends StatelessWidget {
+  const _VoiceBadge();
+
+  @override
+  Widget build(BuildContext context) => Row(
+        key: const Key('assistant-voice-message-badge'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.graphic_eq_rounded, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            context.l10n.assistantVoice,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
       );
 }
 
@@ -388,22 +626,19 @@ class _ThinkingBubble extends StatelessWidget {
   const _ThinkingBubble();
 
   @override
-  Widget build(BuildContext context) => Align(
-        alignment: Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 10),
-              Text(context.l10n.assistantThinking),
-            ],
-          ),
+  Widget build(BuildContext context) => _ConversationRow(
+        isUser: false,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 9),
+            Text(context.l10n.assistantThinking),
+          ],
         ),
       );
 }
@@ -412,13 +647,70 @@ class _EmptyConversation extends StatelessWidget {
   const _EmptyConversation();
 
   @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [scheme.primary, scheme.secondary],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.24),
+                    blurRadius: 24,
+                  ),
+                ],
+              ),
+              child: Text(
+                'K',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              context.l10n.assistantEmpty,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.kundiTextSecondary,
+                    height: 1.4,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssistantLoading extends StatelessWidget {
+  const _AssistantLoading();
+
+  @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            context.l10n.assistantEmpty,
-            textAlign: TextAlign.center,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _KundiMark(color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 14),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ],
         ),
       );
 }
@@ -431,25 +723,33 @@ class _TransportError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Material(
-      color: colors.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: colors.onErrorContainer),
-              ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: KundiRadius.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: colors.onErrorContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: colors.onErrorContainer),
             ),
-            if (onRetry != null)
-              TextButton(
-                onPressed: onRetry,
-                child: Text(context.l10n.commonRetry),
-              ),
-          ],
-        ),
+          ),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: Text(context.l10n.commonRetry),
+            ),
+        ],
       ),
     );
   }
@@ -460,17 +760,120 @@ class _LoadError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Center(
+  Widget build(BuildContext context) => KundiStateBody.error(
+        label: context.l10n.assistantLoadFailed,
+        onRetry: onRetry,
+      );
+}
+
+class _SessionsSheet extends StatelessWidget {
+  const _SessionsSheet({
+    required this.view,
+    required this.onOpen,
+    required this.onLoadMore,
+  });
+
+  final AssistantViewState view;
+  final ValueChanged<AssistantSessionEntity> onOpen;
+  final VoidCallback? onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FractionallySizedBox(
+      heightFactor: 0.72,
+      child: Material(
+        color: scheme.kundiSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(context.l10n.assistantLoadFailed),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: onRetry,
-              child: Text(context.l10n.commonRetry),
+            const SizedBox(height: 10),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: scheme.kundiBorder,
+                borderRadius: KundiRadius.pill,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      context.l10n.assistantPastChats,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: scheme.kundiBorder),
+            Expanded(
+              child: view.sessions.isEmpty
+                  ? Center(child: Text(context.l10n.assistantEmpty))
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount:
+                          view.sessions.length + (onLoadMore == null ? 0 : 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
+                      itemBuilder: (context, index) {
+                        if (index == view.sessions.length) {
+                          return TextButton(
+                            onPressed: onLoadMore,
+                            child: Text(context.l10n.assistantShowMore),
+                          );
+                        }
+                        final session = view.sessions[index];
+                        final selected = session.id == view.activeSession?.id;
+                        return ListTile(
+                          selected: selected,
+                          selectedTileColor:
+                              scheme.primary.withValues(alpha: 0.1),
+                          leading: CircleAvatar(
+                            backgroundColor: selected
+                                ? scheme.primary.withValues(alpha: 0.18)
+                                : scheme.kundiElevated,
+                            child: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.kundiTextSecondary,
+                            ),
+                          ),
+                          title: Text(
+                            session.title.isEmpty
+                                ? context.l10n.assistantNewChat
+                                : session.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            context.l10n
+                                .assistantGradeClass(session.gradeLevel),
+                          ),
+                          trailing: selected
+                              ? Icon(
+                                  Icons.check_circle_rounded,
+                                  color: scheme.primary,
+                                )
+                              : null,
+                          onTap: () => onOpen(session),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
-      );
+      ),
+    );
+  }
 }

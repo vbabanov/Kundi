@@ -726,6 +726,9 @@ class AppLocalizationsKk extends AppLocalizations {
   String get assistantTitle => 'Kundi-ден сұраңыз';
 
   @override
+  String get assistantSubtitle => 'Оқу бойынша көмекші';
+
+  @override
   String get assistantPastChats => 'Алдыңғы диалогтар';
 
   @override

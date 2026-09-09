@@ -766,6 +766,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get assistantTitle => 'Спросите Kundi';
 
   @override
+  String get assistantSubtitle => 'Помощник по учёбе';
+
+  @override
   String get assistantPastChats => 'Прошлые диалоги';
 
   @override

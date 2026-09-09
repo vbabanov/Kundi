@@ -8,6 +8,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../gamification/application/gamification_controller.dart';
 import '../../gamification/domain/gamification_entity.dart';
 import '../../gamification/presentation/gamification_page.dart';
+import '../../gamification/presentation/achievement_progress.dart';
 import '../../settings/application/settings_controller.dart';
 import '../../settings/domain/settings_entity.dart';
 import '../application/profile_controller.dart';
@@ -801,7 +802,7 @@ class _AchievementsSection extends StatelessWidget {
             icon: _achievementIcon(item.category),
             title: item.title.resolve(language),
             subtitle: context.l10n.gamificationProgress(
-              item.current,
+              displayAchievementCurrent(item),
               item.target,
             ),
             glow: color,

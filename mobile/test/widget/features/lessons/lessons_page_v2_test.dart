@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/kundi_behavior/application/kundi_behavior_clock.dart';
 import 'package:kundi_mobile/features/kundi_behavior/application/kundi_behavior_controller.dart';
 import 'package:kundi_mobile/features/kundi_behavior/domain/kundi_behavior_event.dart';
+import 'package:kundi_mobile/features/home_insight/application/home_insight_controller.dart';
+import 'package:kundi_mobile/features/home_insight/domain/home_insight.dart';
 import 'package:kundi_mobile/features/lessons/application/lessons_controller.dart';
 import 'package:kundi_mobile/features/lessons/domain/lessons_entity.dart';
 import 'package:kundi_mobile/features/lessons/domain/lessons_repository.dart';
@@ -18,6 +20,30 @@ import 'package:kundi_mobile/shared/theme/app_theme.dart';
 import 'package:kundi_mobile/shared/widgets/student_pull_to_refresh.dart';
 
 void main() {
+  for (final locale in const <String>['ru', 'kk']) {
+    testWidgets('neutral Home renders the $locale daily insight',
+        (tester) async {
+      await _setSurface(tester, const Size(430, 1000));
+      final insight = HomeInsight.localFallback(
+        locale: locale,
+        gradeLevel: 7,
+      );
+      await tester.pumpWidget(
+        _testApp(
+          lessons: const <LessonsEntity>[],
+          summary: SummaryEntity.empty,
+          studentName: '',
+          insight: insight,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(insight.text), findsOneWidget);
+      expect(find.byKey(KundiHomeHero.heroKey), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('home header, gamification panel and hero use current data',
       (tester) async {
     await _setSurface(tester, const Size(430, 1000));
@@ -94,7 +120,7 @@ void main() {
     expect(title.style?.color, theme.colorScheme.onSurface);
   });
 
-  testWidgets('behavior flag false preserves the stable Home contract',
+  testWidgets('behavior flag false keeps the neutral daily insight',
       (tester) async {
     await _setSurface(tester, const Size(430, 1000));
     final clock = _FrozenBehaviorClock(DateTime.utc(2026, 4, 5, 7, 45));
@@ -119,7 +145,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Давай посмотрим, что запланировано на сегодня.'),
+      find.text(
+        'Попробуй объяснить правило своими словами — так легче заметить пробел.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Отличная работа!'), findsNothing);
@@ -360,7 +388,9 @@ void main() {
     expect(find.text('Заданий на сегодня нет'), findsOneWidget);
     expect(find.text('Новых оценок нет'), findsOneWidget);
     expect(
-      find.text('Давай посмотрим, что запланировано на сегодня.'),
+      find.text(
+        'Попробуй объяснить правило своими словами — так легче заметить пробел.',
+      ),
       findsOneWidget,
     );
     _expectNoMojibake(tester);
@@ -458,6 +488,7 @@ Widget _testApp({
   KundiBehaviorController? behaviorController,
   Future<void> Function()? refreshAction,
   ThemeData? theme,
+  HomeInsight? insight,
 }) {
   final page = LessonsPage(
     now: DateTime(2026, 4, 5, 7, 45),
@@ -487,6 +518,10 @@ Widget _testApp({
       profileControllerProvider.overrideWith(
         () => _FakeProfileController(studentName),
       ),
+      if (insight != null)
+        homeInsightControllerProvider.overrideWith(
+          () => _FakeHomeInsightController(insight),
+        ),
       kundiBehaviorCoreEnabledProvider.overrideWithValue(behaviorCoreEnabled),
       if (behaviorController != null)
         kundiBehaviorControllerProvider.overrideWith(
@@ -506,6 +541,18 @@ Widget _testApp({
       home: home,
     ),
   );
+}
+
+class _FakeHomeInsightController extends HomeInsightController {
+  _FakeHomeInsightController(this.insight);
+
+  final HomeInsight insight;
+
+  @override
+  HomeInsight build() => insight;
+
+  @override
+  Future<void> refresh() async {}
 }
 
 Future<void> _setSurface(WidgetTester tester, Size size) async {

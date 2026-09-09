@@ -9,6 +9,7 @@ import '../../../shared/widgets/student_pull_to_refresh.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/domain/kundi_behavior_state.dart';
 import '../../kundi_behavior/presentation/kundi_home_presentation_adapter.dart';
+import '../../home_insight/application/home_insight_controller.dart';
 import '../../profile/domain/profile_entity.dart';
 import '../../profile/application/profile_controller.dart';
 import '../../profile/presentation/profile_page.dart';
@@ -71,6 +72,7 @@ class LessonsPage extends ConsumerWidget {
         ref.watch(homeGamificationMetricsProvider(currentTime));
     final summaryState = ref.watch(summaryControllerProvider);
     final profileState = ref.watch(profileControllerProvider);
+    final homeInsight = ref.watch(homeInsightControllerProvider);
     final behaviorCoreEnabled = ref.watch(kundiBehaviorCoreEnabledProvider);
     final behaviorState =
         behaviorCoreEnabled ? ref.watch(kundiBehaviorControllerProvider) : null;
@@ -97,13 +99,8 @@ class LessonsPage extends ConsumerWidget {
     final greeting = studentName.trim().isEmpty
         ? '$greetingPrefix!'
         : l10n.homeGreeting(greetingPrefix, studentName.trim());
-    final heroMessage = _heroMessage(
-      lessonsState: lessonsState,
-      snapshot: today,
-      l10n: l10n,
-    );
-    final semanticState =
-        today.hasData ? l10n.homePlanAvailable : l10n.homePlanEmpty;
+    final heroMessage = homeInsight.text;
+    final semanticState = homeInsight.text;
     KundiHomePresentation? behaviorPresentation;
     if (behaviorState != null) {
       try {
@@ -147,7 +144,10 @@ class LessonsPage extends ConsumerWidget {
         child: SafeArea(
           bottom: false,
           child: RefreshIndicator(
-            onRefresh: () => refreshStudentFromGesture(context, ref),
+            onRefresh: () async {
+              await refreshStudentFromGesture(context, ref);
+              await ref.read(homeInsightControllerProvider.notifier).refresh();
+            },
             child: ListView(
               key: const Key('home-main-scroll'),
               clipBehavior: Clip.none,
@@ -824,28 +824,6 @@ class _TodaySnapshot {
           : l10n.homeNoLessons,
     );
   }
-}
-
-String _heroMessage({
-  required AsyncValue<List<LessonsEntity>> lessonsState,
-  required _TodaySnapshot snapshot,
-  required AppLocalizations l10n,
-}) {
-  if (lessonsState.isLoading && !snapshot.hasData) {
-    return l10n.homeBuildingPlan;
-  }
-  if (lessonsState.hasError && !snapshot.hasData) {
-    return l10n.homeScheduleUnavailable;
-  }
-  if (!snapshot.hasData) {
-    return l10n.homeSeeTodayPlan;
-  }
-  if (snapshot.homeworkCount == 0) {
-    return '${l10n.homeTodayLessons(snapshot.lessonCount)} '
-        '${l10n.homeNearestSubject(snapshot.nextLessonSubject)}';
-  }
-  return '${l10n.homeTodayLessons(snapshot.lessonCount)} '
-      '${l10n.homeTodayHomework(snapshot.homeworkCount)}';
 }
 
 String _homeworkActionText(int homeworkCount, AppLocalizations l10n) {

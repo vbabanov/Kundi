@@ -17,6 +17,7 @@ import '../../assistant/application/kundi_voice_assistant_coordinator.dart';
 import '../../assistant/presentation/assistant_page.dart';
 import '../../homework/application/homework_controller.dart';
 import '../../homework/presentation/homework_page.dart';
+import '../../home_insight/application/home_insight_controller.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
 import '../../kundi_behavior/domain/kundi_behavior_event.dart';
 import '../../lessons/application/lessons_controller.dart';
@@ -156,6 +157,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_recordGamificationActivity());
+      unawaited(ref.read(homeInsightControllerProvider.notifier).refresh());
     }
   }
 

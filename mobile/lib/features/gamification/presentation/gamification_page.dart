@@ -5,6 +5,7 @@ import '../../../l10n/l10n.dart';
 import '../../../shared/widgets/kundi_surface.dart';
 import '../application/gamification_controller.dart';
 import '../domain/gamification_entity.dart';
+import 'achievement_progress.dart';
 
 class GamificationPage extends ConsumerWidget {
   const GamificationPage({this.initialProfile, super.key});
@@ -272,7 +273,7 @@ class _AchievementTile extends StatelessWidget {
                     children: [
                       Text(
                         context.l10n.gamificationProgress(
-                          item.current,
+                          displayAchievementCurrent(item),
                           item.target,
                         ),
                         style: Theme.of(context).textTheme.labelSmall,

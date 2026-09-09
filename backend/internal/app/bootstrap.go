@@ -19,6 +19,7 @@ import (
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
 	ingestmodule "github.com/kundi/kundi/backend/internal/modules/diary_ingest"
 	gamificationmodule "github.com/kundi/kundi/backend/internal/modules/gamification"
+	homeinsightmodule "github.com/kundi/kundi/backend/internal/modules/homeinsight"
 	jobsmodule "github.com/kundi/kundi/backend/internal/modules/jobs"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	"github.com/kundi/kundi/backend/internal/modules/profiles"
@@ -53,6 +54,7 @@ type Bootstrap struct {
 	WhatsAppDispatch *whatsappmodule.DispatchProcessor
 	AuditService     *auditmodule.Service
 	Gamification     *gamificationmodule.Service
+	HomeInsight      *homeinsightmodule.Service
 }
 
 func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
@@ -95,6 +97,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	personaService := persona.NewService()
 	assistantEnabled := cfg.AI.AssistantEnabled
 	voiceInputEnabled := cfg.AI.VoiceInputEnabled
+	assistantLLMProvider := resolveAssistantLLMProvider(cfg.AI)
 	canaryGate, err := assistantmodule.NewCanaryGate(cfg.AI.AssistantRolloutMode, cfg.AI.AssistantCanaryStudentIDs)
 	if err != nil && assistantEnabled {
 		pool.Close()
@@ -102,7 +105,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 	}
 	assistantService := assistantmodule.NewServiceWithOptions(
 		personaService,
-		resolveAssistantLLMProvider(cfg.AI),
+		assistantLLMProvider,
 		resolveTTSProvider(cfg.AI.TTSProvider, cfg.AI.TTSBaseURL, cfg.AI.TTSAPIKey),
 		assistantmodule.Options{
 			SpeechBroker: speechauth.New(speechauth.Config{
@@ -151,6 +154,15 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		pool.Close()
 		return nil, err
 	}
+	homeInsightService, err := homeinsightmodule.NewService(
+		assistantLLMProvider,
+		homeinsightmodule.NewPostgresGradeSource(pool),
+		homeinsightmodule.Options{Timezone: cfg.Gamification.Timezone},
+	)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
 
 	return &Bootstrap{
 		Config:           cfg,
@@ -170,6 +182,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		WhatsAppDispatch: whatsAppDispatch,
 		AuditService:     auditService,
 		Gamification:     gamificationService,
+		HomeInsight:      homeInsightService,
 	}, nil
 }
 

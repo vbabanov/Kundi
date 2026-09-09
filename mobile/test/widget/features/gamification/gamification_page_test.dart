@@ -49,6 +49,14 @@ void main() {
           );
           expect(find.byIcon(Icons.workspace_premium_rounded), findsOneWidget);
           expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+          expect(
+            find.text(locale.languageCode == 'kk' ? '1 / 1' : '1 из 1'),
+            findsOneWidget,
+          );
+          expect(
+            find.text(locale.languageCode == 'kk' ? '2 / 1' : '2 из 1'),
+            findsNothing,
+          );
         },
       );
     }
@@ -85,7 +93,7 @@ GamificationProfile _profile() => GamificationProfile(
           description: const LocalizedGamificationText(
               ru: 'Впервые воспользуйся Kundi.',
               kk: 'Kundi қолданбасын алғаш рет пайдалан.'),
-          current: 1,
+          current: 2,
           target: 1,
           unlocked: true,
           unlockedAt: DateTime.utc(2026, 9, 9),
