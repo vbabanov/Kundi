@@ -63,6 +63,12 @@ class ImeVisibilityTrackerTest {
     }
 
     @Test
+    fun proactiveLegacyLayoutIsLimitedToAndroidTenAndOlder() {
+        assertTrue(shouldPrepareLegacyImeLayout(sdkInt = 29))
+        assertFalse(shouldPrepareLegacyImeLayout(sdkInt = 30))
+    }
+
+    @Test
     fun legacyVisibleFrameDetectsKeyboardOcclusion() {
         assertTrue(
             isLegacyImeLikelyVisible(

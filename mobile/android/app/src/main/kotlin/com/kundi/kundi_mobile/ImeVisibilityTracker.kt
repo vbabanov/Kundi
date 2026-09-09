@@ -23,6 +23,8 @@ internal fun shouldEnableLegacyImeResize(
     isVisible: Boolean,
 ): Boolean = sdkInt < 30 && !wasVisible && isVisible
 
+internal fun shouldPrepareLegacyImeLayout(sdkInt: Int): Boolean = sdkInt < 30
+
 /**
  * Detects the legacy keyboard from the window's visible frame.
  *

@@ -16,6 +16,7 @@ import com.kundi.kundi_mobile.speech.KundiSystemSpeechHost
 import com.kundi.kundi_mobile.tts.KundiTtsHost
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val imeVisibilityTracker = ImeVisibilityTracker()
@@ -41,6 +42,23 @@ class MainActivity : FlutterActivity() {
         KundiTtsHost.register(this, flutterEngine)
         if (BuildConfig.KUNDI_VOICE_INPUT_ENABLED) {
             KundiSystemSpeechHost.register(this, flutterEngine)
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            LEGACY_IME_LAYOUT_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            if (call.method != PREPARE_LEGACY_IME_LAYOUT_METHOD) {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            if (shouldPrepareLegacyImeLayout(Build.VERSION.SDK_INT)) {
+                // This must happen before Flutter asks Android to show the
+                // keyboard. MIUI 12 does not report IME insets while the
+                // existing edge-to-edge layout is active.
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                Log.d(IMMERSIVE_LOG_TAG, "legacy IME layout prepared")
+            }
+            result.success(null)
         }
     }
 
@@ -187,6 +205,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private companion object {
+        const val LEGACY_IME_LAYOUT_CHANNEL =
+            "com.kundi.kundi_mobile/legacy_ime_layout"
+        const val PREPARE_LEGACY_IME_LAYOUT_METHOD = "prepareForIme"
         const val IME_SYSTEM_UI_COOLDOWN_MILLIS = 1_100L
         const val IMMERSIVE_LOG_TAG = "KundiImmersive"
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundi_mobile/features/assistant/application/assistant_controller.dart';
 import 'package:kundi_mobile/features/assistant/assistant_feature.dart';
@@ -114,6 +115,51 @@ void main() {
     );
 
     expect(initialBottom.dy - keyboardBottom.dy, closeTo(240, 1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('prepares the legacy Android layout before suggestion focus',
+      (tester) async {
+    const channel = MethodChannel(
+      'com.kundi.kundi_mobile/legacy_ime_layout',
+    );
+    var prepareCalls = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async {
+        if (call.method == 'prepareForIme') prepareCalls++;
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(errorMessage: '')),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('assistant-suggestion-0')));
+    await tester.pumpAndSettle();
+
+    expect(prepareCalls, greaterThanOrEqualTo(1));
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const Key('assistant-text-field')),
+          )
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
   });
 

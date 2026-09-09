@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../shared/theme/kundi_tokens.dart';
@@ -18,6 +19,9 @@ class AssistantPage extends ConsumerStatefulWidget {
 }
 
 class _AssistantPageState extends ConsumerState<AssistantPage> {
+  static const _legacyImeLayoutChannel =
+      MethodChannel('com.kundi.kundi_mobile/legacy_ime_layout');
+
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _messageFocus = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -26,6 +30,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   void initState() {
     super.initState();
     _messageController.addListener(_onDraftChanged);
+    _messageFocus.addListener(_onMessageFocusChanged);
     unawaited(
       ref.read(assistantControllerProvider.notifier).revalidateOnPageOpen(),
     );
@@ -36,13 +41,36 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     _messageController
       ..removeListener(_onDraftChanged)
       ..dispose();
-    _messageFocus.dispose();
+    _messageFocus
+      ..removeListener(_onMessageFocusChanged)
+      ..dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _onDraftChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onMessageFocusChanged() {
+    if (_messageFocus.hasFocus) {
+      unawaited(_prepareLegacyImeLayout());
+    }
+  }
+
+  Future<void> _prepareLegacyImeLayout() async {
+    try {
+      await _legacyImeLayoutChannel.invokeMethod<void>('prepareForIme');
+    } on MissingPluginException {
+      // Non-Android targets and widget tests do not install the host channel.
+    } on PlatformException {
+      // Input remains usable if a vendor host rejects the compatibility hint.
+    }
+  }
+
+  Future<void> _focusComposer() async {
+    await _prepareLegacyImeLayout();
+    if (mounted) _messageFocus.requestFocus();
   }
 
   @override
@@ -204,7 +232,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
               _messageController
                 ..text = text
                 ..selection = TextSelection.collapsed(offset: text.length);
-              _messageFocus.requestFocus();
+              unawaited(_focusComposer());
             },
           );
         },
