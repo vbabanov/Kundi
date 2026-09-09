@@ -47,7 +47,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
+        if (hasFocus && !imeVisibilityTracker.isVisible) {
             applyImmersiveMode("window-focus-restored")
         }
     }
@@ -118,10 +118,22 @@ class MainActivity : FlutterActivity() {
         val decorView = window.decorView
         ViewCompat.setOnApplyWindowInsetsListener(decorView) { _, insets ->
             val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+            val imeWasVisible = imeVisibilityTracker.isVisible
+            val enableLegacyImeResize = shouldEnableLegacyImeResize(
+                sdkInt = Build.VERSION.SDK_INT,
+                wasVisible = imeWasVisible,
+                isVisible = imeVisible,
+            )
             val shouldRestoreAfterIme =
                 imeVisibilityTracker.onVisibilityChanged(imeVisible)
             if (imeVisible) {
                 decorView.removeCallbacks(restoreAfterIme)
+                // On Android 8-10, edge-to-edge decor does not resize the
+                // Flutter surface for adjustResize. Temporarily let the
+                // platform fit the decor so the composer stays above the IME.
+                if (enableLegacyImeResize) {
+                    WindowCompat.setDecorFitsSystemWindows(window, true)
+                }
             } else if (shouldRestoreAfterIme) {
                 decorView.removeCallbacks(restoreAfterIme)
                 decorView.postDelayed(restoreAfterIme, IME_SYSTEM_UI_COOLDOWN_MILLIS)

@@ -32,4 +32,33 @@ class ImeVisibilityTrackerTest {
         tracker.onVisibilityChanged(true)
         assertTrue(tracker.onVisibilityChanged(false))
     }
+
+    @Test
+    fun legacyImeOpenRequestsOneDecorFitTransition() {
+        assertTrue(
+            shouldEnableLegacyImeResize(
+                sdkInt = 29,
+                wasVisible = false,
+                isVisible = true,
+            ),
+        )
+        assertFalse(
+            shouldEnableLegacyImeResize(
+                sdkInt = 29,
+                wasVisible = true,
+                isVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun modernAndroidKeepsEdgeToEdgeInsetHandling() {
+        assertFalse(
+            shouldEnableLegacyImeResize(
+                sdkInt = 30,
+                wasVisible = false,
+                isVisible = true,
+            ),
+        )
+    }
 }

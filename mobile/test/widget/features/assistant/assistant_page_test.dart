@@ -86,6 +86,37 @@ void main() {
     }
   }
 
+  testWidgets('composer stays above the reported keyboard inset',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          assistantControllerProvider.overrideWith(
+            () => _FakeAssistantController(_viewState(errorMessage: '')),
+          ),
+        ],
+        child: const MaterialApp(home: AssistantPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final initialBottom = tester.getBottomRight(
+      find.byKey(const Key('assistant-text-field')),
+    );
+    tester.view.viewInsets =
+        FakeViewPadding(bottom: 240 * tester.view.devicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final keyboardBottom = tester.getBottomRight(
+      find.byKey(const Key('assistant-text-field')),
+    );
+
+    expect(initialBottom.dy - keyboardBottom.dy, closeTo(240, 1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'renders text-only conversation without microphone or provider data',
       (tester) async {

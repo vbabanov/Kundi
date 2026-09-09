@@ -16,3 +16,9 @@ internal class ImeVisibilityTracker {
         return keyboardWasClosed
     }
 }
+
+internal fun shouldEnableLegacyImeResize(
+    sdkInt: Int,
+    wasVisible: Boolean,
+    isVisible: Boolean,
+): Boolean = sdkInt < 30 && !wasVisible && isVisible
