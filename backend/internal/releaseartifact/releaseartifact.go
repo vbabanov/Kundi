@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,7 +29,7 @@ const (
 	TargetGOARCH      = "amd64"
 	TargetGOAMD64     = "v1"
 	TargetCGOEnabled  = "0"
-	SchemaVersion     = 1
+	SchemaVersion     = 2
 )
 
 var productionTargets = []string{
@@ -44,6 +45,15 @@ var requiredBuildFlags = []string{
 	"-trimpath",
 	"-buildvcs=true",
 	"-ldflags=-buildid=",
+}
+
+var requiredScripts = []string{
+	"run-api.sh",
+	"run-migrator.sh",
+	"run-worker-ai.sh",
+	"run-worker-jobs.sh",
+	"run-worker-whatsapp.sh",
+	"verify-runtime.sh",
 }
 
 type Config struct {
@@ -69,6 +79,14 @@ type Migration struct {
 	SHA256   string `json:"sha256"`
 }
 
+type Script struct {
+	Name   string `json:"name"`
+	Path   string `json:"path"`
+	Size   int64  `json:"size"`
+	SHA256 string `json:"sha256"`
+	Mode   string `json:"mode"`
+}
+
 type Manifest struct {
 	SchemaVersion   int         `json:"schema_version"`
 	Repository      string      `json:"repository"`
@@ -84,6 +102,7 @@ type Manifest struct {
 	BuildFlags      []string    `json:"build_flags"`
 	Binaries        []Binary    `json:"binaries"`
 	Migrations      []Migration `json:"migrations"`
+	Scripts         []Script    `json:"scripts"`
 	PackageFilename string      `json:"package_filename"`
 }
 
@@ -98,6 +117,7 @@ type Comparison struct {
 	ArchiveSHA string
 	Binaries   []Binary
 	Migrations []Migration
+	Scripts    []Script
 }
 
 type buildMetadata struct {
@@ -108,6 +128,7 @@ type buildMetadata struct {
 	CommitUnix     int64
 	GoVersion      string
 	MigrationNames []string
+	ScriptNames    []string
 }
 
 type archiveEntry struct {
@@ -147,6 +168,9 @@ func Build(cfg Config) (Result, error) {
 	}
 	if err := os.MkdirAll(filepath.Join(packageRoot, "migrations"), 0o755); err != nil {
 		return Result{}, fmt.Errorf("create migration directory: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(packageRoot, "scripts"), 0o755); err != nil {
+		return Result{}, fmt.Errorf("create scripts directory: %w", err)
 	}
 	if err := os.MkdirAll(cfg.GoCache, 0o755); err != nil {
 		return Result{}, fmt.Errorf("create Go cache: %w", err)
@@ -199,6 +223,24 @@ func Build(cfg Config) (Result, error) {
 		}
 		manifest.Migrations = append(manifest.Migrations, Migration{Filename: filename, SHA256: hash})
 	}
+	for _, filename := range meta.ScriptNames {
+		destination := filepath.Join(packageRoot, "scripts", filename)
+		contents, err := gitBytes(cfg.SourceRoot, "cat-file", "blob", "HEAD:backend/scripts/"+filename)
+		if err != nil {
+			return Result{}, fmt.Errorf("read runtime script Git blob %s: %w", filename, err)
+		}
+		if err := os.WriteFile(destination, contents, 0o755); err != nil {
+			return Result{}, fmt.Errorf("write runtime script %s: %w", filename, err)
+		}
+		hash, size, err := fileSHA256(destination)
+		if err != nil {
+			return Result{}, err
+		}
+		manifest.Scripts = append(manifest.Scripts, Script{
+			Name: filename, Path: filepath.ToSlash(filepath.Join("scripts", filename)),
+			Size: size, SHA256: hash, Mode: "0755",
+		})
+	}
 
 	manifestBytes, err := marshalManifest(manifest)
 	if err != nil {
@@ -212,6 +254,9 @@ func Build(cfg Config) (Result, error) {
 		return Result{}, fmt.Errorf("write release manifest: %w", err)
 	}
 	if err := writeChecksums(packageRoot); err != nil {
+		return Result{}, err
+	}
+	if err := ValidateRuntimePackage(packageRoot, manifest); err != nil {
 		return Result{}, err
 	}
 
@@ -291,6 +336,30 @@ func Compare(outputA, outputB string) (Comparison, error) {
 			return Comparison{}, fmt.Errorf("verify build B migration %s: %w", migration.Filename, err)
 		}
 	}
+	if len(manifestA.Scripts) != len(requiredScripts) || len(manifestB.Scripts) != len(requiredScripts) {
+		return Comparison{}, errors.New("manifest does not contain the exact runtime script set")
+	}
+	for index, expectedName := range requiredScripts {
+		a, b := manifestA.Scripts[index], manifestB.Scripts[index]
+		if a.Name != expectedName || b.Name != expectedName || a.Path != "scripts/"+expectedName || b.Path != "scripts/"+expectedName || a.Mode != "0755" || b.Mode != "0755" {
+			return Comparison{}, fmt.Errorf("runtime script order, path, or mode mismatch at index %d", index)
+		}
+		if a.Size != b.Size || a.SHA256 != b.SHA256 {
+			return Comparison{}, fmt.Errorf("runtime script %s is not reproducible", expectedName)
+		}
+		if err := verifyManifestFile(outputA, manifestA, a.Path, a.SHA256, a.Size); err != nil {
+			return Comparison{}, fmt.Errorf("verify build A script %s: %w", expectedName, err)
+		}
+		if err := verifyManifestFile(outputB, manifestB, b.Path, b.SHA256, b.Size); err != nil {
+			return Comparison{}, fmt.Errorf("verify build B script %s: %w", expectedName, err)
+		}
+	}
+	if err := ValidateRuntimePackage(filepath.Join(outputA, "kundi-backend-"+manifestA.GitCommit[:7]), manifestA); err != nil {
+		return Comparison{}, fmt.Errorf("validate build A runtime: %w", err)
+	}
+	if err := ValidateRuntimePackage(filepath.Join(outputB, "kundi-backend-"+manifestB.GitCommit[:7]), manifestB); err != nil {
+		return Comparison{}, fmt.Errorf("validate build B runtime: %w", err)
+	}
 	archiveA := filepath.Join(outputA, manifestA.PackageFilename)
 	archiveB := filepath.Join(outputB, manifestB.PackageFilename)
 	hashA, sizeA, err := fileSHA256(archiveA)
@@ -304,7 +373,7 @@ func Compare(outputA, outputB string) (Comparison, error) {
 	if sizeA != sizeB || hashA != hashB {
 		return Comparison{}, errors.New("release archives are not reproducible")
 	}
-	return Comparison{ArchiveSHA: hashA, Binaries: manifestA.Binaries, Migrations: manifestA.Migrations}, nil
+	return Comparison{ArchiveSHA: hashA, Binaries: manifestA.Binaries, Migrations: manifestA.Migrations, Scripts: manifestA.Scripts}, nil
 }
 
 func normalizeConfig(cfg *Config) error {
@@ -407,6 +476,7 @@ func preflight(cfg Config) (buildMetadata, error) {
 	return buildMetadata{
 		Repository: repository, Commit: commit, Tree: tree, CommitTime: commitTime,
 		CommitUnix: commitUnix, GoVersion: RequiredGoVersion, MigrationNames: migrationNames,
+		ScriptNames: append([]string(nil), requiredScripts...),
 	}, nil
 }
 
@@ -507,8 +577,8 @@ func migrationFiles(directory string) ([]string, error) {
 		}
 	}
 	sort.Strings(files)
-	if len(files) != 11 {
-		return nil, fmt.Errorf("require exactly 11 SQL migrations, found %d", len(files))
+	if len(files) != 12 {
+		return nil, fmt.Errorf("require exactly 12 SQL migrations, found %d", len(files))
 	}
 	for index, path := range files {
 		prefix := fmt.Sprintf("%04d_", index+1)
@@ -521,7 +591,7 @@ func migrationFiles(directory string) ([]string, error) {
 
 func writeChecksums(packageRoot string) error {
 	var relativePaths []string
-	for _, directory := range []string{"bin", "migrations"} {
+	for _, directory := range []string{"bin", "migrations", "scripts"} {
 		entries, err := os.ReadDir(filepath.Join(packageRoot, directory))
 		if err != nil {
 			return fmt.Errorf("read %s for checksums: %w", directory, err)
@@ -626,7 +696,7 @@ func collectArchiveEntries(packageRoot, packageBase string) ([]archiveEntry, err
 			return err
 		}
 		mode := int64(0o644)
-		if strings.HasPrefix(filepath.ToSlash(relativePath), "bin/") {
+		if strings.HasPrefix(filepath.ToSlash(relativePath), "bin/") || strings.HasPrefix(filepath.ToSlash(relativePath), "scripts/") {
 			mode = 0o755
 		}
 		entries = append(entries, archiveEntry{
@@ -641,6 +711,45 @@ func collectArchiveEntries(packageRoot, packageBase string) ([]archiveEntry, err
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ArchivePath < entries[j].ArchivePath })
 	return entries, nil
+}
+
+// ValidateRuntimePackage is the deploy gate for a clean unpacked artifact. It
+// intentionally checks no repository paths: every runtime dependency must be
+// present and executable inside packageRoot.
+func ValidateRuntimePackage(packageRoot string, manifest Manifest) error {
+	if len(manifest.Binaries) != len(productionTargets) {
+		return errors.New("runtime binary manifest is incomplete")
+	}
+	if len(manifest.Scripts) != len(requiredScripts) {
+		return errors.New("runtime script manifest is incomplete")
+	}
+	for index, target := range productionTargets {
+		entry := manifest.Binaries[index]
+		if entry.Name != target || entry.Path != "bin/"+target {
+			return fmt.Errorf("runtime entrypoint %s is absent from manifest", target)
+		}
+		info, err := os.Stat(filepath.Join(packageRoot, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			return fmt.Errorf("runtime entrypoint missing: %s: %w", entry.Path, err)
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+			return fmt.Errorf("runtime entrypoint is not executable: %s", entry.Path)
+		}
+	}
+	for index, name := range requiredScripts {
+		entry := manifest.Scripts[index]
+		if entry.Name != name || entry.Path != "scripts/"+name || entry.Mode != "0755" {
+			return fmt.Errorf("runtime wrapper %s is absent from manifest", name)
+		}
+		info, err := os.Stat(filepath.Join(packageRoot, filepath.FromSlash(entry.Path)))
+		if err != nil {
+			return fmt.Errorf("runtime wrapper missing: %s: %w", entry.Path, err)
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+			return fmt.Errorf("runtime wrapper is not executable: %s", entry.Path)
+		}
+	}
+	return nil
 }
 
 func marshalManifest(manifest Manifest) ([]byte, error) {

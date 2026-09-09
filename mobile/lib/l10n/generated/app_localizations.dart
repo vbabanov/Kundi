@@ -824,6 +824,78 @@ abstract class AppLocalizations {
   /// **'Получите 5 оценок\n«5»'**
   String get profileAchievementFirstFiveHint;
 
+  /// No description provided for @gamificationLoading.
+  ///
+  /// In ru, this message translates to:
+  /// **'Загружаем достижения…'**
+  String get gamificationLoading;
+
+  /// No description provided for @gamificationLoadFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось загрузить достижения. Ранее полученные данные не изменены.'**
+  String get gamificationLoadFailed;
+
+  /// No description provided for @gamificationUnavailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'Достижения пока недоступны'**
+  String get gamificationUnavailable;
+
+  /// No description provided for @gamificationLocked.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не открыто'**
+  String get gamificationLocked;
+
+  /// No description provided for @gamificationUnlocked.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открыто'**
+  String get gamificationUnlocked;
+
+  /// No description provided for @gamificationUnlockedOn.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открыто {date}'**
+  String gamificationUnlockedOn(String date);
+
+  /// No description provided for @gamificationProgress.
+  ///
+  /// In ru, this message translates to:
+  /// **'{current} из {target}'**
+  String gamificationProgress(int current, int target);
+
+  /// No description provided for @gamificationUnlockedSummary.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открыто: {unlocked} из {total}'**
+  String gamificationUnlockedSummary(int unlocked, int total);
+
+  /// No description provided for @gamificationNextLevel.
+  ///
+  /// In ru, this message translates to:
+  /// **'До следующего уровня: {points} очков'**
+  String gamificationNextLevel(int points);
+
+  /// No description provided for @gamificationMaxLevel.
+  ///
+  /// In ru, this message translates to:
+  /// **'Максимальный уровень достигнут'**
+  String get gamificationMaxLevel;
+
+  /// No description provided for @gamificationUnlockOne.
+  ///
+  /// In ru, this message translates to:
+  /// **'Новое достижение: {title}'**
+  String gamificationUnlockOne(String title);
+
+  /// No description provided for @gamificationUnlockMany.
+  ///
+  /// In ru, this message translates to:
+  /// **'Открыто новых достижений: {count}'**
+  String gamificationUnlockMany(int count);
+
   /// No description provided for @settingsTitle.
   ///
   /// In ru, this message translates to:

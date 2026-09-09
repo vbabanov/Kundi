@@ -33,6 +33,11 @@ type releaseManifest struct {
 	Migrations []struct {
 		Filename string `json:"filename"`
 	} `json:"migrations"`
+	Scripts []struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+		Mode string `json:"mode"`
+	} `json:"scripts"`
 }
 
 func main() {
@@ -62,6 +67,9 @@ func run() error {
 		return err
 	}
 	if err := verifyManifest(manifest, expectedSHA); err != nil {
+		return err
+	}
+	if err := verifyRuntimePackage(packageRoot); err != nil {
 		return err
 	}
 	migratorSHA, revision, modified, err := inspectMigrator(migratorPath, manifest, expectedSHA)
@@ -103,7 +111,7 @@ func run() error {
 	if err := runMigrator(packageRoot); err != nil {
 		return fmt.Errorf("run full packaged migrator: %w", err)
 	}
-	if err := requireMigrationCount(ctx, pool, 11); err != nil {
+	if err := requireMigrationCount(ctx, pool, 12); err != nil {
 		return err
 	}
 	if err := verifyMigrationNames(ctx, pool); err != nil {
@@ -123,7 +131,7 @@ func run() error {
 	if err := runMigrator(packageRoot); err != nil {
 		return fmt.Errorf("rerun full packaged migrator: %w", err)
 	}
-	if err := requireMigrationCount(ctx, pool, 11); err != nil {
+	if err := requireMigrationCount(ctx, pool, 12); err != nil {
 		return err
 	}
 	secondSignature, err := schemaSignature(ctx, pool)
@@ -139,8 +147,8 @@ func run() error {
 	fmt.Printf("migrator_vcs_revision=%s\n", revision)
 	fmt.Printf("migrator_vcs_modified=%t\n", modified)
 	fmt.Println("pre0009_migration_count=8")
-	fmt.Println("full_migration_count=11")
-	fmt.Println("second_migration_count=11")
+	fmt.Println("full_migration_count=12")
+	fmt.Println("second_migration_count=12")
 	fmt.Println("second_run_schema_unchanged=true")
 	fmt.Println("ownership_mismatch_sqlstate=23503")
 	fmt.Println("input_mode_invalid_sqlstate=23514")
@@ -168,8 +176,18 @@ func verifyManifest(manifest releaseManifest, expectedSHA string) error {
 	if len(manifest.Binaries) != 5 {
 		return fmt.Errorf("manifest binary count = %d, want 5", len(manifest.Binaries))
 	}
-	if len(manifest.Migrations) != 11 {
-		return fmt.Errorf("manifest migration count = %d, want 11", len(manifest.Migrations))
+	if len(manifest.Migrations) != 12 {
+		return fmt.Errorf("manifest migration count = %d, want 12", len(manifest.Migrations))
+	}
+	wantScripts := []string{"run-api.sh", "run-migrator.sh", "run-worker-ai.sh", "run-worker-jobs.sh", "run-worker-whatsapp.sh", "verify-runtime.sh"}
+	if len(manifest.Scripts) != len(wantScripts) {
+		return fmt.Errorf("manifest runtime script count = %d, want %d", len(manifest.Scripts), len(wantScripts))
+	}
+	for index, name := range wantScripts {
+		item := manifest.Scripts[index]
+		if item.Name != name || item.Path != "scripts/"+name || item.Mode != "0755" {
+			return fmt.Errorf("manifest runtime script %d is %#v", index, item)
+		}
 	}
 	for index, migration := range manifest.Migrations {
 		wantPrefix := fmt.Sprintf("%04d_", index+1)
@@ -276,12 +294,29 @@ func copyFile(source, destination string, mode os.FileMode) error {
 }
 
 func runMigrator(packageRoot string) error {
-	command := exec.Command(filepath.Join(packageRoot, "bin", "migrator"))
+	entrypoint := filepath.Join(packageRoot, "scripts", "run-migrator.sh")
+	if _, err := os.Stat(entrypoint); errors.Is(err, os.ErrNotExist) {
+		entrypoint = filepath.Join(packageRoot, "bin", "migrator")
+	}
+	command := exec.Command(entrypoint)
 	command.Dir = packageRoot
 	command.Env = os.Environ()
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func verifyRuntimePackage(packageRoot string) error {
+	command := exec.Command(filepath.Join(packageRoot, "scripts", "verify-runtime.sh"))
+	command.Dir = packageRoot
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("verify clean unpacked runtime package: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	if strings.TrimSpace(string(output)) != "runtime_package=ready" {
+		return fmt.Errorf("unexpected runtime package verification: %q", strings.TrimSpace(string(output)))
 	}
 	return nil
 }
@@ -314,8 +349,8 @@ func verifyMigrationNames(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	if len(names) != 11 {
-		return fmt.Errorf("unique schema migration names = %d, want 11", len(names))
+	if len(names) != 12 {
+		return fmt.Errorf("unique schema migration names = %d, want 12", len(names))
 	}
 	for index, name := range names {
 		if !strings.HasPrefix(name, fmt.Sprintf("%04d_", index+1)) {

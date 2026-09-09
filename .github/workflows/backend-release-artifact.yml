@@ -6,6 +6,8 @@ on:
     branches:
       - release/kundi-migration-hardening
       - ui/reference-polish-pass-2
+      - codex/kundi-gamification-v1
+      - stable
     paths:
       - "backend/**"
       - ".github/workflows/backend-release-artifact.yml"
@@ -168,6 +170,13 @@ jobs:
           migrations/0009_assistant_phase1_sessions.sql
           migrations/0010_assistant_voice_input.sql
           migrations/0011_assistant_session_ownership_integrity.sql
+          migrations/0012_gamification_v1.sql
+          scripts/run-api.sh
+          scripts/run-migrator.sh
+          scripts/run-worker-ai.sh
+          scripts/run-worker-jobs.sh
+          scripts/run-worker-whatsapp.sh
+          scripts/verify-runtime.sh
           EOF
           find "$package_root" -type f -printf '%P\n' | sort >"$actual_paths"
           diff -u "$expected_paths" "$actual_paths"
@@ -183,6 +192,21 @@ jobs:
           test -z "$(git -C "$GITHUB_WORKSPACE/source-a" status --porcelain=v1 --untracked-files=all)"
           test -z "$(git -C "$GITHUB_WORKSPACE/source-b" status --porcelain=v1 --untracked-files=all)"
 
+      - name: Verify clean unpacked runtime without repository files
+        shell: bash
+        run: |
+          set -euo pipefail
+          unpack_root="$RUNNER_TEMP/clean-unpack"
+          mkdir "$unpack_root"
+          tar -xzf "$RUNNER_TEMP/build-a/kundi-backend-${{ steps.source.outputs.short_sha }}-linux-amd64.tar.gz" -C "$unpack_root"
+          package_root="$unpack_root/kundi-backend-${{ steps.source.outputs.short_sha }}"
+          test ! -e "$package_root/.git"
+          test ! -e "$package_root/backend"
+          test -x "$package_root/scripts/run-api.sh"
+          test -x "$package_root/scripts/run-migrator.sh"
+          test "$($package_root/scripts/verify-runtime.sh)" = "runtime_package=ready"
+          echo "unpacked_package_root=$package_root" >> "$GITHUB_ENV"
+
       - name: Rehearse canonical Linux migrator on PostgreSQL 16
         working-directory: tooling/backend
         shell: bash
@@ -192,13 +216,13 @@ jobs:
           set -euo pipefail
           report="$RUNNER_TEMP/canonical-migration-rehearsal.txt"
           go run ./cmd/releasemigrationcheck \
-            --package-root "$RUNNER_TEMP/build-a/kundi-backend-${{ steps.source.outputs.short_sha }}" \
+            --package-root "$unpacked_package_root" \
             --expected-sha "$SOURCE_SHA" | tee "$report"
           grep -F -x "migrator_vcs_revision=$SOURCE_SHA" "$report"
           grep -F -x "migrator_vcs_modified=false" "$report"
           grep -F -x "pre0009_migration_count=8" "$report"
-          grep -F -x "full_migration_count=11" "$report"
-          grep -F -x "second_migration_count=11" "$report"
+          grep -F -x "full_migration_count=12" "$report"
+          grep -F -x "second_migration_count=12" "$report"
           grep -F -x "second_run_schema_unchanged=true" "$report"
           grep -F -x "ownership_mismatch_sqlstate=23503" "$report"
           grep -F -x "input_mode_invalid_sqlstate=23514" "$report"
@@ -216,12 +240,13 @@ jobs:
           go test -count=1 -v ./... 2>&1 | tee "$report"
           for test_name in \
             TestPostgresSessionOwnershipIntegrity \
-            TestMigrationsFresh0001Through0011 \
-            TestMigrationsUpgrade0001Through0008To0011 \
+            TestMigrationsFresh0001Through0012 \
+            TestMigrationsUpgrade0001Through0008To0012 \
             TestMigration0011PreservesValidRows \
             TestMigration0011RejectsMismatchedOwnership \
             TestMigration0011RejectsInvalidExistingContent \
-            TestMigrationsCrossSchemaConstraintRepair; do
+            TestMigrationsCrossSchemaConstraintRepair \
+            TestPostgresGamificationReconcileIsIdempotentOwnedAndFiltered; do
             grep -F -- "--- PASS: $test_name" "$report"
             if grep -F -- "--- SKIP: $test_name" "$report"; then
               echo "required PostgreSQL test skipped: $test_name" >&2

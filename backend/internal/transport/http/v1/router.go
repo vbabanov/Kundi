@@ -29,6 +29,7 @@ import (
 	assistantsafety "github.com/kundi/kundi/backend/internal/modules/assistant/safety"
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
 	ingestmodule "github.com/kundi/kundi/backend/internal/modules/diary_ingest"
+	"github.com/kundi/kundi/backend/internal/modules/gamification"
 	"github.com/kundi/kundi/backend/internal/platform/apperrors"
 	platformauth "github.com/kundi/kundi/backend/internal/platform/auth"
 	httpx "github.com/kundi/kundi/backend/internal/platform/http"
@@ -64,6 +65,10 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/homework", withAuth(api.homework))
 	mux.Handle("GET /v1/grades", withAuth(api.grades))
 	mux.Handle("GET /v1/attendance", withAuth(api.attendance))
+	mux.Handle("GET /v1/gamification/profile", withAuth(api.gamificationProfile))
+	mux.Handle("GET /v1/gamification/achievements", withAuth(api.gamificationAchievements))
+	mux.Handle("POST /v1/gamification/activity", withAuth(api.gamificationActivity))
+	mux.Handle("POST /v1/gamification/achievements/ack", withAuth(api.ackGamificationAchievements))
 	mux.Handle("PUT /v1/profile/local", withAuth(api.updateLocalAppProfile))
 	mux.Handle("POST /v1/assistant/message", withAuth(api.assistantMessage))
 	mux.Handle("POST /v1/assistant/sessions", withAuth(api.createAssistantSession))
@@ -77,6 +82,82 @@ func NewRouter(deps *app.Bootstrap) http.Handler {
 	mux.Handle("GET /v1/whatsapp/jobs/{jobID}", withAuth(api.whatsappJobStatus))
 
 	return mux
+}
+
+func (a *API) gamificationProfile(w http.ResponseWriter, r *http.Request) {
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.Gamification.GetProfile(r.Context(), studentID)
+	if err != nil {
+		httpx.JSONError(w, apperrors.Internal("gamification_load_failed", "failed to load gamification profile", err))
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+func (a *API) gamificationAchievements(w http.ResponseWriter, r *http.Request) {
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.Gamification.GetProfile(r.Context(), studentID)
+	if err != nil {
+		httpx.JSONError(w, apperrors.Internal("gamification_load_failed", "failed to load achievements", err))
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"catalog_version": result.CatalogVersion,
+		"achievements":    result.Achievements,
+		"pending_unlocks": result.PendingUnlocks,
+	})
+}
+
+func (a *API) gamificationActivity(w http.ResponseWriter, r *http.Request) {
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	result, err := a.deps.Gamification.RecordActivity(r.Context(), studentID)
+	if err != nil {
+		httpx.JSONError(w, apperrors.Internal("gamification_activity_failed", "failed to record daily activity", err))
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
+}
+
+type acknowledgeAchievementsRequest struct {
+	Codes []string `json:"codes"`
+}
+
+func (a *API) ackGamificationAchievements(w http.ResponseWriter, r *http.Request) {
+	studentID, err := studentIDFromRequest(r)
+	if err != nil {
+		httpx.JSONError(w, err)
+		return
+	}
+	var request acknowledgeAchievementsRequest
+	if err := decodeJSONStrict(r, &request); err != nil {
+		httpx.JSONError(w, apperrors.BadRequest("invalid_json", "request body is not valid JSON"))
+		return
+	}
+	if len(request.Codes) == 0 || len(request.Codes) > 13 {
+		httpx.JSONError(w, apperrors.BadRequest("achievement_codes_invalid", "codes must contain between 1 and 13 items"))
+		return
+	}
+	if err := a.deps.Gamification.Acknowledge(r.Context(), studentID, request.Codes); err != nil {
+		if errors.Is(err, gamification.ErrUnknownAchievement) {
+			httpx.JSONError(w, apperrors.BadRequest("achievement_codes_invalid", "codes contain an unknown achievement"))
+			return
+		}
+		httpx.JSONError(w, apperrors.Internal("gamification_ack_failed", "failed to acknowledge achievements", err))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *API) ready(w http.ResponseWriter, r *http.Request) {

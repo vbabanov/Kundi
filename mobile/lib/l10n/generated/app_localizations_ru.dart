@@ -415,6 +415,55 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileAchievementFirstFiveHint => 'Получите 5 оценок\n«5»';
 
   @override
+  String get gamificationLoading => 'Загружаем достижения…';
+
+  @override
+  String get gamificationLoadFailed =>
+      'Не удалось загрузить достижения. Ранее полученные данные не изменены.';
+
+  @override
+  String get gamificationUnavailable => 'Достижения пока недоступны';
+
+  @override
+  String get gamificationLocked => 'Не открыто';
+
+  @override
+  String get gamificationUnlocked => 'Открыто';
+
+  @override
+  String gamificationUnlockedOn(String date) {
+    return 'Открыто $date';
+  }
+
+  @override
+  String gamificationProgress(int current, int target) {
+    return '$current из $target';
+  }
+
+  @override
+  String gamificationUnlockedSummary(int unlocked, int total) {
+    return 'Открыто: $unlocked из $total';
+  }
+
+  @override
+  String gamificationNextLevel(int points) {
+    return 'До следующего уровня: $points очков';
+  }
+
+  @override
+  String get gamificationMaxLevel => 'Максимальный уровень достигнут';
+
+  @override
+  String gamificationUnlockOne(String title) {
+    return 'Новое достижение: $title';
+  }
+
+  @override
+  String gamificationUnlockMany(int count) {
+    return 'Открыто новых достижений: $count';
+  }
+
+  @override
   String get settingsTitle => 'Настройки';
 
   @override

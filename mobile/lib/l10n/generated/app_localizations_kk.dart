@@ -393,6 +393,55 @@ class AppLocalizationsKk extends AppLocalizations {
   String get profileAchievementFirstFiveHint => '«5» деген 5\nбаға алыңыз';
 
   @override
+  String get gamificationLoading => 'Жетістіктер жүктелуде…';
+
+  @override
+  String get gamificationLoadFailed =>
+      'Жетістіктерді жүктеу мүмкін болмады. Бұрын алынған деректер өзгермеді.';
+
+  @override
+  String get gamificationUnavailable => 'Жетістіктер әзірге қолжетімсіз';
+
+  @override
+  String get gamificationLocked => 'Ашылмаған';
+
+  @override
+  String get gamificationUnlocked => 'Ашылды';
+
+  @override
+  String gamificationUnlockedOn(String date) {
+    return '$date ашылды';
+  }
+
+  @override
+  String gamificationProgress(int current, int target) {
+    return '$current / $target';
+  }
+
+  @override
+  String gamificationUnlockedSummary(int unlocked, int total) {
+    return 'Ашылғаны: $unlocked / $total';
+  }
+
+  @override
+  String gamificationNextLevel(int points) {
+    return 'Келесі деңгейге дейін: $points ұпай';
+  }
+
+  @override
+  String get gamificationMaxLevel => 'Ең жоғары деңгейге жеттіңіз';
+
+  @override
+  String gamificationUnlockOne(String title) {
+    return 'Жаңа жетістік: $title';
+  }
+
+  @override
+  String gamificationUnlockMany(int count) {
+    return 'Жаңа жетістіктер ашылды: $count';
+  }
+
+  @override
   String get settingsTitle => 'Баптаулар';
 
   @override

@@ -32,9 +32,9 @@ func TestBuildFlagsAreExact(t *testing.T) {
 	}
 }
 
-func TestMigrationFilesRequireOrdered0001Through0011(t *testing.T) {
+func TestMigrationFilesRequireOrdered0001Through0012(t *testing.T) {
 	directory := t.TempDir()
-	for number := 1; number <= 11; number++ {
+	for number := 1; number <= 12; number++ {
 		name := filepath.Join(directory, formatMigrationName(number))
 		if err := os.WriteFile(name, []byte("SELECT 1;\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -44,10 +44,10 @@ func TestMigrationFilesRequireOrdered0001Through0011(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrationFiles() error = %v", err)
 	}
-	if len(files) != 11 || filepath.Base(files[0]) != "0001_test.sql" || filepath.Base(files[10]) != "0011_test.sql" {
+	if len(files) != 12 || filepath.Base(files[0]) != "0001_test.sql" || filepath.Base(files[11]) != "0012_test.sql" {
 		t.Fatalf("unexpected migration order: %v", files)
 	}
-	if err := os.Rename(filepath.Join(directory, "0005_test.sql"), filepath.Join(directory, "0012_test.sql")); err != nil {
+	if err := os.Rename(filepath.Join(directory, "0005_test.sql"), filepath.Join(directory, "0013_test.sql")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := migrationFiles(directory); err == nil || !strings.Contains(err.Error(), "sequence mismatch") {
@@ -72,6 +72,7 @@ func TestManifestIsStableAndDoesNotLeakEnvironmentOrPaths(t *testing.T) {
 		BuildFlags:      BuildFlags(),
 		Binaries:        []Binary{{Name: "api", Path: "bin/api", Size: 42, SHA256: strings.Repeat("c", 64), VCSRevision: strings.Repeat("a", 40)}},
 		Migrations:      []Migration{{Filename: "0001_test.sql", SHA256: strings.Repeat("d", 64)}},
+		Scripts:         []Script{{Name: "run-api.sh", Path: "scripts/run-api.sh", Size: 42, SHA256: strings.Repeat("e", 64), Mode: "0755"}},
 		PackageFilename: "kundi-backend-aaaaaaa-linux-amd64.tar.gz",
 	}
 	first, err := marshalManifest(manifest)
@@ -174,7 +175,7 @@ func TestDeterministicArchiveMetadata(t *testing.T) {
 			t.Fatalf("mtime for %s = %s, want %s", header.Name, header.ModTime, fixedTime)
 		}
 		wantMode := int64(0o644)
-		if strings.Contains(header.Name, "/bin/") {
+		if strings.Contains(header.Name, "/bin/") || strings.Contains(header.Name, "/scripts/") {
 			wantMode = 0o755
 		}
 		if header.Mode != wantMode {
@@ -186,6 +187,7 @@ func TestDeterministicArchiveMetadata(t *testing.T) {
 		"kundi-backend-aaaaaaa/SHA256SUMS",
 		"kundi-backend-aaaaaaa/bin/api",
 		"kundi-backend-aaaaaaa/migrations/0001_test.sql",
+		"kundi-backend-aaaaaaa/scripts/run-api.sh",
 	}
 	if !reflect.DeepEqual(names, wantNames) {
 		t.Fatalf("archive paths = %v, want sorted %v", names, wantNames)
@@ -206,7 +208,7 @@ func createTestArchive(t *testing.T, directoryName string, fixedTime, fileTime t
 	t.Helper()
 	directory := filepath.Join(t.TempDir(), directoryName)
 	packageRoot := filepath.Join(directory, "kundi-backend-aaaaaaa")
-	for _, subdirectory := range []string{"bin", "migrations"} {
+	for _, subdirectory := range []string{"bin", "migrations", "scripts"} {
 		if err := os.MkdirAll(filepath.Join(packageRoot, subdirectory), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -214,6 +216,7 @@ func createTestArchive(t *testing.T, directoryName string, fixedTime, fileTime t
 	files := map[string]string{
 		"bin/api":                  "binary contents",
 		"migrations/0001_test.sql": "SELECT 1;\n",
+		"scripts/run-api.sh":       "#!/bin/sh\nexec ../bin/api\n",
 		"RELEASE_MANIFEST.json":    "{}\n",
 		"SHA256SUMS":               "checksum data\n",
 	}
@@ -231,6 +234,49 @@ func createTestArchive(t *testing.T, directoryName string, fixedTime, fileTime t
 		t.Fatal(err)
 	}
 	return archivePath
+}
+
+func TestValidateRuntimePackageFailsWhenAPIEntrypointOrWrapperIsMissing(t *testing.T) {
+	root := t.TempDir()
+	manifest := Manifest{}
+	for _, target := range productionTargets {
+		path := filepath.Join(root, "bin", target)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(target), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		manifest.Binaries = append(manifest.Binaries, Binary{Name: target, Path: "bin/" + target})
+	}
+	for _, name := range requiredScripts {
+		path := filepath.Join(root, "scripts", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		manifest.Scripts = append(manifest.Scripts, Script{Name: name, Path: "scripts/" + name, Mode: "0755"})
+	}
+	if err := ValidateRuntimePackage(root, manifest); err != nil {
+		t.Fatalf("valid runtime rejected: %v", err)
+	}
+	if err := os.Remove(filepath.Join(root, "bin", "api")); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRuntimePackage(root, manifest); err == nil || !strings.Contains(err.Error(), "bin/api") {
+		t.Fatalf("missing API gate error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "bin", "api"), []byte("api"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "scripts", "run-api.sh")); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRuntimePackage(root, manifest); err == nil || !strings.Contains(err.Error(), "scripts/run-api.sh") {
+		t.Fatalf("missing API wrapper gate error = %v", err)
+	}
 }
 
 func formatMigrationName(number int) string {

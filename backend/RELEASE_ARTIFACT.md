@@ -27,6 +27,13 @@ a dirty source, a different commit or source branch ref, another Go patch
 version, an incorrect migration sequence, and missing or dirty VCS build info.
 It does not read provider configuration or credentials.
 
+The archive also contains executable, manifest-hashed wrappers in `scripts/`:
+`run-api.sh`, `run-migrator.sh`, one wrapper for each worker, and
+`verify-runtime.sh`. Deployment must execute the wrapper from the clean unpacked
+release directory. The runtime gate fails if any binary or wrapper is missing or
+not executable; copying an entrypoint from the repository or an older release is
+not a supported deployment path.
+
 ## Reproducibility proof
 
 Create two standalone checkouts at the same source SHA, then invoke the same
@@ -69,11 +76,16 @@ Migration contents are read from the commit's Git blobs rather than the checked
 out files. This prevents `core.autocrlf` or another checkout policy from changing
 their packaged bytes across operating systems.
 
-The canonical package contains exactly eleven ordered migrations, `0001` through
-`0011`. Migration `0011` validates existing assistant message content and enforces
+The canonical package contains exactly twelve ordered migrations, `0001` through
+`0012`. Migration `0011` validates existing assistant message content and enforces
 that every assistant message has the same student owner as its session. It does
 not add a default for `assistant_messages.content`: the active repository writes
 both `text_content` and `content`, while an unknown direct SQL writer from before
 `0009` is not a supported runtime contract. Such a writer must be updated before
 using this schema; this is a known direct-writer compatibility limitation, not a
 rollback blocker for the verified rollback runtime.
+
+Migration `0012` adds only the gamification activity ledger, canonical fact
+ledger, unlock state, and recomputable profile projection. The previous runtime
+does not read these tables, so switching the API release back is operationally
+reversible without rolling the schema back.

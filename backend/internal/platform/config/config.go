@@ -25,6 +25,7 @@ type Config struct {
 	WhatsApp      WhatsAppConfig
 	Jobs          JobsConfig
 	Observability ObservabilityConfig
+	Gamification  GamificationConfig
 }
 
 type AppConfig struct {
@@ -116,6 +117,10 @@ type ObservabilityConfig struct {
 	MetricsListenAddr string
 }
 
+type GamificationConfig struct {
+	Timezone string
+}
+
 func Load() (Config, error) {
 	assistantEnabled := envBool("KUNDI_ASSISTANT_ENABLED", false)
 	rolloutMode, canaryStudentIDs, err := assistantRolloutConfig(assistantEnabled)
@@ -201,6 +206,9 @@ func Load() (Config, error) {
 		Observability: ObservabilityConfig{
 			Mode:              env("OBSERVABILITY_MODE", "log"),
 			MetricsListenAddr: env("OBSERVABILITY_METRICS_LISTEN_ADDR", "127.0.0.1:29090"),
+		},
+		Gamification: GamificationConfig{
+			Timezone: env("GAMIFICATION_TIMEZONE", "Asia/Almaty"),
 		},
 	}
 	if err := validateObservability(cfg.Observability); err != nil {

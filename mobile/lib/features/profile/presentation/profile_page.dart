@@ -5,6 +5,9 @@ import '../../../l10n/l10n.dart';
 import '../../../shared/providers/providers.dart';
 import '../../../shared/widgets/kundi_surface.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../gamification/application/gamification_controller.dart';
+import '../../gamification/domain/gamification_entity.dart';
+import '../../gamification/presentation/gamification_page.dart';
 import '../../settings/application/settings_controller.dart';
 import '../../settings/domain/settings_entity.dart';
 import '../application/profile_controller.dart';
@@ -38,6 +41,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final state = ref.watch(profileControllerProvider);
     final liveProfile = state.asData?.value;
     final profile = liveProfile ?? _cachedProfile;
+    final gamification = ref.watch(gamificationControllerProvider).valueOrNull;
 
     if (liveProfile != null) {
       _cachedProfile = liveProfile;
@@ -65,6 +69,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           _syncForm(profile);
                           return _ProfileContent(
                             profile: profile,
+                            gamification: gamification,
                             phone1Controller: _phone1Controller,
                             phone2Controller: _phone2Controller,
                             formKey: _formKey,
@@ -105,7 +110,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    await ref.read(profileControllerProvider.notifier).saveLocalAppProfile(
+    await ref
+        .read(profileControllerProvider.notifier)
+        .saveLocalAppProfile(
           parentPhone1: _normalizePhone(_phone1Controller.text),
           parentPhone2: _normalizePhone(_phone2Controller.text),
         );
@@ -139,7 +146,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    final shouldLogout = await showDialog<bool>(
+    final shouldLogout =
+        await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text(context.l10n.profileLogoutTitle),
@@ -164,18 +172,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     await ref.read(secureStorageProvider).clearAll();
     ref.invalidate(profileControllerProvider);
+    ref.invalidate(gamificationControllerProvider);
     ref.invalidate(authControllerProvider);
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
 class _ProfileContent extends StatelessWidget {
   const _ProfileContent({
     required this.profile,
+    required this.gamification,
     required this.phone1Controller,
     required this.phone2Controller,
     required this.formKey,
@@ -185,6 +196,7 @@ class _ProfileContent extends StatelessWidget {
   });
 
   final ProfileEntity profile;
+  final GamificationProfile? gamification;
   final TextEditingController phone1Controller;
   final TextEditingController phone2Controller;
   final GlobalKey<FormState> formKey;
@@ -195,14 +207,12 @@ class _ProfileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final providerIdentity = profile.providerIdentity;
-    final localProfile = profile.localAppProfile;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       children: [
         _ProfileHeroCard(
           providerIdentity: providerIdentity,
-          localProfile: localProfile,
+          gamification: gamification,
           onAddPhoto: onAddPhoto,
         ),
         const SizedBox(height: 10),
@@ -236,17 +246,14 @@ class _ProfileContent extends StatelessWidget {
         const SizedBox(height: 4),
         const _AppSettingsSection(),
         const SizedBox(height: 10),
-        const _AchievementsSection(),
+        _AchievementsSection(profile: gamification),
       ],
     );
   }
 }
 
 class _ProfileTopBar extends StatelessWidget {
-  const _ProfileTopBar({
-    required this.onBack,
-    required this.onLogout,
-  });
+  const _ProfileTopBar({required this.onBack, required this.onLogout});
 
   final VoidCallback onBack;
   final VoidCallback onLogout;
@@ -272,10 +279,7 @@ class _ProfileTopBar extends StatelessWidget {
               ),
             ),
           ),
-          _IconGlassButton(
-            icon: Icons.logout_rounded,
-            onTap: onLogout,
-          ),
+          _IconGlassButton(icon: Icons.logout_rounded, onTap: onLogout),
         ],
       ),
     );
@@ -283,10 +287,7 @@ class _ProfileTopBar extends StatelessWidget {
 }
 
 class _IconGlassButton extends StatelessWidget {
-  const _IconGlassButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _IconGlassButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -321,12 +322,12 @@ class _IconGlassButton extends StatelessWidget {
 class _ProfileHeroCard extends StatelessWidget {
   const _ProfileHeroCard({
     required this.providerIdentity,
-    required this.localProfile,
+    required this.gamification,
     required this.onAddPhoto,
   });
 
   final ProviderIdentityProfileSection? providerIdentity;
-  final LocalAppProfileSection? localProfile;
+  final GamificationProfile? gamification;
   final VoidCallback onAddPhoto;
 
   @override
@@ -386,10 +387,7 @@ class _ProfileHeroCard extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        _orNotSet(
-                          context,
-                          providerIdentity?.classLabel ?? '',
-                        ),
+                        _orNotSet(context, providerIdentity?.classLabel ?? ''),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10.8,
@@ -405,7 +403,7 @@ class _ProfileHeroCard extends StatelessWidget {
                       Expanded(
                         child: _GamificationStat(
                           icon: Icons.auto_awesome,
-                          value: _pointsValue(providerIdentity),
+                          value: _pointsValue(gamification),
                           label: context.l10n.profilePoints,
                           iconColor: const Color(0xFFB86DFF),
                         ),
@@ -414,7 +412,7 @@ class _ProfileHeroCard extends StatelessWidget {
                       Expanded(
                         child: _GamificationStat(
                           icon: Icons.local_fire_department_outlined,
-                          value: _streakValue(localProfile),
+                          value: _streakValue(gamification),
                           label: context.l10n.profileStreak,
                           iconColor: const Color(0xFFFF974A),
                         ),
@@ -423,7 +421,7 @@ class _ProfileHeroCard extends StatelessWidget {
                       Expanded(
                         child: _GamificationStat(
                           icon: Icons.shield_moon_outlined,
-                          value: _levelValue(providerIdentity),
+                          value: _levelValue(gamification),
                           label: context.l10n.profileLevel,
                           iconColor: const Color(0xFFB86DFF),
                         ),
@@ -441,10 +439,7 @@ class _ProfileHeroCard extends StatelessWidget {
 }
 
 class _AvatarSlot extends StatelessWidget {
-  const _AvatarSlot({
-    required this.fullName,
-    required this.onAddPhoto,
-  });
+  const _AvatarSlot({required this.fullName, required this.onAddPhoto});
 
   final String fullName;
   final VoidCallback onAddPhoto;
@@ -460,12 +455,12 @@ class _AvatarSlot extends StatelessWidget {
             width: 88,
             height: 88,
             padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFF7D47FF), Color(0xFFB15CFF)],
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
                   color: Color(0x403F23A3),
                   blurRadius: 12,
@@ -484,10 +479,7 @@ class _AvatarSlot extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  _profileInitials(
-                    fullName,
-                    context.l10n.profileInitials,
-                  ),
+                  _profileInitials(fullName, context.l10n.profileInitials),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -719,10 +711,10 @@ class _ParentContactsCard extends StatelessWidget {
             Text(
               context.l10n.profileContactsHelp,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFFAFA4DA),
-                    fontSize: 10,
-                    height: 1.18,
-                  ),
+                color: const Color(0xFFAFA4DA),
+                fontSize: 10,
+                height: 1.18,
+              ),
             ),
             const SizedBox(height: 6),
             TextFormField(
@@ -788,87 +780,108 @@ class _ParentContactsCard extends StatelessWidget {
 }
 
 class _AchievementsSection extends StatelessWidget {
-  const _AchievementsSection();
+  const _AchievementsSection({required this.profile});
+
+  final GamificationProfile? profile;
 
   @override
   Widget build(BuildContext context) {
-    final cards = <_AchievementCardData>[
-      _AchievementCardData(
-        icon: Icons.emoji_events_outlined,
-        title: context.l10n.profileAchievementExcellent,
-        subtitle: context.l10n.profileAchievementExcellentHint,
-        glow: const Color(0xFFCE6BFF),
-        outline: const Color(0xFF8E46FF),
-      ),
-      _AchievementCardData(
-        icon: Icons.local_fire_department_outlined,
-        title: context.l10n.profileAchievementDiligent,
-        subtitle: context.l10n.profileAchievementDiligentHint,
-        glow: const Color(0xFFFFB24A),
-        outline: const Color(0xFFFF7B2C),
-      ),
-      _AchievementCardData(
-        icon: Icons.menu_book_outlined,
-        title: context.l10n.profileAchievementCurious,
-        subtitle: context.l10n.profileAchievementCuriousHint,
-        glow: const Color(0xFF6AB2FF),
-        outline: const Color(0xFF3B6DFF),
-      ),
-      _AchievementCardData(
-        icon: Icons.star_outline_rounded,
-        title: context.l10n.profileAchievementFirstFive,
-        subtitle: context.l10n.profileAchievementFirstFiveHint,
-        glow: const Color(0xFFB8FF5D),
-        outline: const Color(0xFF58D94C),
-      ),
-    ];
+    final language = Localizations.localeOf(context).languageCode;
+    final achievements = profile?.achievements ?? const <AchievementEntity>[];
+    final sorted = List<AchievementEntity>.of(achievements)
+      ..sort((a, b) {
+        if (a.unlocked == b.unlocked) return 0;
+        return a.unlocked ? -1 : 1;
+      });
+    final cards = sorted
+        .take(4)
+        .map((item) {
+          final color = _achievementColor(item.category);
+          return _AchievementCardData(
+            icon: _achievementIcon(item.category),
+            title: item.title.resolve(language),
+            subtitle: context.l10n.gamificationProgress(
+              item.current,
+              item.target,
+            ),
+            glow: color,
+            outline: color,
+            unlocked: item.unlocked,
+          );
+        })
+        .toList(growable: false);
 
     return Column(
       children: [
         _SectionHeading(
           title: context.l10n.profileAchievements,
           icon: Icons.workspace_premium_outlined,
-          trailing: const _MoreLink(),
-        ),
-        const SizedBox(height: 2),
-        SizedBox(
-          height: 118,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: cards.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (context, index) =>
-                _AchievementCard(data: cards[index]),
+          trailing: _MoreLink(
+            onTap: profile == null
+                ? null
+                : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => GamificationPage(initialProfile: profile),
+                    ),
+                  ),
           ),
         ),
+        const SizedBox(height: 2),
+        if (cards.isEmpty)
+          SizedBox(
+            height: 72,
+            child: Center(child: Text(context.l10n.gamificationUnavailable)),
+          )
+        else
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              key: const Key('profile-achievement-strip'),
+              scrollDirection: Axis.horizontal,
+              itemCount: cards.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, index) =>
+                  _AchievementCard(data: cards[index]),
+            ),
+          ),
       ],
     );
   }
 }
 
 class _MoreLink extends StatelessWidget {
-  const _MoreLink();
+  const _MoreLink({required this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          context.l10n.profileAllAchievements,
-          style: const TextStyle(
-            color: Color(0xFFB56BFF),
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-          ),
+    return InkWell(
+      key: const Key('profile-all-achievements'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              context.l10n.profileAllAchievements,
+              style: const TextStyle(
+                color: Color(0xFFB56BFF),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFFB56BFF),
+              size: 18,
+            ),
+          ],
         ),
-        const SizedBox(width: 4),
-        const Icon(
-          Icons.chevron_right_rounded,
-          color: Color(0xFFB56BFF),
-          size: 18,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -880,17 +893,23 @@ class _AchievementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 96,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF161334), Color(0xFF20174A)],
+          colors: [
+            scheme.surface.withValues(alpha: 0.98),
+            scheme.surfaceContainerHigh.withValues(alpha: 0.98),
+          ],
         ),
-        border: Border.all(color: const Color(0x66362868)),
+        border: Border.all(
+          color: data.unlocked ? data.outline : scheme.outlineVariant,
+        ),
       ),
       child: Column(
         children: [
@@ -910,20 +929,24 @@ class _AchievementCard extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1A153E), Color(0xFF251B55)],
+                gradient: LinearGradient(
+                  colors: [scheme.surface, scheme.surfaceContainerHigh],
                 ),
                 border: Border.all(color: data.outline, width: 1.6),
               ),
-              child: Icon(data.icon, color: data.glow, size: 18),
+              child: Icon(
+                data.unlocked ? data.icon : Icons.lock_outline_rounded,
+                color: data.unlocked ? data.glow : scheme.onSurfaceVariant,
+                size: 18,
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             data.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: scheme.onSurface,
               fontSize: 9.6,
               fontWeight: FontWeight.w700,
             ),
@@ -933,8 +956,8 @@ class _AchievementCard extends StatelessWidget {
             child: Text(
               data.subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Color(0xFF9C92C6),
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
                 fontSize: 7.2,
                 fontWeight: FontWeight.w500,
                 height: 1.12,
@@ -954,6 +977,7 @@ class _AchievementCardData {
     required this.subtitle,
     required this.glow,
     required this.outline,
+    required this.unlocked,
   });
 
   final IconData icon;
@@ -961,6 +985,7 @@ class _AchievementCardData {
   final String subtitle;
   final Color glow;
   final Color outline;
+  final bool unlocked;
 }
 
 class _GlassCard extends StatelessWidget {
@@ -1086,7 +1111,8 @@ class _AppSettingsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsControllerProvider).valueOrNull ??
+    final settings =
+        ref.watch(settingsControllerProvider).valueOrNull ??
         const AppSettings();
     return _GlassCard(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
@@ -1147,9 +1173,9 @@ class _AppSettingsSection extends ConsumerWidget {
       await action();
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.settingsSaveFailed)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.settingsSaveFailed)));
     }
   }
 }
@@ -1178,9 +1204,9 @@ class _SettingsRow<T> extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.white),
           ),
         ),
         DropdownButtonHideUnderline(
@@ -1190,9 +1216,9 @@ class _SettingsRow<T> extends StatelessWidget {
             dropdownColor: const Color(0xFF20174A),
             iconEnabledColor: const Color(0xFFAFA4DA),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
             items: items,
             onChanged: (next) {
               if (next != null) onChanged(next);
@@ -1229,9 +1255,9 @@ class _ShiftBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1251,8 +1277,8 @@ class _ProfileBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: const [
+    return const Stack(
+      children: [
         Positioned(
           top: -110,
           left: -90,
@@ -1365,18 +1391,27 @@ String _profileInitials(String fullName, String fallback) {
   return '$first$second'.toUpperCase();
 }
 
-String _pointsValue(ProviderIdentityProfileSection? identity) {
-  final level = (identity?.gradeLevel ?? 1).clamp(1, 11);
-  return '${level * 46}';
-}
+String _pointsValue(GamificationProfile? profile) =>
+    profile == null ? '—' : '${profile.points}';
 
-String _streakValue(LocalAppProfileSection? localProfile) {
-  final hasPhone = (localProfile?.parentPhone1.trim().isNotEmpty ?? false) ||
-      (localProfile?.parentPhone2.trim().isNotEmpty ?? false);
-  return hasPhone ? '12' : '3';
-}
+String _streakValue(GamificationProfile? profile) =>
+    profile == null ? '—' : '${profile.currentStreak}';
 
-String _levelValue(ProviderIdentityProfileSection? identity) {
-  final base = (identity?.gradeLevel ?? 1) >= 7 ? 4 : 3;
-  return '$base';
-}
+String _levelValue(GamificationProfile? profile) =>
+    profile == null ? '—' : '${profile.level}';
+
+IconData _achievementIcon(String category) => switch (category) {
+  'activity' => Icons.local_fire_department_outlined,
+  'grades' => Icons.star_outline_rounded,
+  'learning' => Icons.menu_book_outlined,
+  'independence' => Icons.psychology_alt_outlined,
+  _ => Icons.workspace_premium_outlined,
+};
+
+Color _achievementColor(String category) => switch (category) {
+  'activity' => const Color(0xFFFF9F43),
+  'grades' => const Color(0xFF7BD95A),
+  'learning' => const Color(0xFF65A8FF),
+  'independence' => const Color(0xFFCE6BFF),
+  _ => const Color(0xFFB56BFF),
+};

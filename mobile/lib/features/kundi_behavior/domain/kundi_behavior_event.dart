@@ -5,6 +5,7 @@ enum KundiBehaviorEventType {
   allHomeworkCompleted,
   lowHomeworkProgress,
   newGrade,
+  achievementUnlocked,
   absenceDetected,
   assistantQuestionSubmitted,
   assistantListeningStarted,

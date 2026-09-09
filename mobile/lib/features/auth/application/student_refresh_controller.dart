@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../grades/application/grades_controller.dart';
+import '../../gamification/application/gamification_controller.dart';
 import '../../homework/application/homework_controller.dart';
 import '../../lessons/application/lessons_controller.dart';
 import '../../profile/application/profile_controller.dart';
@@ -25,8 +26,8 @@ class StudentRefreshState {
 
 final studentRefreshControllerProvider =
     NotifierProvider<StudentRefreshController, StudentRefreshState>(
-  StudentRefreshController.new,
-);
+      StudentRefreshController.new,
+    );
 
 /// Owns the only user-initiated provider refresh transaction. Page gestures
 /// join [_inFlight], then every screen projection reloads from the one active
@@ -81,18 +82,19 @@ class StudentRefreshController extends Notifier<StudentRefreshState> {
         ref.read(gradesControllerProvider.notifier).reloadFromCache(),
         ref.read(profileControllerProvider.notifier).reloadFromCache(),
         ref.read(summaryControllerProvider.notifier).reloadFromCache(),
+        ref
+            .read(gamificationControllerProvider.notifier)
+            .refresh()
+            .then<void>((_) {}),
       ]);
       debugPrint(
         '[KUNDI_REFRESH] trace_id=${result.traceId} '
-        'snapshot_at=${result.snapshotAt} controllers=5',
+        'snapshot_at=${result.snapshotAt} controllers=6',
       );
       state = StudentRefreshState(lastResult: result);
       return result;
     } catch (error) {
-      state = StudentRefreshState(
-        lastResult: state.lastResult,
-        error: error,
-      );
+      state = StudentRefreshState(lastResult: state.lastResult, error: error);
       rethrow;
     }
   }

@@ -181,6 +181,7 @@ void main() {
       KundiBehaviorEventType.allHomeworkCompleted:
           KundiBehaviorKind.celebrating,
       KundiBehaviorEventType.newGrade: KundiBehaviorKind.celebrating,
+      KundiBehaviorEventType.achievementUnlocked: KundiBehaviorKind.celebrating,
       KundiBehaviorEventType.lowHomeworkProgress: KundiBehaviorKind.warning,
       KundiBehaviorEventType.absenceDetected: KundiBehaviorKind.warning,
       KundiBehaviorEventType.assistantQuestionSubmitted:

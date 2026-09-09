@@ -27,6 +27,7 @@ class KundiBehaviorReducer {
       case KundiBehaviorEventType.allHomeworkCompleted:
       case KundiBehaviorEventType.lowHomeworkProgress:
       case KundiBehaviorEventType.newGrade:
+      case KundiBehaviorEventType.achievementUnlocked:
       case KundiBehaviorEventType.absenceDetected:
       case KundiBehaviorEventType.assistantQuestionSubmitted:
       case KundiBehaviorEventType.assistantListeningStarted:
@@ -113,6 +114,7 @@ class KundiBehaviorReducer {
       case KundiBehaviorEventType.homeworkCompleted:
       case KundiBehaviorEventType.allHomeworkCompleted:
       case KundiBehaviorEventType.newGrade:
+      case KundiBehaviorEventType.achievementUnlocked:
         return KundiBehaviorKind.celebrating;
       case KundiBehaviorEventType.assistantQuestionSubmitted:
       case KundiBehaviorEventType.assistantResponseStarted:

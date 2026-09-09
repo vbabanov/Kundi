@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestMigrationsFresh0001Through0011(t *testing.T) {
+func TestMigrationsFresh0001Through0012(t *testing.T) {
 	pool := newMigrationTestPool(t)
 	ctx := context.Background()
 
@@ -26,8 +26,8 @@ func TestMigrationsFresh0001Through0011(t *testing.T) {
 		t.Fatalf("run fresh migration chain: %v", err)
 	}
 	first := migrationRecords(t, pool)
-	if len(first) != 11 {
-		t.Fatalf("fresh migration record count = %d, want 11", len(first))
+	if len(first) != 12 {
+		t.Fatalf("fresh migration record count = %d, want 12", len(first))
 	}
 	assertOwnershipConstraints(t, pool)
 
@@ -40,7 +40,7 @@ func TestMigrationsFresh0001Through0011(t *testing.T) {
 	}
 }
 
-func TestMigrationsUpgrade0001Through0008To0011(t *testing.T) {
+func TestMigrationsUpgrade0001Through0008To0012(t *testing.T) {
 	pool := newMigrationTestPool(t)
 	ctx := context.Background()
 
@@ -51,10 +51,10 @@ func TestMigrationsUpgrade0001Through0008To0011(t *testing.T) {
 		t.Fatalf("pre-0009 migration record count = %d, want 8", count)
 	}
 	if err := RunMigrations(ctx, pool, migrationsPath(t)); err != nil {
-		t.Fatalf("upgrade through 0011: %v", err)
+		t.Fatalf("upgrade through 0012: %v", err)
 	}
-	if count := len(migrationRecords(t, pool)); count != 11 {
-		t.Fatalf("upgraded migration record count = %d, want 11", count)
+	if count := len(migrationRecords(t, pool)); count != 12 {
+		t.Fatalf("upgraded migration record count = %d, want 12", count)
 	}
 	assertOwnershipConstraints(t, pool)
 }
@@ -201,8 +201,8 @@ func TestMigrationsCrossSchemaConstraintRepair(t *testing.T) {
 	if err := RunMigrations(ctx, targetPool, migrationsPath(t)); err != nil {
 		t.Fatalf("migrate second schema after public: %v", err)
 	}
-	if count := len(migrationRecords(t, targetPool)); count != 11 {
-		t.Fatalf("second-schema migration record count = %d, want 11", count)
+	if count := len(migrationRecords(t, targetPool)); count != 12 {
+		t.Fatalf("second-schema migration record count = %d, want 12", count)
 	}
 	assertOwnershipConstraints(t, targetPool)
 }

@@ -10,6 +10,7 @@ import '../../../shared/providers/providers.dart';
 import '../../../shared/theme/kundi_tokens.dart';
 import '../../grades/application/grades_controller.dart';
 import '../../grades/presentation/grades_page.dart';
+import '../../gamification/application/gamification_controller.dart';
 import '../../assistant/assistant_feature.dart';
 import '../../assistant/application/assistant_voice_locale_resolver.dart';
 import '../../assistant/application/kundi_voice_assistant_coordinator.dart';
@@ -17,6 +18,7 @@ import '../../assistant/presentation/assistant_page.dart';
 import '../../homework/application/homework_controller.dart';
 import '../../homework/presentation/homework_page.dart';
 import '../../kundi_behavior/application/kundi_behavior_controller.dart';
+import '../../kundi_behavior/domain/kundi_behavior_event.dart';
 import '../../lessons/application/lessons_controller.dart';
 import '../../lessons/presentation/lessons_page.dart';
 import '../../profile/application/profile_controller.dart';
@@ -42,10 +44,7 @@ final class _VoiceGestureTransaction {
 }
 
 class MainShellPage extends ConsumerStatefulWidget {
-  const MainShellPage({
-    this.avatarLoadingFrame,
-    super.key,
-  });
+  const MainShellPage({this.avatarLoadingFrame, super.key});
 
   final KundiHomeAvatarLoadingFrame? avatarLoadingFrame;
 
@@ -56,8 +55,9 @@ class MainShellPage extends ConsumerStatefulWidget {
 class _MainShellPageState extends ConsumerState<MainShellPage>
     with WidgetsBindingObserver {
   static const _initialPage = 1;
-  late final PageController _pageController =
-      PageController(initialPage: _initialPage);
+  late final PageController _pageController = PageController(
+    initialPage: _initialPage,
+  );
   int _rootPageIndex = _initialPage;
   bool _homePageSettled = true;
   late final bool _behaviorCoreEnabled;
@@ -83,14 +83,13 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     super.initState();
     _pageController.addListener(_handleRootPageScroll);
     _behaviorCoreEnabled = ref.read(kundiBehaviorCoreEnabledProvider);
-    _voiceInputEnabled = ref.read(kundiAssistantEnabledProvider) &&
+    _voiceInputEnabled =
+        ref.read(kundiAssistantEnabledProvider) &&
         ref.read(kundiVoiceInputEnabledProvider);
     if (_behaviorCoreEnabled || _voiceInputEnabled) {
       WidgetsBinding.instance.addObserver(this);
     }
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -155,6 +154,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         _rootPageIndex == _initialPage) {
       ref.read(kundiBehaviorControllerProvider.notifier).homeVisible();
     }
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_recordGamificationActivity());
+    }
   }
 
   Future<void> _bootstrapMainScreen() async {
@@ -176,6 +178,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         stage: 'main_screen_auth_baseline_result',
         outcome: 'success',
       );
+      unawaited(_recordGamificationActivity());
       await Future.wait([
         ref.read(lessonsControllerProvider.notifier).refreshFromCache(),
         ref.read(homeworkControllerProvider.notifier).refreshFromCache(),
@@ -191,6 +194,45 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
         details: {'error': _sanitizeError(error.toString())},
       );
     }
+  }
+
+  Future<void> _recordGamificationActivity() async {
+    final unlocked = await ref
+        .read(gamificationControllerProvider.notifier)
+        .recordDailyActivityAndClaim();
+    if (!mounted || unlocked.isEmpty) return;
+    if (_behaviorCoreEnabled &&
+        _rootPageIndex == _initialPage &&
+        _homePageSettled &&
+        !_assistantRouteVisible) {
+      final now = DateTime.now();
+      ref
+          .read(kundiBehaviorControllerProvider.notifier)
+          .dispatch(
+            KundiBehaviorEvent(
+              type: KundiBehaviorEventType.achievementUnlocked,
+              id: 'achievement:${unlocked.map((item) => item.code).join(',')}',
+              occurredAt: now,
+              fingerprint: 'achievement-unlock',
+              duration: const Duration(seconds: 3),
+            ),
+          );
+    }
+    HapticFeedback.lightImpact();
+    final language = Localizations.localeOf(context).languageCode;
+    final message = unlocked.length == 1
+        ? context.l10n.gamificationUnlockOne(
+            unlocked.single.title.resolve(language),
+          )
+        : context.l10n.gamificationUnlockMany(unlocked.length);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        key: const Key('gamification-unlock-celebration'),
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _prewarmAvatar() async {
@@ -239,11 +281,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     Map<String, dynamic> details = const <String, dynamic>{},
   }) {
     debugPrint(
-      '[KUNDI_POST_LOGIN] ${jsonEncode({
-            'stage': stage,
-            'outcome': outcome,
-            ...details,
-          })}',
+      '[KUNDI_POST_LOGIN] ${jsonEncode({'stage': stage, 'outcome': outcome, ...details})}',
     );
   }
 
@@ -283,9 +321,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     }
     setState(() => _assistantRouteVisible = true);
     try {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AssistantPage()),
-      );
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const AssistantPage()));
     } finally {
       if (mounted) {
         setState(() => _assistantRouteVisible = false);
@@ -362,8 +400,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
     );
     HapticFeedback.mediumImpact();
     if (mounted) setState(() => _voiceLocalePreparing = true);
-    final resolution =
-        await ref.read(assistantVoiceLocaleResolverProvider).resolve();
+    final resolution = await ref
+        .read(assistantVoiceLocaleResolverProvider)
+        .resolve();
     if (!mounted || !_isActiveVoiceGesture(gesture.generation)) return;
     setState(() => _voiceLocalePreparing = false);
     KundiVoiceQaTelemetry.event(
@@ -404,9 +443,7 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           suppressTrailingTap: false,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.voiceRecognizerUnavailable),
-          ),
+          SnackBar(content: Text(context.l10n.voiceRecognizerUnavailable)),
         );
       case KundiVoiceStartOutcome.listening:
         break;
@@ -528,9 +565,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           .requestPermission();
       if (!mounted || _hasNewerVoiceGesture(generation)) return;
       if (permission == KundiSpeechPermission.granted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.voiceHoldHint)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.voiceHoldHint)));
       } else if (permission == KundiSpeechPermission.permanentlyDenied) {
         await _showMicrophoneSettings(generation);
       }
@@ -586,19 +623,19 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
   String _voiceStatus(KundiSpeechRecognitionState speech) {
     if (_voiceLocalePreparing) return context.l10n.voicePreparing;
     return switch (speech.status) {
-      KundiSpeechRecognitionStatus.listening => speech.partialText.isEmpty
-          ? context.l10n.voiceListening
-          : speech.partialText,
+      KundiSpeechRecognitionStatus.listening =>
+        speech.partialText.isEmpty
+            ? context.l10n.voiceListening
+            : speech.partialText,
       KundiSpeechRecognitionStatus.processing => context.l10n.voiceProcessing,
       KundiSpeechRecognitionStatus.recognized ||
-      KundiSpeechRecognitionStatus.sending =>
-        context.l10n.voiceThinking,
+      KundiSpeechRecognitionStatus.sending => context.l10n.voiceThinking,
       KundiSpeechRecognitionStatus.error =>
         speech.errorCode == 'no_match'
             ? context.l10n.voiceNoMatch
             : speech.errorCode == 'no_speech'
-                ? context.l10n.voiceNoSpeech
-                : context.l10n.voiceRecognitionFailed,
+            ? context.l10n.voiceNoSpeech
+            : context.l10n.voiceRecognitionFailed,
       _ => '',
     };
   }
@@ -612,8 +649,9 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: scheme.kundiBackground,
-      systemNavigationBarIconBrightness:
-          isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: isDark
+          ? Brightness.light
+          : Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
     );
     final assistantEnabled = ref.watch(kundiAssistantEnabledProvider);
@@ -636,13 +674,16 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
           onGradesTap: () => _showRootPage(2),
           assistantEnabled: assistantEnabled,
           onAssistantTap: assistantEnabled ? _handleAssistantTap : null,
-          onAssistantPointerDown:
-              voiceEnabled ? (_) => _voicePointerDown() : null,
+          onAssistantPointerDown: voiceEnabled
+              ? (_) => _voicePointerDown()
+              : null,
           onAssistantPointerUp: voiceEnabled ? (_) => _voicePointerUp() : null,
-          onAssistantPointerCancel:
-              voiceEnabled ? (_) => _voicePointerCancel() : null,
-          onAssistantLongPressStart:
-              voiceEnabled ? (_) => unawaited(_startVoiceHold()) : null,
+          onAssistantPointerCancel: voiceEnabled
+              ? (_) => _voicePointerCancel()
+              : null,
+          onAssistantLongPressStart: voiceEnabled
+              ? (_) => unawaited(_startVoiceHold())
+              : null,
           onAssistantLongPressEnd: voiceEnabled ? (_) => _endVoiceHold() : null,
           onAssistantLongPressCancel: voiceEnabled
               ? () {
@@ -659,21 +700,25 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
                       reason: 'long_press_cancel',
                       suppressTrailingTap: false,
                     );
-                    unawaited(ref
-                        .read(kundiVoiceAssistantCoordinatorProvider.notifier)
-                        .cancel());
+                    unawaited(
+                      ref
+                          .read(kundiVoiceAssistantCoordinatorProvider.notifier)
+                          .cancel(),
+                    );
                   }
                 }
               : null,
           voiceStatusText: voiceEnabled ? _voiceStatus(speech) : '',
-          voiceListening: voiceEnabled &&
+          voiceListening:
+              voiceEnabled &&
               speech.status == KundiSpeechRecognitionStatus.listening,
           realtimeAvatarEnabled:
               KundiNativeAvatarFeature.enabled && _avatarRuntimeReady,
           realtimeAvatarPreparing:
               KundiNativeAvatarFeature.enabled && !_avatarRuntimeResolved,
           realtimeAvatarLoadingFrame: widget.avatarLoadingFrame,
-          isHomeVisible: _rootPageIndex == _initialPage &&
+          isHomeVisible:
+              _rootPageIndex == _initialPage &&
               _homePageSettled &&
               !_assistantRouteVisible,
         ),
@@ -711,69 +756,62 @@ class _MainShellPageState extends ConsumerState<MainShellPage>
               end: Alignment.bottomCenter,
               colors: [Color(0xFF0B0921), Color(0xFF171033)],
             ),
-            border: Border(
-              top: BorderSide(color: Color(0xB334275F), width: 1),
-            ),
+            border: Border(top: BorderSide(color: Color(0xB334275F), width: 1)),
           ),
           child: SafeArea(
             top: false,
             child: SizedBox(
               height: 42,
               child: Row(
-                children: List.generate(
-                  rootLabels.length,
-                  (index) {
-                    final selected = index == _rootPageIndex;
-                    final color = selected
-                        ? const Color(0xFFF74FC8)
-                        : const Color(0xD99A8FC8);
-                    return Expanded(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            _showRootPage(index);
-                          },
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                width: selected ? 54 : 0,
-                                height: selected ? 2 : 0,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFF4FCB),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
+                children: List.generate(rootLabels.length, (index) {
+                  final selected = index == _rootPageIndex;
+                  final color = selected
+                      ? const Color(0xFFF74FC8)
+                      : const Color(0xD99A8FC8);
+                  return Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          _showRootPage(index);
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: selected ? 54 : 0,
+                              height: selected ? 2 : 0,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF4FCB),
+                                borderRadius: BorderRadius.circular(999),
                               ),
-                              const SizedBox(height: 2),
-                              Icon(
-                                _rootIcons[index],
-                                size: selected ? 20 : 18,
-                                color: color,
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                rootLabels[index],
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(
-                                      fontSize: selected ? 10.0 : 9.5,
-                                      fontWeight: selected
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      color: color,
-                                    ),
-                              ),
-                              const SizedBox(height: 1),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 2),
+                            Icon(
+                              _rootIcons[index],
+                              size: selected ? 20 : 18,
+                              color: color,
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              rootLabels[index],
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    fontSize: selected ? 10.0 : 9.5,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
+                                    color: color,
+                                  ),
+                            ),
+                            const SizedBox(height: 1),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                }),
               ),
             ),
           ),

@@ -18,6 +18,7 @@ import (
 	auditmodule "github.com/kundi/kundi/backend/internal/modules/audit"
 	authmodule "github.com/kundi/kundi/backend/internal/modules/auth"
 	ingestmodule "github.com/kundi/kundi/backend/internal/modules/diary_ingest"
+	gamificationmodule "github.com/kundi/kundi/backend/internal/modules/gamification"
 	jobsmodule "github.com/kundi/kundi/backend/internal/modules/jobs"
 	"github.com/kundi/kundi/backend/internal/modules/persona"
 	"github.com/kundi/kundi/backend/internal/modules/profiles"
@@ -51,6 +52,7 @@ type Bootstrap struct {
 	WhatsAppService  *whatsappmodule.Service
 	WhatsAppDispatch *whatsappmodule.DispatchProcessor
 	AuditService     *auditmodule.Service
+	Gamification     *gamificationmodule.Service
 }
 
 func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
@@ -144,6 +146,11 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		resolveWhatsAppProvider(cfg.WhatsApp.Provider, cfg.WhatsApp.BaseURL, cfg.WhatsApp.APIToken),
 	)
 	auditService := auditmodule.NewService(pool)
+	gamificationService, err := gamificationmodule.NewService(pool, cfg.Gamification.Timezone)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
 
 	return &Bootstrap{
 		Config:           cfg,
@@ -162,6 +169,7 @@ func New(ctx context.Context, serviceName string) (*Bootstrap, error) {
 		WhatsAppService:  whatsAppService,
 		WhatsAppDispatch: whatsAppDispatch,
 		AuditService:     auditService,
+		Gamification:     gamificationService,
 	}, nil
 }
 
