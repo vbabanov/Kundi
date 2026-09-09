@@ -724,24 +724,28 @@ class _TransportError extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
+      key: const Key('assistant-transport-error'),
       margin: const EdgeInsets.fromLTRB(14, 4, 14, 6),
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: KundiRadius.sm,
+        color: colors.kundiElevated,
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.45),
+        ),
+        borderRadius: KundiRadius.lg,
       ),
       child: Row(
         children: [
           Icon(
             Icons.info_outline_rounded,
             size: 18,
-            color: colors.onErrorContainer,
+            color: colors.primary,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.onErrorContainer),
+              style: TextStyle(color: colors.onSurface),
             ),
           ),
           if (onRetry != null)

@@ -173,6 +173,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kundi временно не смогла ответить.'), findsOneWidget);
     expect(find.text('Повторить'), findsOneWidget);
+    final transportError = tester.widget<Container>(
+      find.byKey(const Key('assistant-transport-error')),
+    );
+    final decoration = transportError.decoration! as BoxDecoration;
+    expect(
+        decoration.color,
+        isNot(Theme.of(tester.element(find.byType(AssistantPage)))
+            .colorScheme
+            .errorContainer));
+    expect(decoration.border, isNotNull);
 
     await tester.pumpWidget(
       ProviderScope(
